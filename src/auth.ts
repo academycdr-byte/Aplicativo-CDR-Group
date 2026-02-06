@@ -9,6 +9,38 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt" },
+  callbacks: {
+    ...authConfig.callbacks,
+    async jwt({ token, user, trigger, session }) {
+      if (user) {
+        token.sub = user.id;
+
+        // Load user's first organization and role
+        const membership = await prisma.membership.findFirst({
+          where: { userId: user.id },
+          include: { organization: true },
+          orderBy: { createdAt: "asc" },
+        });
+
+        if (membership) {
+          token.organizationId = membership.organizationId;
+          token.role = membership.role;
+        }
+      }
+
+      // Allow updating the token from session update
+      if (trigger === "update" && session) {
+        if (session.organizationId) {
+          token.organizationId = session.organizationId;
+        }
+        if (session.role) {
+          token.role = session.role;
+        }
+      }
+
+      return token;
+    },
+  },
   providers: [
     Credentials({
       name: "credentials",

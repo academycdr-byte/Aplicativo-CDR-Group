@@ -35,11 +35,26 @@ export const authConfig = {
       if (token.sub) {
         session.user.id = token.sub;
       }
+      if (token.organizationId) {
+        session.user.organizationId = token.organizationId as string;
+      }
+      if (token.role) {
+        session.user.role = token.role as string;
+      }
       return session;
     },
-    jwt({ token, user }) {
+    jwt({ token, user, trigger, session }) {
       if (user) {
         token.sub = user.id;
+      }
+      // Allow updating the token from session update
+      if (trigger === "update" && session) {
+        if (session.organizationId) {
+          token.organizationId = session.organizationId;
+        }
+        if (session.role) {
+          token.role = session.role;
+        }
       }
       return token;
     },
