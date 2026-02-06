@@ -13,8 +13,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Link2, Unlink } from "lucide-react";
+import { Link2, Unlink, RefreshCw } from "lucide-react";
 import { getIntegrations, connectApiKeyIntegration, disconnectIntegration } from "@/actions/integrations";
+import { syncPlatform } from "@/actions/sync";
 import { Platform } from "@prisma/client";
 
 type PlatformConfig = {
@@ -107,6 +108,7 @@ export default function IntegrationsPage() {
   const [connectDialog, setConnectDialog] = useState<PlatformConfig | null>(null);
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  const [syncing, setSyncing] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
 
   useEffect(() => {
@@ -125,12 +127,39 @@ export default function IntegrationsPage() {
 
   function openConnect(platform: PlatformConfig) {
     if (platform.authType === "oauth") {
-      setMsg("OAuth ainda nao implementado. Em breve!");
+      const oauthRoutes: Record<string, string> = {
+        SHOPIFY: "/api/integrations/shopify",
+        NUVEMSHOP: "/api/integrations/nuvemshop",
+        FACEBOOK_ADS: "/api/integrations/facebook",
+        GOOGLE_ADS: "/api/integrations/google",
+      };
+      const route = oauthRoutes[platform.platform];
+      if (route) {
+        if (platform.platform === "SHOPIFY") {
+          const shop = prompt("Digite o dominio da sua loja Shopify (ex: minha-loja.myshopify.com):");
+          if (shop) {
+            window.location.href = `${route}?shop=${encodeURIComponent(shop)}`;
+          }
+        } else {
+          window.location.href = route;
+        }
+      }
       return;
     }
     setFormData({});
     setMsg("");
     setConnectDialog(platform);
+  }
+
+  async function handleSync(platform: Platform) {
+    setSyncing(platform);
+    const result = await syncPlatform(platform);
+    if ("error" in result && result.error) {
+      alert(`Erro ao sincronizar: ${result.error}`);
+    } else {
+      loadIntegrations();
+    }
+    setSyncing(null);
   }
 
   async function handleConnect(e: React.FormEvent) {
@@ -212,14 +241,24 @@ export default function IntegrationsPage() {
                   </Badge>
 
                   {isConnected ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDisconnect(platform.platform)}
-                    >
-                      <Unlink className="w-4 h-4 mr-1" />
-                      Desconectar
-                    </Button>
+                    <div className="flex gap-1.5">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleSync(platform.platform)}
+                        disabled={syncing === platform.platform}
+                      >
+                        <RefreshCw className={`w-4 h-4 mr-1 ${syncing === platform.platform ? "animate-spin" : ""}`} />
+                        Sync
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDisconnect(platform.platform)}
+                      >
+                        <Unlink className="w-4 h-4" />
+                      </Button>
+                    </div>
                   ) : (
                     <Button size="sm" onClick={() => openConnect(platform)}>
                       <Link2 className="w-4 h-4 mr-1" />
