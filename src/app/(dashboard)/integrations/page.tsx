@@ -1,102 +1,283 @@
-const platforms = [
+"use client";
+
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Link2, Unlink } from "lucide-react";
+import { getIntegrations, connectApiKeyIntegration, disconnectIntegration } from "@/actions/integrations";
+import { Platform } from "@prisma/client";
+
+type PlatformConfig = {
+  name: string;
+  platform: Platform;
+  description: string;
+  authType: "oauth" | "apikey";
+  color: string;
+  fields: { key: string; label: string; placeholder: string }[];
+};
+
+const platforms: PlatformConfig[] = [
   {
     name: "Shopify",
+    platform: "SHOPIFY",
     description: "Conecte sua loja Shopify para sincronizar pedidos e produtos.",
-    status: "disconnected" as const,
-    authType: "OAuth",
+    authType: "oauth",
     color: "#96BF48",
+    fields: [],
   },
   {
     name: "Nuvemshop",
+    platform: "NUVEMSHOP",
     description: "Conecte sua Nuvemshop para sincronizar pedidos e produtos.",
-    status: "disconnected" as const,
-    authType: "OAuth",
+    authType: "oauth",
     color: "#2B35AF",
+    fields: [],
   },
   {
     name: "Cartpanda",
+    platform: "CARTPANDA",
     description: "Conecte sua Cartpanda usando sua API Key.",
-    status: "disconnected" as const,
-    authType: "API Key",
+    authType: "apikey",
     color: "#FF6B35",
+    fields: [
+      { key: "apiKey", label: "API Key", placeholder: "Cole sua API Key da Cartpanda" },
+      { key: "externalStoreId", label: "Store ID", placeholder: "ID da sua loja" },
+    ],
   },
   {
     name: "Yampi",
+    platform: "YAMPI",
     description: "Conecte sua Yampi usando suas credenciais de API.",
-    status: "disconnected" as const,
-    authType: "API Key",
+    authType: "apikey",
     color: "#7C3AED",
+    fields: [
+      { key: "apiKey", label: "Token", placeholder: "Token de API da Yampi" },
+      { key: "apiSecret", label: "Secret Key", placeholder: "Secret Key da Yampi" },
+      { key: "externalStoreId", label: "Alias da loja", placeholder: "alias-da-sua-loja" },
+    ],
   },
   {
     name: "Facebook Ads",
+    platform: "FACEBOOK_ADS",
     description: "Conecte sua conta de anuncios do Facebook/Meta.",
-    status: "disconnected" as const,
-    authType: "OAuth",
+    authType: "oauth",
     color: "#1877F2",
+    fields: [],
   },
   {
     name: "Google Ads",
+    platform: "GOOGLE_ADS",
     description: "Conecte sua conta do Google Ads.",
-    status: "disconnected" as const,
-    authType: "OAuth",
+    authType: "oauth",
     color: "#4285F4",
+    fields: [],
   },
   {
     name: "Reportana",
+    platform: "REPORTANA",
     description: "Conecte o Reportana usando sua API Key.",
-    status: "disconnected" as const,
-    authType: "API Key",
+    authType: "apikey",
     color: "#E91E63",
+    fields: [
+      { key: "apiKey", label: "API Key", placeholder: "Cole sua API Key do Reportana" },
+    ],
   },
 ];
 
+type IntegrationData = {
+  id: string;
+  platform: Platform;
+  status: string;
+  lastSyncAt: Date | null;
+  syncStatus: string;
+};
+
 export default function IntegrationsPage() {
+  const [integrations, setIntegrations] = useState<IntegrationData[]>([]);
+  const [connectDialog, setConnectDialog] = useState<PlatformConfig | null>(null);
+  const [formData, setFormData] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  useEffect(() => {
+    loadIntegrations();
+  }, []);
+
+  async function loadIntegrations() {
+    const data = await getIntegrations();
+    setIntegrations(data);
+  }
+
+  function getStatus(platform: Platform) {
+    const integration = integrations.find((i) => i.platform === platform);
+    return integration?.status || "DISCONNECTED";
+  }
+
+  function openConnect(platform: PlatformConfig) {
+    if (platform.authType === "oauth") {
+      setMsg("OAuth ainda nao implementado. Em breve!");
+      return;
+    }
+    setFormData({});
+    setMsg("");
+    setConnectDialog(platform);
+  }
+
+  async function handleConnect(e: React.FormEvent) {
+    e.preventDefault();
+    if (!connectDialog) return;
+    setLoading(true);
+    setMsg("");
+
+    const result = await connectApiKeyIntegration({
+      platform: connectDialog.platform,
+      apiKey: formData.apiKey || "",
+      apiSecret: formData.apiSecret,
+      externalStoreId: formData.externalStoreId,
+    });
+
+    if (result.error) {
+      setMsg(result.error);
+    } else {
+      setConnectDialog(null);
+      loadIntegrations();
+    }
+    setLoading(false);
+  }
+
+  async function handleDisconnect(platform: Platform) {
+    if (!confirm("Tem certeza que deseja desconectar esta integracao?")) return;
+    const result = await disconnectIntegration(platform);
+    if (result.error) {
+      alert(result.error);
+    } else {
+      loadIntegrations();
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-bold">Plataformas</h2>
-        <p className="text-[var(--muted-foreground)] text-sm mt-1">
+        <p className="text-muted-foreground text-sm mt-1">
           Conecte suas plataformas para centralizar os dados no dashboard.
         </p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {platforms.map((platform) => (
-          <div
-            key={platform.name}
-            className="bg-[var(--card)] border border-[var(--border)] rounded-xl p-5 flex flex-col"
-          >
-            <div className="flex items-center gap-3 mb-3">
-              <div
-                className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-xs"
-                style={{ backgroundColor: platform.color }}
-              >
-                {platform.name.slice(0, 2).toUpperCase()}
-              </div>
-              <div>
-                <h3 className="font-semibold">{platform.name}</h3>
-                <span className="text-xs text-[var(--muted-foreground)]">
-                  {platform.authType}
-                </span>
-              </div>
-            </div>
+        {platforms.map((platform) => {
+          const status = getStatus(platform.platform);
+          const isConnected = status === "CONNECTED";
 
-            <p className="text-sm text-[var(--muted-foreground)] mb-4 flex-1">
-              {platform.description}
-            </p>
+          return (
+            <Card key={platform.platform} className="flex flex-col">
+              <CardContent className="pt-6 flex flex-col flex-1">
+                <div className="flex items-center gap-3 mb-3">
+                  <div
+                    className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-xs"
+                    style={{ backgroundColor: platform.color }}
+                  >
+                    {platform.name.slice(0, 2).toUpperCase()}
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">{platform.name}</h3>
+                    <span className="text-xs text-muted-foreground">
+                      {platform.authType === "oauth" ? "OAuth" : "API Key"}
+                    </span>
+                  </div>
+                </div>
 
-            <div className="flex items-center justify-between">
-              <span className="inline-flex items-center gap-1.5 text-xs">
-                <span className="w-2 h-2 rounded-full bg-[var(--muted-foreground)]" />
-                Desconectado
-              </span>
-              <button className="px-4 py-2 text-sm font-medium bg-[var(--primary)] text-white rounded-lg hover:bg-[var(--primary-hover)] transition-colors">
-                Conectar
-              </button>
-            </div>
-          </div>
-        ))}
+                <p className="text-sm text-muted-foreground mb-4 flex-1">
+                  {platform.description}
+                </p>
+
+                <div className="flex items-center justify-between">
+                  <Badge variant={isConnected ? "default" : "secondary"} className="gap-1.5">
+                    <span
+                      className={`w-2 h-2 rounded-full ${
+                        isConnected ? "bg-green-400" : "bg-muted-foreground"
+                      }`}
+                    />
+                    {isConnected ? "Conectado" : "Desconectado"}
+                  </Badge>
+
+                  {isConnected ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDisconnect(platform.platform)}
+                    >
+                      <Unlink className="w-4 h-4 mr-1" />
+                      Desconectar
+                    </Button>
+                  ) : (
+                    <Button size="sm" onClick={() => openConnect(platform)}>
+                      <Link2 className="w-4 h-4 mr-1" />
+                      Conectar
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
+
+      {/* Connect Dialog for API Key platforms */}
+      <Dialog open={!!connectDialog} onOpenChange={() => setConnectDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Conectar {connectDialog?.name}</DialogTitle>
+            <DialogDescription>
+              Insira as credenciais da plataforma para conectar.
+            </DialogDescription>
+          </DialogHeader>
+
+          {msg && (
+            <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-lg p-3">
+              {msg}
+            </div>
+          )}
+
+          <form onSubmit={handleConnect} className="space-y-4">
+            {connectDialog?.fields.map((field) => (
+              <div key={field.key} className="space-y-2">
+                <Label>{field.label}</Label>
+                <Input
+                  value={formData[field.key] || ""}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, [field.key]: e.target.value }))
+                  }
+                  placeholder={field.placeholder}
+                  required={field.key === "apiKey"}
+                />
+              </div>
+            ))}
+            <div className="flex justify-end gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setConnectDialog(null)}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={loading}>
+                {loading ? "Conectando..." : "Conectar"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
