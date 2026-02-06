@@ -1,0 +1,237 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── ENUMS ──────────────────────────────────────────
+
+enum UserRole {
+  OWNER
+  ADMIN
+  MEMBER
+  CLIENT
+}
+
+enum Platform {
+  SHOPIFY
+  CARTPANDA
+  YAMPI
+  NUVEMSHOP
+  FACEBOOK_ADS
+  GOOGLE_ADS
+  REPORTANA
+}
+
+enum IntegrationStatus {
+  CONNECTED
+  DISCONNECTED
+  ERROR
+  PENDING
+}
+
+enum SyncStatus {
+  IDLE
+  SYNCING
+  SUCCESS
+  FAILED
+}
+
+// ─── AUTH.JS REQUIRED MODELS ────────────────────────
+
+model User {
+  id             String    @id @default(cuid())
+  name           String?
+  email          String    @unique
+  emailVerified  DateTime?
+  hashedPassword String?
+  image          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  accounts    Account[]
+  sessions    Session[]
+  memberships Membership[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ─── MULTI-TENANCY ─────────────────────────────────
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  logo      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships  Membership[]
+  integrations Integration[]
+  orders       Order[]
+  adMetrics    AdMetric[]
+  syncLogs     SyncLog[]
+
+  @@map("organizations")
+}
+
+model Membership {
+  id             String   @id @default(cuid())
+  role           UserRole @default(CLIENT)
+  userId         String
+  organizationId String
+  createdAt      DateTime @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@map("memberships")
+}
+
+// ─── INTEGRATIONS ──────────────────────────────────
+
+model Integration {
+  id             String            @id @default(cuid())
+  platform       Platform
+  status         IntegrationStatus @default(PENDING)
+  organizationId String
+
+  // Credentials (encrypted at rest)
+  accessToken  String? @db.Text
+  refreshToken String? @db.Text
+  apiKey       String? @db.Text
+  apiSecret    String? @db.Text
+  tokenExpiresAt DateTime?
+
+  // Platform-specific identifiers
+  externalStoreId   String?
+  externalAccountId String?
+
+  // Metadata
+  scopes    String?
+  metadata  Json?
+
+  lastSyncAt DateTime?
+  syncStatus SyncStatus @default(IDLE)
+  errorMessage String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, platform])
+  @@map("integrations")
+}
+
+// ─── SYNCED DATA ───────────────────────────────────
+
+model Order {
+  id              String   @id @default(cuid())
+  organizationId  String
+  platform        Platform
+  externalOrderId String
+  status          String
+  customerName    String?
+  customerEmail   String?
+  totalAmount     Decimal  @db.Decimal(10, 2)
+  currency        String   @default("BRL")
+  itemCount       Int      @default(0)
+  orderDate       DateTime
+  rawData         Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, platform, externalOrderId])
+  @@index([organizationId, orderDate])
+  @@index([organizationId, platform])
+  @@map("orders")
+}
+
+model AdMetric {
+  id             String   @id @default(cuid())
+  organizationId String
+  platform       Platform
+  campaignId     String?
+  campaignName   String?
+  adSetId        String?
+  adSetName      String?
+  date           DateTime @db.Date
+  impressions    Int      @default(0)
+  clicks         Int      @default(0)
+  spend          Decimal  @db.Decimal(10, 2) @default(0)
+  conversions    Int      @default(0)
+  revenue        Decimal  @db.Decimal(10, 2) @default(0)
+  currency       String   @default("BRL")
+  rawData        Json?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, platform, campaignId, date])
+  @@index([organizationId, date])
+  @@index([organizationId, platform])
+  @@map("ad_metrics")
+}
+
+model SyncLog {
+  id             String     @id @default(cuid())
+  organizationId String
+  platform       Platform
+  status         SyncStatus
+  recordsSynced  Int        @default(0)
+  errorMessage   String?    @db.Text
+  startedAt      DateTime   @default(now())
+  completedAt    DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, platform])
+  @@map("sync_logs")
+}

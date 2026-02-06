@@ -1,0 +1,48 @@
+import type { NextAuthConfig } from "next-auth";
+
+export const authConfig = {
+  pages: {
+    signIn: "/login",
+  },
+  callbacks: {
+    authorized({ auth, request: { nextUrl } }) {
+      const isLoggedIn = !!auth?.user;
+      const isOnDashboard =
+        nextUrl.pathname.startsWith("/dashboard") ||
+        nextUrl.pathname.startsWith("/integrations") ||
+        nextUrl.pathname.startsWith("/orders") ||
+        nextUrl.pathname.startsWith("/sales") ||
+        nextUrl.pathname.startsWith("/ads") ||
+        nextUrl.pathname.startsWith("/reports") ||
+        nextUrl.pathname.startsWith("/settings") ||
+        nextUrl.pathname.startsWith("/admin");
+
+      if (isOnDashboard) {
+        if (isLoggedIn) return true;
+        return false; // Redirect to /login
+      } else if (isLoggedIn) {
+        // If logged in and on auth pages, redirect to dashboard
+        if (
+          nextUrl.pathname === "/login" ||
+          nextUrl.pathname === "/register"
+        ) {
+          return Response.redirect(new URL("/dashboard", nextUrl));
+        }
+      }
+      return true;
+    },
+    session({ session, token }) {
+      if (token.sub) {
+        session.user.id = token.sub;
+      }
+      return session;
+    },
+    jwt({ token, user }) {
+      if (user) {
+        token.sub = user.id;
+      }
+      return token;
+    },
+  },
+  providers: [], // configured in auth.ts
+} satisfies NextAuthConfig;
