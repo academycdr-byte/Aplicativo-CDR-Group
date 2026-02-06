@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Download, FileSpreadsheet, FileText } from "lucide-react";
+import { toast } from "sonner";
 import { getOrders } from "@/actions/orders";
 import { getAdMetrics } from "@/actions/ads";
 
@@ -36,6 +37,7 @@ export default function ReportsPage() {
 
       const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
       downloadFile(csv, "pedidos.csv", "text/csv");
+      toast.success("Relatorio de pedidos exportado!");
     } finally {
       setExporting(false);
     }
@@ -61,6 +63,7 @@ export default function ReportsPage() {
 
       const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
       downloadFile(csv, "anuncios.csv", "text/csv");
+      toast.success("Relatorio de anuncios exportado!");
     } finally {
       setExporting(false);
     }

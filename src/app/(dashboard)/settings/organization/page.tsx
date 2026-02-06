@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { UserPlus, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import {
   getOrganization,
   updateOrganization,
@@ -119,8 +120,9 @@ export default function OrganizationPage() {
       role: newRole as "ADMIN" | "MEMBER" | "CLIENT",
     });
     if (result.error) {
-      alert(result.error);
+      toast.error(result.error);
     } else {
+      toast.success("Funcao atualizada!");
       loadData();
     }
   }
@@ -129,8 +131,9 @@ export default function OrganizationPage() {
     if (!confirm("Tem certeza que deseja remover este membro?")) return;
     const result = await removeMember(membershipId);
     if (result.error) {
-      alert(result.error);
+      toast.error(result.error);
     } else {
+      toast.success("Membro removido.");
       loadData();
     }
   }

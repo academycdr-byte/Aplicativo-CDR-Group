@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Link2, Unlink, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 import { getIntegrations, connectApiKeyIntegration, disconnectIntegration } from "@/actions/integrations";
 import { syncPlatform } from "@/actions/sync";
 import { Platform } from "@prisma/client";
@@ -155,8 +156,9 @@ export default function IntegrationsPage() {
     setSyncing(platform);
     const result = await syncPlatform(platform);
     if ("error" in result && result.error) {
-      alert(`Erro ao sincronizar: ${result.error}`);
+      toast.error(`Erro ao sincronizar: ${result.error}`);
     } else {
+      toast.success("Sincronizacao concluida!");
       loadIntegrations();
     }
     setSyncing(null);
@@ -179,6 +181,7 @@ export default function IntegrationsPage() {
       setMsg(result.error);
     } else {
       setConnectDialog(null);
+      toast.success("Plataforma conectada com sucesso!");
       loadIntegrations();
     }
     setLoading(false);
@@ -188,8 +191,9 @@ export default function IntegrationsPage() {
     if (!confirm("Tem certeza que deseja desconectar esta integracao?")) return;
     const result = await disconnectIntegration(platform);
     if (result.error) {
-      alert(result.error);
+      toast.error(result.error);
     } else {
+      toast.success("Plataforma desconectada.");
       loadIntegrations();
     }
   }

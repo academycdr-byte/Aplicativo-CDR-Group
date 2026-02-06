@@ -1,9 +1,36 @@
 import type { Metadata } from "next";
+import { ThemeProvider } from "@/components/theme-provider";
+import { Toaster } from "sonner";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "CDR Group - Painel de Gestão",
-  description: "Centralize seus dados de e-commerce e anúncios em um único lugar",
+  title: {
+    default: "CDR Group - Painel de Gestao",
+    template: "%s | CDR Group",
+  },
+  description:
+    "Centralize seus dados de e-commerce e anuncios em um unico lugar. Conecte Shopify, Nuvemshop, Cartpanda, Yampi, Facebook Ads, Google Ads e Reportana.",
+  keywords: [
+    "e-commerce",
+    "dashboard",
+    "shopify",
+    "nuvemshop",
+    "cartpanda",
+    "yampi",
+    "facebook ads",
+    "google ads",
+    "reportana",
+    "vendas",
+    "anuncios",
+  ],
+  authors: [{ name: "CDR Group" }],
+  openGraph: {
+    title: "CDR Group - Painel de Gestao",
+    description:
+      "Centralize seus dados de e-commerce e anuncios em um unico lugar.",
+    type: "website",
+    locale: "pt_BR",
+  },
 };
 
 export default function RootLayout({
@@ -12,8 +39,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-BR">
-      <body>{children}</body>
+    <html lang="pt-BR" suppressHydrationWarning>
+      <head>
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+      </head>
+      <body>
+        <ThemeProvider>
+          {children}
+          <Toaster richColors position="top-right" />
+        </ThemeProvider>
+      </body>
     </html>
   );
 }

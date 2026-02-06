@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, User, LogOut } from "lucide-react";
+import { User, LogOut } from "lucide-react";
 import { logoutUser } from "@/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -13,6 +13,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { MobileSidebar } from "@/components/layout/mobile-sidebar";
 
 const pageTitles: Record<string, string> = {
   "/dashboard": "Dashboard",
@@ -31,15 +33,14 @@ export function Header() {
   const title = pageTitles[pathname] || "Dashboard";
 
   return (
-    <header className="h-16 border-b bg-card flex items-center justify-between px-6">
-      {/* Mobile menu button */}
-      <Button variant="ghost" size="icon" className="md:hidden">
-        <Menu className="w-5 h-5" />
-      </Button>
-
-      <h1 className="text-lg font-semibold">{title}</h1>
-
+    <header className="h-16 border-b bg-card flex items-center justify-between px-4 md:px-6">
       <div className="flex items-center gap-3">
+        <MobileSidebar />
+        <h1 className="text-lg font-semibold">{title}</h1>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <ThemeToggle />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-8 w-8 rounded-full">

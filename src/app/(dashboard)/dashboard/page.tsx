@@ -24,6 +24,7 @@ import {
   CartesianGrid,
   Tooltip,
 } from "recharts";
+import { toast } from "sonner";
 import { getDashboardData, getRevenueByDay, getOrdersByPlatform, getRecentOrders } from "@/actions/dashboard";
 import { syncAll } from "@/actions/sync";
 
@@ -73,12 +74,14 @@ export default function DashboardPage() {
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [period, setPeriod] = useState("30");
   const [syncing, setSyncing] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadData();
   }, [period]);
 
   async function loadData() {
+    setLoading(true);
     const days = parseInt(period);
     const [s, r, p, o] = await Promise.all([
       getDashboardData(days),
@@ -90,13 +93,20 @@ export default function DashboardPage() {
     setRevenueData(r);
     setPlatformData(p);
     setRecentOrders(o);
+    setLoading(false);
   }
 
   async function handleSync() {
     setSyncing(true);
-    await syncAll();
-    await loadData();
-    setSyncing(false);
+    try {
+      await syncAll();
+      await loadData();
+      toast.success("Dados sincronizados com sucesso!");
+    } catch {
+      toast.error("Erro ao sincronizar dados.");
+    } finally {
+      setSyncing(false);
+    }
   }
 
   function fmt(amount: number) {
@@ -105,6 +115,40 @@ export default function DashboardPage() {
 
   function formatDate(date: Date) {
     return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit" }).format(new Date(date));
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-bold">Dashboard</h2>
+            <p className="text-muted-foreground text-sm mt-1">Carregando dados...</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Card key={i}>
+              <CardContent className="pt-5">
+                <div className="animate-pulse space-y-3">
+                  <div className="h-4 w-24 bg-muted rounded" />
+                  <div className="h-8 w-32 bg-muted rounded" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {[1, 2].map((i) => (
+            <Card key={i}>
+              <CardContent className="pt-6">
+                <div className="animate-pulse h-64 bg-muted rounded" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   return (
