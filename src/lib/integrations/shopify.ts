@@ -145,19 +145,30 @@ export function getShopifyAuthUrl(shop: string, state: string) {
 }
 
 export async function exchangeShopifyToken(shop: string, code: string) {
+  const clientId = process.env.SHOPIFY_CLIENT_ID;
+  const clientSecret = process.env.SHOPIFY_CLIENT_SECRET;
+
+  console.log("[Shopify] Exchanging token for shop:", shop);
+  console.log("[Shopify] Client ID present:", !!clientId, "length:", clientId?.length);
+  console.log("[Shopify] Client Secret present:", !!clientSecret, "length:", clientSecret?.length);
+
   const response = await fetch(`https://${shop}/admin/oauth/access_token`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      client_id: process.env.SHOPIFY_CLIENT_ID,
-      client_secret: process.env.SHOPIFY_CLIENT_SECRET,
+      client_id: clientId,
+      client_secret: clientSecret,
       code,
     }),
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to exchange Shopify token: ${response.status}`);
+    const errorBody = await response.text();
+    console.error("[Shopify] Token exchange failed:", response.status, errorBody);
+    throw new Error(`Failed to exchange Shopify token: ${response.status} - ${errorBody}`);
   }
 
-  return response.json();
+  const data = await response.json();
+  console.log("[Shopify] Token exchange success, scopes:", data.scope);
+  return data;
 }

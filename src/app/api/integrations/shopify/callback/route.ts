@@ -40,7 +40,9 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    console.log("[Shopify Callback] Starting token exchange for shop:", shop, "state:", state);
     const tokenData = await exchangeShopifyToken(shop, code);
+    console.log("[Shopify Callback] Token received, saving integration for org:", organizationId);
 
     await prisma.integration.upsert({
       where: {
@@ -67,7 +69,8 @@ export async function GET(request: NextRequest) {
       new URL("/integrations?success=shopify", request.url)
     );
   } catch (error) {
-    console.error("Shopify OAuth error:", error);
+    console.error("[Shopify Callback] OAuth error:", error instanceof Error ? error.message : error);
+    console.error("[Shopify Callback] Full error:", error);
     return NextResponse.redirect(
       new URL("/integrations?error=shopify_oauth_failed", request.url)
     );
