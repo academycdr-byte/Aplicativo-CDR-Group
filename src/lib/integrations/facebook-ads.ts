@@ -252,7 +252,7 @@ export function getFacebookAuthUrl(state: string) {
   const clientId = process.env.FACEBOOK_APP_ID?.trim();
   if (!clientId) throw new Error("FACEBOOK_APP_ID nao configurado");
 
-  const scopes = "ads_read,ads_management,read_insights";
+  const scopes = "ads_read,ads_management,read_insights,business_management";
 
   return `https://www.facebook.com/${FB_GRAPH_VERSION}/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(FB_REDIRECT_URI)}&scope=${scopes}&state=${state}`;
 }

@@ -23,6 +23,7 @@ export async function getIntegrations() {
     syncStatus: i.syncStatus,
     errorMessage: i.errorMessage,
     createdAt: i.createdAt,
+    metadata: i.metadata as Record<string, unknown> | null,
   }));
 }
 
@@ -169,6 +170,45 @@ export async function disconnectIntegration(platform: Platform) {
   });
 
   return { success: true };
+}
+
+export async function selectFacebookAdAccount(accountId: string) {
+  const ctx = await getSessionWithOrg();
+  if (!ctx) return { error: "Nao autenticado." };
+
+  const integration = await prisma.integration.findUnique({
+    where: {
+      organizationId_platform: {
+        organizationId: ctx.organization.id,
+        platform: "FACEBOOK_ADS",
+      },
+    },
+  });
+
+  if (!integration || !integration.accessToken) {
+    return { error: "Facebook Ads nao conectado. Faca login novamente." };
+  }
+
+  // Validate that the accountId is in the list of available accounts
+  const metadata = integration.metadata as { adAccounts?: { id: string; name: string }[] } | null;
+  const accounts = metadata?.adAccounts || [];
+  const selected = accounts.find((a) => a.id === accountId);
+
+  if (!selected) {
+    return { error: "Conta de anuncio nao encontrada." };
+  }
+
+  // Update integration with selected account
+  await prisma.integration.update({
+    where: { id: integration.id },
+    data: {
+      status: "CONNECTED",
+      externalAccountId: accountId.replace("act_", ""),
+      errorMessage: null,
+    },
+  });
+
+  return { success: true, accountName: selected.name };
 }
 
 export async function getIntegrationCredentials(platform: Platform) {

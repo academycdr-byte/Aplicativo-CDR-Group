@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Link2, Unlink, RefreshCw, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
-import { getIntegrations, connectApiKeyIntegration, connectShopifyDirect, disconnectIntegration } from "@/actions/integrations";
+import { getIntegrations, connectApiKeyIntegration, connectShopifyDirect, disconnectIntegration, selectFacebookAdAccount } from "@/actions/integrations";
 import { syncPlatform } from "@/actions/sync";
 import { Platform } from "@prisma/client";
 
@@ -103,6 +103,13 @@ type IntegrationData = {
   status: string;
   lastSyncAt: Date | null;
   syncStatus: string;
+  metadata?: Record<string, unknown> | null;
+};
+
+type FacebookAdAccount = {
+  id: string;
+  name: string;
+  account_status?: number;
 };
 
 export default function IntegrationsPage() {
@@ -124,6 +131,9 @@ function IntegrationsContent() {
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
+  const [fbAccountDialog, setFbAccountDialog] = useState(false);
+  const [fbAccounts, setFbAccounts] = useState<FacebookAdAccount[]>([]);
+  const [selectedFbAccount, setSelectedFbAccount] = useState<string>("");
   const searchParams = useSearchParams();
 
   useEffect(() => {
@@ -167,6 +177,22 @@ function IntegrationsContent() {
       toast.error("Dominio da loja nao informado");
     } else if (error === "unauthorized") {
       toast.error("Voce nao tem permissao para esta integracao");
+    }
+
+    // Handle Facebook ad account selection after OAuth
+    const selectAccount = searchParams.get("select_account");
+    if (selectAccount === "facebook") {
+      getIntegrations().then((data) => {
+        const fbIntegration = data.find((i) => i.platform === "FACEBOOK_ADS");
+        const accounts = (fbIntegration?.metadata as { adAccounts?: FacebookAdAccount[] })?.adAccounts || [];
+        if (accounts.length > 0) {
+          setFbAccounts(accounts);
+          setSelectedFbAccount(accounts[0]?.id || "");
+          setFbAccountDialog(true);
+        }
+        setIntegrations(data);
+      });
+      toast.info("Selecione a conta de anuncio que deseja conectar.");
     }
   }, [searchParams]);
 
@@ -273,6 +299,30 @@ function IntegrationsContent() {
     setLoading(false);
   }
 
+  async function handleSelectFbAccount() {
+    if (!selectedFbAccount) return;
+    setLoading(true);
+
+    const result = await selectFacebookAdAccount(selectedFbAccount);
+    if (result.error) {
+      toast.error(result.error);
+    } else {
+      setFbAccountDialog(false);
+      toast.success(`Conta "${result.accountName}" conectada! Sincronizando metricas...`);
+      loadIntegrations();
+      // Auto-sync after selection
+      syncPlatform("FACEBOOK_ADS").then((syncResult) => {
+        if ("error" in syncResult && syncResult.error) {
+          toast.error(`Erro ao sincronizar Facebook Ads: ${syncResult.error}`);
+        } else {
+          toast.success("Metricas do Facebook Ads sincronizadas!");
+          loadIntegrations();
+        }
+      });
+    }
+    setLoading(false);
+  }
+
   async function handleDisconnect(platform: Platform) {
     if (!confirm("Tem certeza que deseja desconectar esta integracao?")) return;
     const result = await disconnectIntegration(platform);
@@ -324,10 +374,10 @@ function IntegrationsContent() {
                   <Badge variant={isConnected ? "default" : "secondary"} className="gap-1.5">
                     <span
                       className={`w-2 h-2 rounded-full ${
-                        isConnected ? "bg-green-400" : "bg-muted-foreground"
+                        isConnected ? "bg-green-400" : status === "PENDING" ? "bg-amber-400" : "bg-muted-foreground"
                       }`}
                     />
-                    {isConnected ? "Conectado" : "Desconectado"}
+                    {isConnected ? "Conectado" : status === "PENDING" ? "Pendente" : "Desconectado"}
                   </Badge>
 
                   {isConnected ? (
@@ -349,6 +399,19 @@ function IntegrationsContent() {
                         <Unlink className="w-4 h-4" />
                       </Button>
                     </div>
+                  ) : status === "PENDING" && platform.platform === "FACEBOOK_ADS" ? (
+                    <Button size="sm" variant="outline" onClick={() => {
+                      const fbIntegration = integrations.find((i) => i.platform === "FACEBOOK_ADS");
+                      const accounts = (fbIntegration?.metadata as { adAccounts?: FacebookAdAccount[] })?.adAccounts || [];
+                      if (accounts.length > 0) {
+                        setFbAccounts(accounts);
+                        setSelectedFbAccount(accounts[0]?.id || "");
+                        setFbAccountDialog(true);
+                      }
+                    }}>
+                      <Link2 className="w-4 h-4 mr-1" />
+                      Selecionar Conta
+                    </Button>
                   ) : (
                     <Button size="sm" onClick={() => openConnect(platform)}>
                       <Link2 className="w-4 h-4 mr-1" />
@@ -485,6 +548,61 @@ function IntegrationsContent() {
               </form>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Facebook Ad Account Selection Dialog */}
+      <Dialog open={fbAccountDialog} onOpenChange={setFbAccountDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Selecione a Conta de Anuncio</DialogTitle>
+            <DialogDescription>
+              Escolha qual conta de anuncio do Facebook voce deseja conectar.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            {fbAccounts.map((account) => {
+              const isActive = account.account_status === 1;
+              return (
+                <label
+                  key={account.id}
+                  className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                    selectedFbAccount === account.id
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover:bg-muted/50"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="fb_account"
+                    value={account.id}
+                    checked={selectedFbAccount === account.id}
+                    onChange={() => setSelectedFbAccount(account.id)}
+                    className="accent-primary"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate">{account.name || account.id}</p>
+                    <p className="text-xs text-muted-foreground">{account.id}</p>
+                  </div>
+                  {isActive !== undefined && (
+                    <Badge variant={isActive ? "default" : "secondary"} className="shrink-0 text-xs">
+                      {isActive ? "Ativa" : "Inativa"}
+                    </Badge>
+                  )}
+                </label>
+              );
+            })}
+          </div>
+
+          <div className="flex justify-end gap-3 mt-2">
+            <Button variant="outline" onClick={() => setFbAccountDialog(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSelectFbAccount} disabled={loading || !selectedFbAccount}>
+              {loading ? "Conectando..." : "Conectar Conta"}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 

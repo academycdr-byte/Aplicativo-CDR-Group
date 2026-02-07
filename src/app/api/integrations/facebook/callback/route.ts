@@ -40,8 +40,12 @@ export async function GET(request: NextRequest) {
   try {
     const tokenData = await exchangeFacebookToken(code);
 
-    // Get the first ad account
+    // Fetch all ad accounts the user has access to
     const adAccounts = await getFacebookAdAccounts(tokenData.access_token);
+
+    // Save token and ad accounts list, but set status to PENDING until user selects account
+    // If only 1 account, auto-select it
+    const hasMultipleAccounts = adAccounts.length > 1;
     const firstAccount = adAccounts[0];
 
     await prisma.integration.upsert({
@@ -51,33 +55,54 @@ export async function GET(request: NextRequest) {
       create: {
         organizationId,
         platform: "FACEBOOK_ADS",
-        status: "CONNECTED",
+        status: hasMultipleAccounts ? "PENDING" : "CONNECTED",
         accessToken: encrypt(tokenData.access_token),
-        externalAccountId: firstAccount?.id?.replace("act_", "") || "",
+        externalAccountId: hasMultipleAccounts ? "" : (firstAccount?.id?.replace("act_", "") || ""),
         tokenExpiresAt: tokenData.expires_in
           ? new Date(Date.now() + tokenData.expires_in * 1000)
           : null,
-        metadata: { adAccounts: adAccounts.map((a: { id: string; name: string }) => ({ id: a.id, name: a.name })) },
+        metadata: {
+          adAccounts: adAccounts.map((a: { id: string; name: string; account_status: number }) => ({
+            id: a.id,
+            name: a.name,
+            account_status: a.account_status,
+          })),
+        },
       },
       update: {
-        status: "CONNECTED",
+        status: hasMultipleAccounts ? "PENDING" : "CONNECTED",
         accessToken: encrypt(tokenData.access_token),
-        externalAccountId: firstAccount?.id?.replace("act_", "") || "",
+        externalAccountId: hasMultipleAccounts ? "" : (firstAccount?.id?.replace("act_", "") || ""),
         tokenExpiresAt: tokenData.expires_in
           ? new Date(Date.now() + tokenData.expires_in * 1000)
           : null,
-        metadata: { adAccounts: adAccounts.map((a: { id: string; name: string }) => ({ id: a.id, name: a.name })) },
+        metadata: {
+          adAccounts: adAccounts.map((a: { id: string; name: string; account_status: number }) => ({
+            id: a.id,
+            name: a.name,
+            account_status: a.account_status,
+          })),
+        },
         errorMessage: null,
       },
     });
 
+    if (hasMultipleAccounts) {
+      // Redirect to selection dialog
+      return NextResponse.redirect(
+        new URL("/integrations?select_account=facebook", request.url)
+      );
+    }
+
+    // Single account - auto-connect and sync
     return NextResponse.redirect(
       new URL("/integrations?success=facebook", request.url)
     );
   } catch (error) {
     console.error("Facebook OAuth error:", error);
+    const msg = error instanceof Error ? error.message : "Erro desconhecido";
     return NextResponse.redirect(
-      new URL("/integrations?error=facebook_oauth_failed", request.url)
+      new URL(`/integrations?error=facebook_oauth_failed&detail=${encodeURIComponent(msg)}`, request.url)
     );
   }
 }
