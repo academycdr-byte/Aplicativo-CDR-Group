@@ -12,6 +12,22 @@ export async function registerUser(formData: {
 }) {
   const { name, email, password } = formData;
 
+  // Validação de email
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return { error: "Email inválido." };
+  }
+
+  // Validação de senha
+  if (password.length < 8) {
+    return { error: "A senha deve ter pelo menos 8 caracteres." };
+  }
+
+  // Validação de nome
+  if (!name || name.trim().length < 2) {
+    return { error: "O nome deve ter pelo menos 2 caracteres." };
+  }
+
   // Check if user already exists
   const existingUser = await prisma.user.findUnique({
     where: { email },
@@ -24,32 +40,37 @@ export async function registerUser(formData: {
   // Hash password
   const hashedPassword = await bcrypt.hash(password, 10);
 
-  // Create user
-  const user = await prisma.user.create({
-    data: {
-      name,
-      email,
-      hashedPassword,
-    },
-  });
-
-  // Create a default organization for the user
+  // Criar user, organization e membership em uma transação atômica
   const slug = email.split("@")[0].toLowerCase().replace(/[^a-z0-9]/g, "-");
-  const organization = await prisma.organization.create({
-    data: {
-      name: name ? `${name}'s Organization` : "Minha Organizacao",
-      slug: `${slug}-${user.id.slice(0, 6)}`,
-    },
-  });
 
-  // Add user as OWNER of the organization
-  await prisma.membership.create({
-    data: {
-      userId: user.id,
-      organizationId: organization.id,
-      role: "OWNER",
-    },
-  });
+  try {
+    await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          name: name.trim(),
+          email,
+          hashedPassword,
+        },
+      });
+
+      const organization = await tx.organization.create({
+        data: {
+          name: name ? `${name.trim()}'s Organization` : "Minha Organizacao",
+          slug: `${slug}-${user.id.slice(0, 6)}`,
+        },
+      });
+
+      await tx.membership.create({
+        data: {
+          userId: user.id,
+          organizationId: organization.id,
+          role: "OWNER",
+        },
+      });
+    });
+  } catch {
+    return { error: "Erro ao criar conta. Tente novamente." };
+  }
 
   // Sign in the user
   try {
