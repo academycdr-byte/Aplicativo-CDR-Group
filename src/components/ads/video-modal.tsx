@@ -13,6 +13,7 @@ interface Creative {
     adName: string | null;
     platform: string;
     thumbnailUrl: string | null;
+    videoUrl: string | null;
     impressions: number;
     clicks: number;
     spend: number;
@@ -70,16 +71,26 @@ export function VideoModal({ isOpen, onClose, creative }: VideoModalProps) {
                     {/* Media Column */}
                     <div className="space-y-4">
                         <div className="relative aspect-video w-full bg-black/50 rounded-lg overflow-hidden flex items-center justify-center border border-border/50">
-                            {/* Placeholder for Video Player - Since we store thumbnails, we show thumbnail. 
-                        In a real scenario, we'd need a 'videoUrl' field. 
-                        We'll add a 'View on Meta' button as fallback per requirements.
-                    */}
-                            {creative.thumbnailUrl ? (
+                            {creative.videoUrl ? (
+                                // Video player with controls
+                                <video
+                                    src={creative.videoUrl}
+                                    controls
+                                    autoPlay
+                                    loop
+                                    muted
+                                    className="w-full h-full object-contain"
+                                    poster={creative.thumbnailUrl || undefined}
+                                    playsInline
+                                >
+                                    Seu navegador não suporta reprodução de vídeo.
+                                </video>
+                            ) : creative.thumbnailUrl ? (
                                 <Image
                                     src={creative.thumbnailUrl}
                                     alt={creative.adName || "Creative"}
                                     fill
-                                    className="object-contain" // Use contain to show full ad
+                                    className="object-contain"
                                     unoptimized
                                 />
                             ) : (
@@ -88,6 +99,12 @@ export function VideoModal({ isOpen, onClose, creative }: VideoModalProps) {
                                 </div>
                             )}
                         </div>
+
+                        {creative.videoUrl && (
+                            <p className="text-xs text-muted-foreground text-center">
+                                🎬 Clique no player acima para controlar o video
+                            </p>
+                        )}
 
                         <div className="flex flex-col items-center gap-2">
                             <Button variant="outline" className="gap-2" asChild>

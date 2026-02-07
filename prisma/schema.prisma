@@ -209,6 +209,7 @@ model AdMetric {
   adId           String?
   adName         String?
   thumbnailUrl   String?
+  videoUrl       String?   @db.Text
   date           DateTime @db.Date
   impressions    Int      @default(0)
   reach          Int      @default(0)

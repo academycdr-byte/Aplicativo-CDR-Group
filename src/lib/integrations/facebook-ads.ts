@@ -80,6 +80,69 @@ async function fetchAdThumbnails(
   return thumbnails;
 }
 
+/**
+ * Busca URLs de videos dos criativos dos anuncios.
+ * Retorna um mapa de adId -> videoUrl
+ */
+async function fetchAdVideoUrls(
+  adIds: string[],
+  accessToken: string
+): Promise<Record<string, string>> {
+  const videoUrls: Record<string, string> = {};
+  if (adIds.length === 0) return videoUrls;
+
+  // Batch fetch (max 50 per request)
+  const batches = [];
+  for (let i = 0; i < adIds.length; i += 50) {
+    batches.push(adIds.slice(i, i + 50));
+  }
+
+  for (const batch of batches) {
+    const ids = batch.join(",");
+    try {
+      // Fetch creative with video_id
+      const response = await fetch(
+        `https://graph.facebook.com/${FB_GRAPH_VERSION}/?ids=${ids}&fields=creative{video_id,object_story_spec}&access_token=${accessToken}`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        const videoIds: string[] = [];
+        const adToVideoMap: Record<string, string> = {};
+
+        for (const [adId, adData] of Object.entries(data)) {
+          const creative = (adData as { creative?: { video_id?: string; object_story_spec?: { video_data?: { video_id?: string } } } })?.creative;
+          const videoId = creative?.video_id || creative?.object_story_spec?.video_data?.video_id;
+          if (videoId) {
+            videoIds.push(videoId);
+            adToVideoMap[adId] = videoId;
+          }
+        }
+
+        // Fetch video source URLs
+        if (videoIds.length > 0) {
+          const uniqueVideoIds = [...new Set(videoIds)];
+          const videoResponse = await fetch(
+            `https://graph.facebook.com/${FB_GRAPH_VERSION}/?ids=${uniqueVideoIds.join(",")}&fields=source&access_token=${accessToken}`
+          );
+          if (videoResponse.ok) {
+            const videoData = await videoResponse.json();
+            for (const [adId, videoId] of Object.entries(adToVideoMap)) {
+              const video = videoData[videoId] as { source?: string };
+              if (video?.source) {
+                videoUrls[adId] = video.source;
+              }
+            }
+          }
+        }
+      }
+    } catch {
+      // Continue without video URLs if fetch fails
+    }
+  }
+
+  return videoUrls;
+}
+
 export async function syncFacebookAdsMetrics(organizationId: string) {
   const integration = await prisma.integration.findUnique({
     where: { organizationId_platform: { organizationId, platform: "FACEBOOK_ADS" } },
@@ -154,9 +217,10 @@ export async function syncFacebookAdsMetrics(organizationId: string) {
       nextUrl = nextData.paging?.next;
     }
 
-    // Fetch creative thumbnails for unique ad IDs
+    // Fetch creative thumbnails and video URLs for unique ad IDs
     const uniqueAdIds = [...new Set(allInsights.map((i: { ad_id: string }) => i.ad_id).filter(Boolean))] as string[];
     const thumbnails = await fetchAdThumbnails(uniqueAdIds, accessToken);
+    const videoUrls = await fetchAdVideoUrls(uniqueAdIds, accessToken);
 
     let synced = 0;
 
@@ -199,6 +263,7 @@ export async function syncFacebookAdsMetrics(organizationId: string) {
           adId: insight.ad_id,
           adName: insight.ad_name,
           thumbnailUrl: thumbnails[insight.ad_id] || null,
+          videoUrl: videoUrls[insight.ad_id] || null,
           date: new Date(insight.date_start),
           impressions: parseInt(insight.impressions || "0"),
           reach: parseInt(insight.reach || "0"),
@@ -216,6 +281,7 @@ export async function syncFacebookAdsMetrics(organizationId: string) {
           adSetName: insight.adset_name,
           adName: insight.ad_name,
           thumbnailUrl: thumbnails[insight.ad_id] || null,
+          videoUrl: videoUrls[insight.ad_id] || null,
           impressions: parseInt(insight.impressions || "0"),
           reach: parseInt(insight.reach || "0"),
           clicks: parseInt(insight.clicks || "0"),

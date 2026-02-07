@@ -93,6 +93,7 @@ type Creative = {
   adSetName: string | null;
   platform: string;
   thumbnailUrl: string | null;
+  videoUrl: string | null;
   impressions: number;
   reach: number;
   clicks: number;

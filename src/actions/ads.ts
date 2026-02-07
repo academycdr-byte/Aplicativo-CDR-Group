@@ -238,7 +238,7 @@ export async function getCreativePerformance(params?: FilterParams) {
     where,
     select: {
       adId: true, adName: true, campaignName: true, adSetName: true,
-      platform: true, thumbnailUrl: true, impressions: true, reach: true,
+      platform: true, thumbnailUrl: true, videoUrl: true, impressions: true, reach: true,
       clicks: true, spend: true, conversions: true, revenue: true,
       addToCart: true, initiateCheckout: true,
     },
@@ -253,6 +253,7 @@ export async function getCreativePerformance(params?: FilterParams) {
     adSetName: string | null;
     platform: string;
     thumbnailUrl: string | null;
+    videoUrl: string | null;
     impressions: number;
     reach: number;
     clicks: number;
@@ -273,6 +274,7 @@ export async function getCreativePerformance(params?: FilterParams) {
         adSetName: m.adSetName,
         platform: m.platform,
         thumbnailUrl: m.thumbnailUrl,
+        videoUrl: m.videoUrl,
         impressions: 0,
         reach: 0,
         clicks: 0,
@@ -292,9 +294,12 @@ export async function getCreativePerformance(params?: FilterParams) {
     byAd[key].addToCart += m.addToCart;
     byAd[key].initiateCheckout += m.initiateCheckout;
 
-    // Keep the latest non-null thumbnail
+    // Keep the latest non-null thumbnail and video URL
     if (m.thumbnailUrl && !byAd[key].thumbnailUrl) {
       byAd[key].thumbnailUrl = m.thumbnailUrl;
+    }
+    if (m.videoUrl && !byAd[key].videoUrl) {
+      byAd[key].videoUrl = m.videoUrl;
     }
   }
 
