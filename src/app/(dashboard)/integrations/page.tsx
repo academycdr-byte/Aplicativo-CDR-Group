@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Link2, Unlink, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import { getIntegrations, connectApiKeyIntegration, disconnectIntegration } from "@/actions/integrations";
+import { getIntegrations, connectApiKeyIntegration, connectShopifyIntegration, disconnectIntegration } from "@/actions/integrations";
 import { syncPlatform } from "@/actions/sync";
 import { Platform } from "@prisma/client";
 
@@ -33,9 +33,11 @@ const platforms: PlatformConfig[] = [
     name: "Shopify",
     platform: "SHOPIFY",
     description: "Conecte sua loja Shopify para sincronizar pedidos e produtos.",
-    authType: "oauth",
+    authType: "apikey",
     color: "#96BF48",
-    fields: [],
+    fields: [
+      { key: "shopDomain", label: "Dominio da loja", placeholder: "minha-loja.myshopify.com" },
+    ],
   },
   {
     name: "Nuvemshop",
@@ -170,12 +172,18 @@ export default function IntegrationsPage() {
     setLoading(true);
     setMsg("");
 
-    const result = await connectApiKeyIntegration({
-      platform: connectDialog.platform,
-      apiKey: formData.apiKey || "",
-      apiSecret: formData.apiSecret,
-      externalStoreId: formData.externalStoreId,
-    });
+    let result: { error?: string; success?: boolean };
+
+    if (connectDialog.platform === "SHOPIFY") {
+      result = await connectShopifyIntegration(formData.shopDomain || "");
+    } else {
+      result = await connectApiKeyIntegration({
+        platform: connectDialog.platform,
+        apiKey: formData.apiKey || "",
+        apiSecret: formData.apiSecret,
+        externalStoreId: formData.externalStoreId,
+      });
+    }
 
     if (result.error) {
       setMsg(result.error);
