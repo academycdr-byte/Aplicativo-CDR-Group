@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,12 +13,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Link2, Unlink, RefreshCw, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Link2, Unlink, RefreshCw, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { getIntegrations, connectApiKeyIntegration, connectShopifyDirect, disconnectIntegration } from "@/actions/integrations";
 import { syncPlatform } from "@/actions/sync";
 import { Platform } from "@prisma/client";
-import { useSearchParams } from "next/navigation";
 
 type PlatformConfig = {
   name: string;
@@ -106,14 +105,6 @@ type IntegrationData = {
 };
 
 export default function IntegrationsPage() {
-  return (
-    <Suspense fallback={<div className="text-muted-foreground text-sm p-4">Carregando...</div>}>
-      <IntegrationsContent />
-    </Suspense>
-  );
-}
-
-function IntegrationsContent() {
   const [integrations, setIntegrations] = useState<IntegrationData[]>([]);
   const [connectDialog, setConnectDialog] = useState<PlatformConfig | null>(null);
   const [shopifyDialog, setShopifyDialog] = useState(false);
@@ -123,35 +114,10 @@ function IntegrationsContent() {
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
-  const searchParams = useSearchParams();
 
   useEffect(() => {
     loadIntegrations();
-
-    // Mostrar mensagens de sucesso/erro do OAuth callback
-    const success = searchParams.get("success");
-    const error = searchParams.get("error");
-    const detail = searchParams.get("detail");
-
-    if (success === "shopify") {
-      toast.success("Shopify conectada com sucesso!");
-    } else if (error === "shopify_oauth_failed") {
-      const isAppNotFound = detail?.includes("nao encontrado") || detail?.includes("application_cannot_be_found");
-      if (isAppNotFound) {
-        toast.error("App Shopify nao encontrado. Verifique as credenciais (API Key) no Shopify Partners e nas variaveis de ambiente do Vercel.", { duration: 10000 });
-      } else {
-        toast.error(`Erro ao conectar Shopify${detail ? `: ${detail}` : ""}`, { duration: 8000 });
-      }
-    } else if (error === "shopify_config_error") {
-      toast.error(`Configuracao Shopify incorreta${detail ? `: ${detail}` : ""}. Verifique as variaveis de ambiente no Vercel.`, { duration: 10000 });
-    } else if (error === "shopify_denied") {
-      toast.error(`Shopify negou acesso${detail ? `: ${detail}` : ""}`);
-    } else if (error === "missing_params") {
-      toast.error("Erro no fluxo OAuth: parametros ausentes");
-    } else if (error === "unauthorized") {
-      toast.error("Voce nao tem permissao para esta integracao");
-    }
-  }, [searchParams]);
+  }, []);
 
   async function loadIntegrations() {
     const data = await getIntegrations();
