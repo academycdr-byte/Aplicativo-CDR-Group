@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { ThemeProvider } from "@/components/theme-provider";
+import { SessionProvider } from "next-auth/react";
 import { Toaster } from "sonner";
 import "./globals.css";
 
@@ -44,10 +45,12 @@ export default function RootLayout({
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
       </head>
       <body>
-        <ThemeProvider>
-          {children}
-          <Toaster richColors position="top-right" />
-        </ThemeProvider>
+        <SessionProvider>
+          <ThemeProvider>
+            {children}
+            <Toaster richColors position="top-right" />
+          </ThemeProvider>
+        </SessionProvider>
       </body>
     </html>
   );

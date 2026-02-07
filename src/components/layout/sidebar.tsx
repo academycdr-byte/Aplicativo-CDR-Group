@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
 import {
   LayoutDashboard,
   Link2,
@@ -12,10 +13,11 @@ import {
   BarChart3,
   Settings,
   Shield,
+  FileText,
   type LucideIcon,
 } from "lucide-react";
 
-type NavItem = { name: string; href: string; icon: LucideIcon };
+type NavItem = { name: string; href: string; icon: LucideIcon; adminOnly?: boolean };
 
 const mainNav: NavItem[] = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -23,13 +25,13 @@ const mainNav: NavItem[] = [
   { name: "Vendas", href: "/sales", icon: TrendingUp },
   { name: "Mais Vendidos", href: "/best-sellers", icon: ShoppingBag },
   { name: "Anuncios", href: "/ads", icon: Megaphone },
-  { name: "Relatorios", href: "/reports", icon: BarChart3 },
+  { name: "Relatorios", href: "/reports", icon: FileText, adminOnly: true },
 ];
 
 const settingsNav: NavItem[] = [
   { name: "Integracoes", href: "/integrations", icon: Link2 },
   { name: "Configuracoes", href: "/settings", icon: Settings },
-  { name: "Admin", href: "/admin", icon: Shield },
+  { name: "Admin", href: "/admin", icon: Shield, adminOnly: true },
 ];
 
 function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
@@ -54,6 +56,14 @@ function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { data: session } = useSession();
+
+  const userRole = session?.user?.role;
+  const isAdmin = userRole === "OWNER" || userRole === "ADMIN";
+
+  // Filter nav items based on admin status
+  const filteredMainNav = mainNav.filter(item => !item.adminOnly || isAdmin);
+  const filteredSettingsNav = settingsNav.filter(item => !item.adminOnly || isAdmin);
 
   return (
     <aside className="hidden md:flex md:w-60 md:flex-col bg-sidebar-bg text-sidebar-text min-h-screen border-r border-white/5">
@@ -80,7 +90,7 @@ export function Sidebar() {
           <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-sidebar-text/30">
             Painel
           </p>
-          {mainNav.map((item) => (
+          {filteredMainNav.map((item) => (
             <NavLink key={item.href} item={item} pathname={pathname} />
           ))}
         </div>
@@ -89,7 +99,7 @@ export function Sidebar() {
           <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-sidebar-text/30">
             Gestao
           </p>
-          {settingsNav.map((item) => (
+          {filteredSettingsNav.map((item) => (
             <NavLink key={item.href} item={item} pathname={pathname} />
           ))}
         </div>

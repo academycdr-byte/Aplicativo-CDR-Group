@@ -85,9 +85,10 @@ import {
   deleteReportSchedule,
   getReportLogs,
   getMetricsForReport,
-  buildReportMessage,
   createReportLog,
 } from "@/actions/reports";
+import { buildReportMessage } from "@/lib/report-message";
+
 
 // ─── TYPES ─────────────────────────────────────────
 
@@ -513,8 +514,8 @@ function CreateReportTab({ clients, onRefresh }: { clients: Client[]; onRefresh:
                 <label
                   key={m.key}
                   className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${metrics[m.key as keyof typeof metrics]
-                      ? "border-primary bg-primary/10"
-                      : "border-border hover:border-primary/50"
+                    ? "border-primary bg-primary/10"
+                    : "border-border hover:border-primary/50"
                     }`}
                 >
                   <Checkbox
@@ -550,8 +551,8 @@ function CreateReportTab({ clients, onRefresh }: { clients: Client[]; onRefresh:
                 <label
                   key={m.key}
                   className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${funnel[m.key as keyof typeof funnel]
-                      ? "border-primary bg-primary/10"
-                      : "border-border hover:border-primary/50"
+                    ? "border-primary bg-primary/10"
+                    : "border-border hover:border-primary/50"
                     }`}
                 >
                   <Checkbox
