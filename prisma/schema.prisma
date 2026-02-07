@@ -109,11 +109,12 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  memberships  Membership[]
-  integrations Integration[]
-  orders       Order[]
-  adMetrics    AdMetric[]
-  syncLogs     SyncLog[]
+  memberships     Membership[]
+  integrations    Integration[]
+  orders          Order[]
+  adMetrics       AdMetric[]
+  syncLogs        SyncLog[]
+  reportanaEvents ReportanaEvent[]
 
   @@map("organizations")
 }
@@ -234,4 +235,29 @@ model SyncLog {
 
   @@index([organizationId, platform])
   @@map("sync_logs")
+}
+
+// ─── REPORTANA WEBHOOK DATA ───────────────────────
+
+model ReportanaEvent {
+  id             String   @id @default(cuid())
+  organizationId String
+  eventType      String   // "abandoned_checkout" or "checkout_recovered"
+  referenceId    String
+  customerName   String?
+  customerEmail  String?
+  customerPhone  String?
+  totalPrice     Decimal  @db.Decimal(10, 2)
+  currency       String   @default("BRL")
+  lineItems      Json?
+  rawData        Json?
+  eventDate      DateTime
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, eventType, referenceId])
+  @@index([organizationId, eventType])
+  @@index([organizationId, eventDate])
+  @@map("reportana_events")
 }
