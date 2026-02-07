@@ -3,6 +3,41 @@ import { encrypt, decrypt } from "@/lib/encryption";
 
 const FB_GRAPH_VERSION = "v19.0";
 
+async function refreshFacebookToken(integrationId: string): Promise<string> {
+  const integration = await prisma.integration.findUnique({
+    where: { id: integrationId },
+  });
+
+  if (!integration?.accessToken) {
+    throw new Error("No access token available for refresh");
+  }
+
+  const currentToken = decrypt(integration.accessToken);
+
+  const response = await fetch(
+    `https://graph.facebook.com/${FB_GRAPH_VERSION}/oauth/access_token?grant_type=fb_exchange_token&client_id=${process.env.FACEBOOK_APP_ID}&client_secret=${process.env.FACEBOOK_APP_SECRET}&fb_exchange_token=${currentToken}`
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to refresh Facebook token");
+  }
+
+  const data = await response.json();
+  const newAccessToken = data.access_token;
+
+  await prisma.integration.update({
+    where: { id: integrationId },
+    data: {
+      accessToken: encrypt(newAccessToken),
+      tokenExpiresAt: data.expires_in
+        ? new Date(Date.now() + data.expires_in * 1000)
+        : null,
+    },
+  });
+
+  return newAccessToken;
+}
+
 export async function syncFacebookAdsMetrics(organizationId: string) {
   const integration = await prisma.integration.findUnique({
     where: { organizationId_platform: { organizationId, platform: "FACEBOOK_ADS" } },
@@ -22,7 +57,20 @@ export async function syncFacebookAdsMetrics(organizationId: string) {
   });
 
   try {
-    const accessToken = decrypt(integration.accessToken);
+    let accessToken = decrypt(integration.accessToken);
+
+    // Refresh token if expired or about to expire (within 1 day)
+    if (
+      integration.tokenExpiresAt &&
+      integration.tokenExpiresAt < new Date(Date.now() + 24 * 60 * 60 * 1000)
+    ) {
+      try {
+        accessToken = await refreshFacebookToken(integration.id);
+      } catch {
+        // Continue with current token if refresh fails
+      }
+    }
+
     const adAccountId = integration.externalAccountId || "";
 
     // Fetch insights for the last 30 days

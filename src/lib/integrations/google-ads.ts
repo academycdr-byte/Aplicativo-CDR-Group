@@ -156,8 +156,8 @@ async function refreshGoogleToken(integrationId: string): Promise<string> {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      client_id: process.env.GOOGLE_CLIENT_ID || "",
-      client_secret: process.env.GOOGLE_CLIENT_SECRET || "",
+      client_id: process.env.GOOGLE_ADS_CLIENT_ID || "",
+      client_secret: process.env.GOOGLE_ADS_CLIENT_SECRET || "",
       refresh_token: refreshToken,
       grant_type: "refresh_token",
     }),
@@ -182,7 +182,7 @@ async function refreshGoogleToken(integrationId: string): Promise<string> {
 }
 
 export function getGoogleAuthUrl(state: string) {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientId = process.env.GOOGLE_ADS_CLIENT_ID;
   const redirectUri = `${process.env.AUTH_URL}/api/integrations/google/callback`;
   const scopes = "https://www.googleapis.com/auth/adwords";
 
@@ -196,8 +196,8 @@ export async function exchangeGoogleToken(code: string) {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      client_id: process.env.GOOGLE_CLIENT_ID || "",
-      client_secret: process.env.GOOGLE_CLIENT_SECRET || "",
+      client_id: process.env.GOOGLE_ADS_CLIENT_ID || "",
+      client_secret: process.env.GOOGLE_ADS_CLIENT_SECRET || "",
       code,
       grant_type: "authorization_code",
       redirect_uri: redirectUri,

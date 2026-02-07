@@ -15,15 +15,18 @@ export async function POST(req: NextRequest) {
 
     // Verify webhook signature
     const secret = process.env.SHOPIFY_CLIENT_SECRET;
-    if (secret) {
-      const hash = crypto
-        .createHmac("sha256", secret)
-        .update(body, "utf8")
-        .digest("base64");
+    if (!secret) {
+      console.error("SHOPIFY_CLIENT_SECRET not configured");
+      return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
+    }
 
-      if (hash !== hmac) {
-        return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
-      }
+    const hash = crypto
+      .createHmac("sha256", secret)
+      .update(body, "utf8")
+      .digest("base64");
+
+    if (hash !== hmac) {
+      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     }
 
     const data = JSON.parse(body);

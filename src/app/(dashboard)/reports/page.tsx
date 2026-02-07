@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -10,14 +11,39 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Download, FileSpreadsheet, FileText } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, BarChart3, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { getOrders } from "@/actions/orders";
 import { getAdMetrics } from "@/actions/ads";
+import { getReportanaData } from "@/actions/reportana";
+
+type ReportanaReport = {
+  id: string;
+  name: string;
+  type: string;
+  createdAt: string;
+};
 
 export default function ReportsPage() {
   const [exporting, setExporting] = useState(false);
   const [period, setPeriod] = useState("30");
+  const [reportanaReports, setReportanaReports] = useState<ReportanaReport[]>([]);
+  const [reportanaConnected, setReportanaConnected] = useState(false);
+  const [loadingReportana, setLoadingReportana] = useState(false);
+
+  useEffect(() => {
+    loadReportana();
+  }, []);
+
+  async function loadReportana() {
+    setLoadingReportana(true);
+    const result = await getReportanaData();
+    if (result && !result.error) {
+      setReportanaConnected(true);
+      setReportanaReports(result.reports || []);
+    }
+    setLoadingReportana(false);
+  }
 
   async function exportOrdersCSV() {
     setExporting(true);
@@ -130,7 +156,7 @@ export default function ReportsPage() {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground mb-4">
-              Exporta metricas de anuncios (Facebook Ads e Google Ads) dos ultimos {period} dias. Inclui gastos, cliques, conversoes e ROAS.
+              Exporta metricas de anuncios (Facebook Ads, Google Ads e Reportana) dos ultimos {period} dias. Inclui gastos, cliques, conversoes e ROAS.
             </p>
             <Button onClick={exportAdsCSV} disabled={exporting} className="w-full">
               <Download className="w-4 h-4 mr-2" />
@@ -143,16 +169,56 @@ export default function ReportsPage() {
       {/* Reportana Section */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Reportana</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <BarChart3 className="w-5 h-5" />
+              Reportana
+            </CardTitle>
+            {reportanaConnected && (
+              <Button variant="outline" size="sm" onClick={loadReportana} disabled={loadingReportana}>
+                <RefreshCw className={`w-4 h-4 mr-1 ${loadingReportana ? "animate-spin" : ""}`} />
+                Atualizar
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="h-32 flex items-center justify-center text-muted-foreground text-sm">
-            Conecte o Reportana nas{" "}
-            <a href="/integrations" className="text-primary mx-1 hover:underline">
-              Integracoes
-            </a>{" "}
-            para importar relatorios automaticamente.
-          </div>
+          {loadingReportana ? (
+            <div className="h-32 flex items-center justify-center">
+              <div className="animate-pulse space-y-3 w-full">
+                <div className="h-4 w-48 bg-muted rounded" />
+                <div className="h-4 w-64 bg-muted rounded" />
+              </div>
+            </div>
+          ) : reportanaConnected ? (
+            reportanaReports.length > 0 ? (
+              <div className="space-y-3">
+                {reportanaReports.map((report) => (
+                  <div key={report.id} className="flex items-center justify-between py-2 border-b last:border-0">
+                    <div>
+                      <p className="text-sm font-medium">{report.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {report.type} &middot; {report.createdAt ? new Date(report.createdAt).toLocaleDateString("pt-BR") : ""}
+                      </p>
+                    </div>
+                    <Badge variant="outline">Reportana</Badge>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="h-32 flex items-center justify-center text-muted-foreground text-sm">
+                Reportana conectado. Os dados de metricas sao sincronizados automaticamente no dashboard de Anuncios.
+              </div>
+            )
+          ) : (
+            <div className="h-32 flex items-center justify-center text-muted-foreground text-sm">
+              Conecte o Reportana nas{" "}
+              <a href="/integrations" className="text-primary mx-1 hover:underline">
+                Integracoes
+              </a>{" "}
+              para importar relatorios automaticamente.
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

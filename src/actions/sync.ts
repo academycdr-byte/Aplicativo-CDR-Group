@@ -8,6 +8,7 @@ import { syncYampiOrders } from "@/lib/integrations/yampi";
 import { syncNuvemshopOrders } from "@/lib/integrations/nuvemshop";
 import { syncFacebookAdsMetrics } from "@/lib/integrations/facebook-ads";
 import { syncGoogleAdsMetrics } from "@/lib/integrations/google-ads";
+import { syncReportanaMetrics } from "@/lib/integrations/reportana";
 
 export async function syncAll() {
   const ctx = await getSessionWithOrg();
@@ -36,6 +37,8 @@ export async function syncPlatform(platform: string) {
       return syncFacebookAdsMetrics(orgId);
     case "GOOGLE_ADS":
       return syncGoogleAdsMetrics(orgId);
+    case "REPORTANA":
+      return syncReportanaMetrics(orgId);
     default:
       return { error: `Unknown platform: ${platform}` };
   }

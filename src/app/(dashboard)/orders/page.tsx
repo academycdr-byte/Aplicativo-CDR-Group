@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -19,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, ShoppingBag } from "lucide-react";
+import { ChevronLeft, ChevronRight, ShoppingBag, Search, X } from "lucide-react";
 import { getOrders } from "@/actions/orders";
 
 type Order = {
@@ -56,15 +57,24 @@ export default function OrdersPage() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [platformFilter, setPlatformFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const limit = 25;
 
   useEffect(() => {
     loadOrders();
-  }, [page, platformFilter]);
+  }, [page, platformFilter, statusFilter, search, dateFrom, dateTo]);
 
   async function loadOrders() {
     const data = await getOrders({
       platform: platformFilter === "all" ? undefined : platformFilter,
+      status: statusFilter === "all" ? undefined : statusFilter,
+      search: search || undefined,
+      dateFrom: dateFrom || undefined,
+      dateTo: dateTo || undefined,
       page,
       limit,
     });
@@ -72,6 +82,23 @@ export default function OrdersPage() {
     setTotal(data.total);
   }
 
+  function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    setSearch(searchInput);
+    setPage(1);
+  }
+
+  function clearFilters() {
+    setPlatformFilter("all");
+    setStatusFilter("all");
+    setSearch("");
+    setSearchInput("");
+    setDateFrom("");
+    setDateTo("");
+    setPage(1);
+  }
+
+  const hasFilters = platformFilter !== "all" || statusFilter !== "all" || search || dateFrom || dateTo;
   const totalPages = Math.ceil(total / limit);
 
   function formatCurrency(amount: number, currency: string) {
@@ -91,17 +118,33 @@ export default function OrdersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold">Pedidos</h2>
-          <p className="text-muted-foreground text-sm mt-1">
-            {total} pedido{total !== 1 ? "s" : ""} de todas as plataformas conectadas.
-          </p>
-        </div>
+      <div>
+        <h2 className="text-xl font-bold">Pedidos</h2>
+        <p className="text-muted-foreground text-sm mt-1">
+          {total} pedido{total !== 1 ? "s" : ""} de todas as plataformas conectadas.
+        </p>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3 items-end">
+        <form onSubmit={handleSearch} className="flex gap-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Buscar por cliente ou pedido..."
+              className="pl-9 w-[250px]"
+            />
+          </div>
+          <Button type="submit" variant="outline" size="icon">
+            <Search className="w-4 h-4" />
+          </Button>
+        </form>
 
         <Select value={platformFilter} onValueChange={(val) => { setPlatformFilter(val); setPage(1); }}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Todas plataformas" />
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="Plataforma" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas plataformas</SelectItem>
@@ -111,6 +154,41 @@ export default function OrdersPage() {
             <SelectItem value="NUVEMSHOP">Nuvemshop</SelectItem>
           </SelectContent>
         </Select>
+
+        <Select value={statusFilter} onValueChange={(val) => { setStatusFilter(val); setPage(1); }}>
+          <SelectTrigger className="w-[140px]">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos status</SelectItem>
+            <SelectItem value="paid">Pago</SelectItem>
+            <SelectItem value="pending">Pendente</SelectItem>
+            <SelectItem value="cancelled">Cancelado</SelectItem>
+            <SelectItem value="refunded">Reembolsado</SelectItem>
+            <SelectItem value="shipped">Enviado</SelectItem>
+            <SelectItem value="delivered">Entregue</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Input
+          type="date"
+          value={dateFrom}
+          onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
+          className="w-[150px]"
+        />
+        <Input
+          type="date"
+          value={dateTo}
+          onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
+          className="w-[150px]"
+        />
+
+        {hasFilters && (
+          <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1">
+            <X className="w-4 h-4" />
+            Limpar
+          </Button>
+        )}
       </div>
 
       <Card>
@@ -118,7 +196,9 @@ export default function OrdersPage() {
           <div className="px-6 py-16 text-center">
             <ShoppingBag className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <p className="text-muted-foreground text-sm">
-              Nenhum pedido encontrado. Conecte suas plataformas para sincronizar pedidos.
+              {hasFilters
+                ? "Nenhum pedido encontrado com os filtros aplicados."
+                : "Nenhum pedido encontrado. Conecte suas plataformas para sincronizar pedidos."}
             </p>
           </div>
         ) : (

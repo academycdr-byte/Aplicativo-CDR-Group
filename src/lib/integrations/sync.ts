@@ -4,6 +4,7 @@ import { syncYampiOrders } from "./yampi";
 import { syncNuvemshopOrders } from "./nuvemshop";
 import { syncFacebookAdsMetrics } from "./facebook-ads";
 import { syncGoogleAdsMetrics } from "./google-ads";
+import { syncReportanaMetrics } from "./reportana";
 
 type SyncResult = {
   platform: string;
@@ -11,6 +12,26 @@ type SyncResult = {
   synced?: number;
   error?: string;
 };
+
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 2,
+  baseDelay: number = 1000
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      if (attempt < maxRetries) {
+        const delay = baseDelay * Math.pow(2, attempt);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+  }
+  throw lastError;
+}
 
 export async function syncAllPlatforms(organizationId: string): Promise<SyncResult[]> {
   const results: SyncResult[] = [];
@@ -22,9 +43,12 @@ export async function syncAllPlatforms(organizationId: string): Promise<SyncResu
     { platform: "NUVEMSHOP", fn: () => syncNuvemshopOrders(organizationId) },
     { platform: "FACEBOOK_ADS", fn: () => syncFacebookAdsMetrics(organizationId) },
     { platform: "GOOGLE_ADS", fn: () => syncGoogleAdsMetrics(organizationId) },
+    { platform: "REPORTANA", fn: () => syncReportanaMetrics(organizationId) },
   ];
 
-  const settled = await Promise.allSettled(syncTasks.map((t) => t.fn()));
+  const settled = await Promise.allSettled(
+    syncTasks.map((t) => withRetry(t.fn))
+  );
 
   for (let i = 0; i < syncTasks.length; i++) {
     const task = syncTasks[i];
@@ -33,7 +57,6 @@ export async function syncAllPlatforms(organizationId: string): Promise<SyncResu
     if (result.status === "fulfilled") {
       const value = result.value;
       if ("error" in value && value.error) {
-        // Not connected or failed - skip silently if "not connected"
         if (!value.error.includes("not connected")) {
           results.push({ platform: task.platform, success: false, error: value.error });
         }

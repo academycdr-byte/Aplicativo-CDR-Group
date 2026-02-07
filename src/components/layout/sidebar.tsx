@@ -10,6 +10,7 @@ import {
   Megaphone,
   BarChart3,
   Settings,
+  Shield,
   type LucideIcon,
 } from "lucide-react";
 
@@ -23,6 +24,7 @@ const navigation: { name: string; href: string; icon: LucideIcon }[] = [
 ];
 
 const bottomNavigation: { name: string; href: string; icon: LucideIcon }[] = [
+  { name: "Admin", href: "/admin", icon: Shield },
   { name: "Configuracoes", href: "/settings", icon: Settings },
 ];
 

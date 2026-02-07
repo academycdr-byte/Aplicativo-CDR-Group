@@ -5,57 +5,77 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getProfile, updateProfile, updatePassword } from "@/actions/profile";
+import { toast } from "sonner";
+import { getProfile, updateProfile, changePassword } from "@/actions/auth";
 
 export default function ProfilePage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [profileMsg, setProfileMsg] = useState("");
+  const [profileLoading, setProfileLoading] = useState(false);
+
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
-  const [profileMsg, setProfileMsg] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordMsg, setPasswordMsg] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [loadingPwd, setLoadingPwd] = useState(false);
+  const [passwordLoading, setPasswordLoading] = useState(false);
 
   useEffect(() => {
-    getProfile().then((user) => {
-      if (user) {
-        setName(user.name || "");
-        setEmail(user.email);
-      }
-    });
+    loadProfile();
   }, []);
+
+  async function loadProfile() {
+    const profile = await getProfile();
+    if (profile) {
+      setName(profile.name || "");
+      setEmail(profile.email);
+    }
+  }
 
   async function handleProfileSubmit(e: React.FormEvent) {
     e.preventDefault();
     setProfileMsg("");
-    setLoading(true);
+    setProfileLoading(true);
+
     const result = await updateProfile({ name, email });
     if (result.error) {
       setProfileMsg(result.error);
     } else {
-      setProfileMsg("Perfil atualizado com sucesso!");
+      toast.success("Perfil atualizado com sucesso!");
     }
-    setLoading(false);
+    setProfileLoading(false);
   }
 
   async function handlePasswordSubmit(e: React.FormEvent) {
     e.preventDefault();
     setPasswordMsg("");
+
+    if (newPassword !== confirmPassword) {
+      setPasswordMsg("As senhas nao coincidem.");
+      return;
+    }
+
     if (newPassword.length < 6) {
       setPasswordMsg("A nova senha deve ter pelo menos 6 caracteres.");
       return;
     }
-    setLoadingPwd(true);
-    const result = await updatePassword({ currentPassword, newPassword });
+
+    setPasswordLoading(true);
+
+    const result = await changePassword({
+      currentPassword,
+      newPassword,
+    });
+
     if (result.error) {
       setPasswordMsg(result.error);
     } else {
-      setPasswordMsg("Senha atualizada com sucesso!");
+      toast.success("Senha alterada com sucesso!");
       setCurrentPassword("");
       setNewPassword("");
+      setConfirmPassword("");
     }
-    setLoadingPwd(false);
+    setPasswordLoading(false);
   }
 
   return (
@@ -63,7 +83,7 @@ export default function ProfilePage() {
       <div>
         <h2 className="text-xl font-bold">Meu Perfil</h2>
         <p className="text-muted-foreground text-sm mt-1">
-          Gerencie suas informacoes pessoais.
+          Gerencie suas informacoes pessoais e senha.
         </p>
       </div>
 
@@ -74,7 +94,7 @@ export default function ProfilePage() {
         </CardHeader>
         <CardContent>
           {profileMsg && (
-            <div className={`text-sm rounded-lg p-3 mb-4 ${profileMsg.includes("sucesso") ? "bg-green-500/10 border border-green-500/20 text-green-700" : "bg-destructive/10 border border-destructive/20 text-destructive"}`}>
+            <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-lg p-3 mb-4">
               {profileMsg}
             </div>
           )}
@@ -86,6 +106,9 @@ export default function ProfilePage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Seu nome"
+                required
+                minLength={2}
+                maxLength={100}
               />
             </div>
             <div className="space-y-2">
@@ -96,10 +119,12 @@ export default function ProfilePage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="seu@email.com"
+                required
+                maxLength={255}
               />
             </div>
-            <Button type="submit" disabled={loading}>
-              {loading ? "Salvando..." : "Salvar alteracoes"}
+            <Button type="submit" disabled={profileLoading}>
+              {profileLoading ? "Salvando..." : "Salvar"}
             </Button>
           </form>
         </CardContent>
@@ -108,11 +133,13 @@ export default function ProfilePage() {
       <Card>
         <CardHeader>
           <CardTitle>Alterar senha</CardTitle>
-          <CardDescription>Atualize sua senha de acesso.</CardDescription>
+          <CardDescription>
+            Para sua seguranca, informe a senha atual antes de definir uma nova.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {passwordMsg && (
-            <div className={`text-sm rounded-lg p-3 mb-4 ${passwordMsg.includes("sucesso") ? "bg-green-500/10 border border-green-500/20 text-green-700" : "bg-destructive/10 border border-destructive/20 text-destructive"}`}>
+            <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-lg p-3 mb-4">
               {passwordMsg}
             </div>
           )}
@@ -124,6 +151,7 @@ export default function ProfilePage() {
                 type="password"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="Sua senha atual"
                 required
               />
             </div>
@@ -134,13 +162,27 @@ export default function ProfilePage() {
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Minimo 6 caracteres"
                 required
                 minLength={6}
-                placeholder="Minimo 6 caracteres"
+                maxLength={128}
               />
             </div>
-            <Button type="submit" disabled={loadingPwd}>
-              {loadingPwd ? "Alterando..." : "Alterar senha"}
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Confirmar nova senha</Label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Repita a nova senha"
+                required
+                minLength={6}
+                maxLength={128}
+              />
+            </div>
+            <Button type="submit" disabled={passwordLoading}>
+              {passwordLoading ? "Alterando..." : "Alterar senha"}
             </Button>
           </form>
         </CardContent>

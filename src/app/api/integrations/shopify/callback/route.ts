@@ -2,9 +2,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { encrypt } from "@/lib/encryption";
 import { exchangeShopifyToken } from "@/lib/integrations/shopify";
+import { auth } from "@/auth";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 // GET /api/integrations/shopify/callback?code=xxx&shop=xxx&state=xxx
 export async function GET(request: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
+
+  const ip = request.headers.get("x-forwarded-for") || "unknown";
+  const rl = checkRateLimit(`oauth-callback:${ip}`, 10, 60_000);
+  if (!rl.allowed) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   const code = request.nextUrl.searchParams.get("code");
   const shop = request.nextUrl.searchParams.get("shop");
   const state = request.nextUrl.searchParams.get("state");
@@ -16,6 +29,15 @@ export async function GET(request: NextRequest) {
   }
 
   const organizationId = state.split(":")[0];
+
+  const membership = await prisma.membership.findFirst({
+    where: { userId: session.user.id, organizationId },
+  });
+  if (!membership) {
+    return NextResponse.redirect(
+      new URL("/integrations?error=unauthorized", request.url)
+    );
+  }
 
   try {
     const tokenData = await exchangeShopifyToken(shop, code);

@@ -19,7 +19,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { DollarSign, Eye, MousePointer, TrendingUp } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { DollarSign, Eye, MousePointer, TrendingUp, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   ResponsiveContainer,
   LineChart,
@@ -72,6 +73,8 @@ export default function AdsPage() {
   const [dayData, setDayData] = useState<DayMetric[]>([]);
   const [platformFilter, setPlatformFilter] = useState("all");
   const [days, setDays] = useState("30");
+  const [metricsPage, setMetricsPage] = useState(1);
+  const metricsPerPage = 20;
 
   useEffect(() => {
     loadData();
@@ -224,51 +227,86 @@ export default function AdsPage() {
         </CardContent>
       </Card>
 
-      {/* Campaigns Table */}
-      {metrics.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Campanhas</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Campanha</TableHead>
-                  <TableHead>Plataforma</TableHead>
-                  <TableHead className="text-right">Impressoes</TableHead>
-                  <TableHead className="text-right">Cliques</TableHead>
-                  <TableHead className="text-right">Gasto</TableHead>
-                  <TableHead className="text-right">Conv.</TableHead>
-                  <TableHead className="text-right">ROAS</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {metrics.slice(0, 20).map((m) => (
-                  <TableRow key={m.id}>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium text-sm">{m.campaignName || "-"}</p>
-                        {m.adSetName && <p className="text-xs text-muted-foreground">{m.adSetName}</p>}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{platformLabels[m.platform] || m.platform}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right">{fmtNum(m.impressions)}</TableCell>
-                    <TableCell className="text-right">{fmtNum(m.clicks)}</TableCell>
-                    <TableCell className="text-right">{fmt(m.spend)}</TableCell>
-                    <TableCell className="text-right">{m.conversions}</TableCell>
-                    <TableCell className="text-right">
-                      {m.spend > 0 ? (m.revenue / m.spend).toFixed(1) + "x" : "-"}
-                    </TableCell>
+      {/* Campaigns Table with Pagination */}
+      {metrics.length > 0 && (() => {
+        const totalMetricsPages = Math.ceil(metrics.length / metricsPerPage);
+        const paginatedMetrics = metrics.slice(
+          (metricsPage - 1) * metricsPerPage,
+          metricsPage * metricsPerPage
+        );
+
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">
+                Campanhas ({metrics.length} resultado{metrics.length !== 1 ? "s" : ""})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Campanha</TableHead>
+                    <TableHead>Plataforma</TableHead>
+                    <TableHead className="text-right">Impressoes</TableHead>
+                    <TableHead className="text-right">Cliques</TableHead>
+                    <TableHead className="text-right">Gasto</TableHead>
+                    <TableHead className="text-right">Conv.</TableHead>
+                    <TableHead className="text-right">ROAS</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
+                </TableHeader>
+                <TableBody>
+                  {paginatedMetrics.map((m) => (
+                    <TableRow key={m.id}>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium text-sm">{m.campaignName || "-"}</p>
+                          {m.adSetName && <p className="text-xs text-muted-foreground">{m.adSetName}</p>}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{platformLabels[m.platform] || m.platform}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right">{fmtNum(m.impressions)}</TableCell>
+                      <TableCell className="text-right">{fmtNum(m.clicks)}</TableCell>
+                      <TableCell className="text-right">{fmt(m.spend)}</TableCell>
+                      <TableCell className="text-right">{m.conversions}</TableCell>
+                      <TableCell className="text-right">
+                        {m.spend > 0 ? (m.revenue / m.spend).toFixed(1) + "x" : "-"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {totalMetricsPages > 1 && (
+                <div className="flex items-center justify-between px-6 py-4 border-t">
+                  <p className="text-sm text-muted-foreground">
+                    Pagina {metricsPage} de {totalMetricsPages}
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={metricsPage === 1}
+                      onClick={() => setMetricsPage(metricsPage - 1)}
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={metricsPage === totalMetricsPages}
+                      onClick={() => setMetricsPage(metricsPage + 1)}
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })()}
     </div>
   );
 }

@@ -7,20 +7,30 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { registerUser } from "@/actions/auth";
+import { validateRegisterForm } from "@/lib/validation";
 
 export default function RegisterPage() {
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
-    setLoading(true);
+    setFieldErrors({});
 
     const formData = new FormData(e.currentTarget);
-    const name = formData.get("name") as string;
-    const email = formData.get("email") as string;
+    const name = (formData.get("name") as string).trim();
+    const email = (formData.get("email") as string).trim();
     const password = formData.get("password") as string;
+
+    const validation = validateRegisterForm({ name, email, password });
+    if (!validation.valid) {
+      setFieldErrors(validation.errors);
+      return;
+    }
+
+    setLoading(true);
 
     try {
       const result = await registerUser({ name, email, password });
@@ -29,7 +39,6 @@ export default function RegisterPage() {
       }
     } catch {
       // signIn redirects on success, which throws a NEXT_REDIRECT error
-      // This is expected behavior
     } finally {
       setLoading(false);
     }
@@ -57,7 +66,12 @@ export default function RegisterPage() {
               type="text"
               required
               placeholder="Seu nome"
+              minLength={2}
+              maxLength={100}
             />
+            {fieldErrors.name && (
+              <p className="text-xs text-destructive">{fieldErrors.name}</p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -68,7 +82,11 @@ export default function RegisterPage() {
               type="email"
               required
               placeholder="seu@email.com"
+              maxLength={255}
             />
+            {fieldErrors.email && (
+              <p className="text-xs text-destructive">{fieldErrors.email}</p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -79,8 +97,12 @@ export default function RegisterPage() {
               type="password"
               required
               minLength={6}
+              maxLength={128}
               placeholder="Minimo 6 caracteres"
             />
+            {fieldErrors.password && (
+              <p className="text-xs text-destructive">{fieldErrors.password}</p>
+            )}
           </div>
 
           <Button type="submit" className="w-full" disabled={loading}>

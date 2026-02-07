@@ -2,20 +2,24 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { syncAllPlatforms } from "@/lib/integrations/sync";
 
-// GET /api/cron/sync
-// This endpoint is called by Vercel Cron to sync all organizations
-// Configure in vercel.json: { "crons": [{ "path": "/api/cron/sync", "schedule": "*/15 * * * *" }] }
 export async function GET(request: NextRequest) {
-  // Verify cron secret (Vercel sets this automatically, or use custom secret)
-  const authHeader = request.headers.get("authorization");
+  // CRON_SECRET is required in production
   const cronSecret = process.env.CRON_SECRET;
 
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  if (!cronSecret) {
+    console.error("CRON_SECRET is not configured. Cron endpoint is disabled.");
+    return NextResponse.json(
+      { error: "CRON_SECRET not configured. Set this environment variable to enable cron sync." },
+      { status: 500 }
+    );
+  }
+
+  const authHeader = request.headers.get("authorization");
+  if (authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
-    // Get all organizations that have at least one connected integration
     const organizations = await prisma.organization.findMany({
       where: {
         integrations: {

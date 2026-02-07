@@ -7,19 +7,29 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { loginUser } from "@/actions/auth";
+import { validateLoginForm } from "@/lib/validation";
 
 export default function LoginPage() {
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
-    setLoading(true);
+    setFieldErrors({});
 
     const formData = new FormData(e.currentTarget);
-    const email = formData.get("email") as string;
+    const email = (formData.get("email") as string).trim();
     const password = formData.get("password") as string;
+
+    const validation = validateLoginForm({ email, password });
+    if (!validation.valid) {
+      setFieldErrors(validation.errors);
+      return;
+    }
+
+    setLoading(true);
 
     try {
       const result = await loginUser({ email, password });
@@ -28,7 +38,6 @@ export default function LoginPage() {
       }
     } catch {
       // signIn redirects on success, which throws a NEXT_REDIRECT error
-      // This is expected behavior
     } finally {
       setLoading(false);
     }
@@ -56,7 +65,11 @@ export default function LoginPage() {
               type="email"
               required
               placeholder="seu@email.com"
+              maxLength={255}
             />
+            {fieldErrors.email && (
+              <p className="text-xs text-destructive">{fieldErrors.email}</p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -67,7 +80,12 @@ export default function LoginPage() {
               type="password"
               required
               placeholder="Sua senha"
+              minLength={6}
+              maxLength={128}
             />
+            {fieldErrors.password && (
+              <p className="text-xs text-destructive">{fieldErrors.password}</p>
+            )}
           </div>
 
           <Button type="submit" className="w-full" disabled={loading}>

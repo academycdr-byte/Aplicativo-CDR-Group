@@ -5,6 +5,10 @@ import { getSessionWithOrg } from "@/lib/session";
 
 export async function getOrders(params?: {
   platform?: string;
+  status?: string;
+  search?: string;
+  dateFrom?: string;
+  dateTo?: string;
   page?: number;
   limit?: number;
 }) {
@@ -21,6 +25,29 @@ export async function getOrders(params?: {
 
   if (params?.platform) {
     where.platform = params.platform;
+  }
+
+  if (params?.status) {
+    where.status = params.status;
+  }
+
+  if (params?.search) {
+    where.OR = [
+      { customerName: { contains: params.search, mode: "insensitive" } },
+      { customerEmail: { contains: params.search, mode: "insensitive" } },
+      { externalOrderId: { contains: params.search, mode: "insensitive" } },
+    ];
+  }
+
+  if (params?.dateFrom || params?.dateTo) {
+    const dateFilter: Record<string, Date> = {};
+    if (params?.dateFrom) dateFilter.gte = new Date(params.dateFrom);
+    if (params?.dateTo) {
+      const to = new Date(params.dateTo);
+      to.setHours(23, 59, 59, 999);
+      dateFilter.lte = to;
+    }
+    where.orderDate = dateFilter;
   }
 
   const [orders, total] = await Promise.all([
