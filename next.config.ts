@@ -30,6 +30,31 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "cdn.shopify.com",
+      },
+      {
+        protocol: "https",
+        hostname: "placehold.co",
+      },
+      {
+        protocol: "https",
+        hostname: "*.d17oa795e.app-domen.com" // Nuvemshop generic, might need more specific if known
+      },
+      {
+        protocol: "https",
+        hostname: "imgur.com"
+      },
+      {
+        protocol: "https",
+        hostname: "*.imgur.com"
+      }
+    ],
+  },
 };
 
 export default nextConfig;
