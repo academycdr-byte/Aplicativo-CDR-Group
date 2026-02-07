@@ -4,17 +4,44 @@ import { encrypt, decrypt } from "@/lib/encryption";
 const SHOPIFY_API_VERSION = "2024-01";
 
 /**
+ * Valida se as credenciais Shopify estao configuradas corretamente.
+ * Retorna um objeto com status e mensagem de erro se houver problema.
+ */
+export function validateShopifyConfig(): { valid: boolean; error?: string } {
+  const clientId = (process.env.SHOPIFY_CLIENT_ID || "").trim();
+  const clientSecret = (process.env.SHOPIFY_CLIENT_SECRET || "").trim();
+  const authUrl = (process.env.AUTH_URL || "").trim();
+
+  if (!clientId) {
+    return { valid: false, error: "SHOPIFY_CLIENT_ID nao configurado nas variaveis de ambiente" };
+  }
+  if (!clientSecret) {
+    return { valid: false, error: "SHOPIFY_CLIENT_SECRET nao configurado nas variaveis de ambiente" };
+  }
+  if (!authUrl) {
+    return { valid: false, error: "AUTH_URL nao configurado nas variaveis de ambiente" };
+  }
+
+  // Validar formato basico do client_id (deve ser hexadecimal, 32 chars para apps Partners)
+  if (!/^[a-f0-9]{32}$/i.test(clientId) && !clientId.includes("-")) {
+    return { valid: false, error: `SHOPIFY_CLIENT_ID parece ter formato invalido: ${clientId.substring(0, 8)}...` };
+  }
+
+  return { valid: true };
+}
+
+/**
  * Gera a URL de autorizacao OAuth do Shopify (Authorization Code Grant)
- * Este e o fluxo correto para apps criados no Dev Dashboard com distribuicao personalizada.
+ * Este e o fluxo correto para apps criados no Shopify Partners com distribuicao personalizada.
  * O token gerado e PERMANENTE (offline access token) — nao expira.
  */
 export function getShopifyAuthUrl(shop: string, state: string) {
-  const clientId = process.env.SHOPIFY_CLIENT_ID;
-  const redirectUri = `${process.env.AUTH_URL}/api/integrations/shopify/callback`;
+  const clientId = (process.env.SHOPIFY_CLIENT_ID || "").trim();
+  const redirectUri = `${(process.env.AUTH_URL || "").trim()}/api/integrations/shopify/callback`;
   const scopes = "read_orders,read_products,read_customers";
 
   console.log("[Shopify OAuth] Generating auth URL for shop:", shop);
-  console.log("[Shopify OAuth] Client ID:", clientId);
+  console.log("[Shopify OAuth] Client ID:", clientId ? `${clientId.substring(0, 8)}...` : "MISSING");
   console.log("[Shopify OAuth] Redirect URI:", redirectUri);
 
   return `https://${shop}/admin/oauth/authorize?client_id=${clientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`;
@@ -28,60 +55,73 @@ export async function exchangeShopifyToken(shop: string, code: string): Promise<
   access_token: string;
   scope: string;
 }> {
-  const clientId = process.env.SHOPIFY_CLIENT_ID;
-  const clientSecret = process.env.SHOPIFY_CLIENT_SECRET;
+  const clientId = (process.env.SHOPIFY_CLIENT_ID || "").trim();
+  const clientSecret = (process.env.SHOPIFY_CLIENT_SECRET || "").trim();
 
   if (!clientId || !clientSecret) {
-    throw new Error("SHOPIFY_CLIENT_ID ou SHOPIFY_CLIENT_SECRET nao configurados");
+    throw new Error("SHOPIFY_CLIENT_ID ou SHOPIFY_CLIENT_SECRET nao configurados. Configure nas variaveis de ambiente do Vercel.");
   }
 
   console.log("[Shopify OAuth] Exchanging code for token...");
   console.log("[Shopify OAuth] Shop:", shop);
+  console.log("[Shopify OAuth] Client ID:", clientId ? `${clientId.substring(0, 8)}...` : "MISSING");
   console.log("[Shopify OAuth] Code (first 10 chars):", code.substring(0, 10) + "...");
 
-  // Tentar com application/x-www-form-urlencoded primeiro (formato recomendado)
-  let response = await fetch(`https://${shop}/admin/oauth/access_token`, {
+  const response = await fetch(`https://${shop}/admin/oauth/access_token`, {
     method: "POST",
     headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
+      "Content-Type": "application/json",
       "Accept": "application/json",
     },
-    body: new URLSearchParams({
+    body: JSON.stringify({
       client_id: clientId,
       client_secret: clientSecret,
       code,
-    }).toString(),
+    }),
   });
-
-  // Se falhar com form-urlencoded, tentar com JSON (fallback)
-  if (!response.ok) {
-    const errorBody1 = await response.text();
-    console.warn("[Shopify OAuth] form-urlencoded failed:", response.status, errorBody1);
-    console.log("[Shopify OAuth] Retrying with JSON body...");
-
-    response = await fetch(`https://${shop}/admin/oauth/access_token`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-      },
-      body: JSON.stringify({
-        client_id: clientId,
-        client_secret: clientSecret,
-        code,
-      }),
-    });
-  }
 
   if (!response.ok) {
     const errorBody = await response.text();
     console.error("[Shopify OAuth] Token exchange FAILED:", response.status, errorBody);
-    throw new Error(`Falha ao trocar token Shopify: ${response.status} - ${errorBody}`);
+
+    // Parsear erro do Shopify para mensagem mais amigavel
+    const friendlyError = parseShopifyError(response.status, errorBody, clientId);
+    throw new Error(friendlyError);
   }
 
   const data = await response.json();
   console.log("[Shopify OAuth] Token obtained! Scopes:", data.scope);
   return data;
+}
+
+/**
+ * Parseia erros da API do Shopify e retorna mensagens actionaveis
+ */
+function parseShopifyError(status: number, body: string, clientId: string): string {
+  try {
+    const parsed = JSON.parse(body);
+    const error = parsed.error || "";
+    const description = parsed.error_description || "";
+
+    if (error === "application_cannot_be_found") {
+      return `App Shopify nao encontrado (API Key: ${clientId.substring(0, 8)}...). `
+        + `Verifique se: (1) O app existe no Shopify Partners, `
+        + `(2) A API Key (SHOPIFY_CLIENT_ID) esta correta no Vercel, `
+        + `(3) O app nao foi deletado ou recriado com novas credenciais.`;
+    }
+
+    if (error === "invalid_request" && description.includes("authorization code")) {
+      return "Codigo de autorizacao expirado ou invalido. Tente conectar novamente.";
+    }
+
+    if (error === "invalid_client") {
+      return `Client Secret invalido. Verifique se SHOPIFY_CLIENT_SECRET esta correto no Vercel.`;
+    }
+
+    return `Erro Shopify (${status}): ${description || error || body}`;
+  } catch {
+    return `Erro Shopify (${status}): ${body}`;
+  }
 }
 
 /**

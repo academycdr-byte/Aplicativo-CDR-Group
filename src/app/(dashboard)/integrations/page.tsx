@@ -135,7 +135,14 @@ function IntegrationsContent() {
     if (success === "shopify") {
       toast.success("Shopify conectada com sucesso!");
     } else if (error === "shopify_oauth_failed") {
-      toast.error(`Erro ao conectar Shopify${detail ? `: ${detail}` : ""}`);
+      const isAppNotFound = detail?.includes("nao encontrado") || detail?.includes("application_cannot_be_found");
+      if (isAppNotFound) {
+        toast.error("App Shopify nao encontrado. Verifique as credenciais (API Key) no Shopify Partners e nas variaveis de ambiente do Vercel.", { duration: 10000 });
+      } else {
+        toast.error(`Erro ao conectar Shopify${detail ? `: ${detail}` : ""}`, { duration: 8000 });
+      }
+    } else if (error === "shopify_config_error") {
+      toast.error(`Configuracao Shopify incorreta${detail ? `: ${detail}` : ""}. Verifique as variaveis de ambiente no Vercel.`, { duration: 10000 });
     } else if (error === "shopify_denied") {
       toast.error(`Shopify negou acesso${detail ? `: ${detail}` : ""}`);
     } else if (error === "missing_params") {
@@ -329,10 +336,14 @@ function IntegrationsContent() {
 
           <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-200 text-sm rounded-lg p-3 flex gap-2">
             <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-            <span>
-              O app CDR Group precisa estar instalado na sua loja Shopify antes de conectar.
-              Use o link de instalacao fornecido pelo administrador.
-            </span>
+            <div>
+              <p className="font-medium">Antes de conectar:</p>
+              <ol className="list-decimal list-inside mt-1 space-y-0.5 text-xs">
+                <li>O app CDR Group deve estar criado no Shopify Partners</li>
+                <li>O app deve estar instalado na sua loja Shopify</li>
+                <li>As credenciais (API Key e Secret) devem estar configuradas no Vercel</li>
+              </ol>
+            </div>
           </div>
 
           <form onSubmit={handleShopifyConnect} className="space-y-4">
