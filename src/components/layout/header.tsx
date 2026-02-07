@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { User, LogOut } from "lucide-react";
+import { User, LogOut, Bell } from "lucide-react";
 import { logoutUser } from "@/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -16,37 +15,23 @@ import {
 import { ThemeToggle } from "@/components/theme-toggle";
 import { MobileSidebar } from "@/components/layout/mobile-sidebar";
 
-const pageTitles: Record<string, string> = {
-  "/dashboard": "Dashboard",
-  "/integrations": "Integracoes",
-  "/orders": "Pedidos",
-  "/sales": "Vendas",
-  "/ads": "Anuncios",
-  "/reports": "Relatorios",
-  "/settings": "Configuracoes",
-  "/settings/profile": "Meu Perfil",
-  "/settings/organization": "Organizacao",
-  "/admin": "Administracao",
-};
-
 export function Header() {
-  const pathname = usePathname();
-  const title = pageTitles[pathname] || "Dashboard";
-
   return (
-    <header className="h-16 border-b bg-card flex items-center justify-between px-4 md:px-6">
+    <header className="h-14 border-b border-border/50 bg-card/80 backdrop-blur-sm flex items-center justify-between px-4 md:px-6">
       <div className="flex items-center gap-3">
         <MobileSidebar />
-        <h1 className="text-lg font-semibold">{title}</h1>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5">
         <ThemeToggle />
+        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+          <Bell className="w-4 h-4" />
+        </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-8 w-8 rounded-full">
               <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-primary text-primary-foreground text-sm">
+                <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
                   U
                 </AvatarFallback>
               </Avatar>
