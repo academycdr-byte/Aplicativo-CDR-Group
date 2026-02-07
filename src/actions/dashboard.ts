@@ -144,6 +144,207 @@ export async function getOrdersByPlatform() {
   }));
 }
 
+/**
+ * Analise de Metricas: combined daily order + ad data for multi-metric chart
+ */
+export async function getMetricsAnalysis(days: number = 30, from?: string, to?: string) {
+  const ctx = await getSessionWithOrg();
+  if (!ctx) return [];
+
+  const orgId = ctx.organization.id;
+  const { since, until } = getDateRange(days, from, to);
+  const dateFilter = until ? { gte: since, lte: until } : { gte: since };
+
+  const [orders, adMetrics] = await Promise.all([
+    prisma.order.findMany({
+      where: { organizationId: orgId, orderDate: dateFilter },
+      select: { orderDate: true, totalAmount: true, status: true },
+      orderBy: { orderDate: "asc" },
+    }),
+    prisma.adMetric.findMany({
+      where: { organizationId: orgId, date: dateFilter },
+      select: { date: true, spend: true, conversions: true, revenue: true },
+      orderBy: { date: "asc" },
+    }),
+  ]);
+
+  const grouped: Record<string, {
+    date: string;
+    faturamento: number;
+    investimento: number;
+    compras: number;
+    ticketMedio: number;
+    cpa: number;
+    roas: number;
+  }> = {};
+
+  for (const o of orders) {
+    const key = o.orderDate.toISOString().split("T")[0];
+    if (!grouped[key]) grouped[key] = { date: key, faturamento: 0, investimento: 0, compras: 0, ticketMedio: 0, cpa: 0, roas: 0 };
+    if (o.status === "paid") {
+      grouped[key].faturamento += Number(o.totalAmount);
+      grouped[key].compras += 1;
+    }
+  }
+
+  for (const m of adMetrics) {
+    const key = m.date.toISOString().split("T")[0];
+    if (!grouped[key]) grouped[key] = { date: key, faturamento: 0, investimento: 0, compras: 0, ticketMedio: 0, cpa: 0, roas: 0 };
+    grouped[key].investimento += Number(m.spend);
+  }
+
+  // Compute derived metrics
+  for (const d of Object.values(grouped)) {
+    d.ticketMedio = d.compras > 0 ? d.faturamento / d.compras : 0;
+    d.cpa = d.compras > 0 ? d.investimento / d.compras : 0;
+    d.roas = d.investimento > 0 ? d.faturamento / d.investimento : 0;
+  }
+
+  return Object.values(grouped).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/**
+ * E-commerce funnel: total orders → paid → shipped → delivered
+ * Plus Reportana abandoned carts if available
+ */
+export async function getFunnelData(days: number = 30, from?: string, to?: string) {
+  const ctx = await getSessionWithOrg();
+  if (!ctx) return null;
+
+  const orgId = ctx.organization.id;
+  const { since, until } = getDateRange(days, from, to);
+  const dateFilter = until ? { gte: since, lte: until } : { gte: since };
+
+  const [totalOrders, paidOrders, shippedOrders, deliveredOrders, abandonedCarts] = await Promise.all([
+    prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter } }),
+    prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter, status: "paid" } }),
+    prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter, status: { in: ["shipped", "delivered"] } } }),
+    prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter, status: "delivered" } }),
+    prisma.reportanaEvent.count({
+      where: { organizationId: orgId, eventType: "abandoned_checkout", eventDate: dateFilter },
+    }).catch(() => 0),
+  ]);
+
+  // Top of funnel = abandoned carts + total orders (interest)
+  const topFunnel = abandonedCarts + totalOrders;
+
+  return {
+    checkouts: topFunnel,
+    pedidosGerados: totalOrders,
+    pedidosPagos: paidOrders,
+    pedidosEnviados: shippedOrders,
+    pedidosEntregues: deliveredOrders,
+  };
+}
+
+/**
+ * % paid orders and % repurchase rate
+ */
+export async function getPaidAndRepurchaseRates(days: number = 30, from?: string, to?: string) {
+  const ctx = await getSessionWithOrg();
+  if (!ctx) return null;
+
+  const orgId = ctx.organization.id;
+  const { since, until } = getDateRange(days, from, to);
+  const dateFilter = until ? { gte: since, lte: until } : { gte: since };
+
+  const [totalOrders, paidOrders, allCustomers] = await Promise.all([
+    prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter } }),
+    prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter, status: "paid" } }),
+    prisma.order.findMany({
+      where: { organizationId: orgId, orderDate: dateFilter, customerEmail: { not: null } },
+      select: { customerEmail: true },
+    }),
+  ]);
+
+  // Count unique customers and those with more than 1 order
+  const emailCounts: Record<string, number> = {};
+  for (const o of allCustomers) {
+    if (o.customerEmail) {
+      emailCounts[o.customerEmail] = (emailCounts[o.customerEmail] || 0) + 1;
+    }
+  }
+
+  const uniqueCustomers = Object.keys(emailCounts).length;
+  const repeatCustomers = Object.values(emailCounts).filter((c) => c > 1).length;
+
+  return {
+    paidRate: totalOrders > 0 ? (paidOrders / totalOrders) * 100 : 0,
+    paidOrders,
+    totalOrders,
+    repurchaseRate: uniqueCustomers > 0 ? (repeatCustomers / uniqueCustomers) * 100 : 0,
+    repeatCustomers,
+    uniqueCustomers,
+  };
+}
+
+/**
+ * Customer trends by month: new vs returning customers
+ */
+export async function getCustomerTrends(days: number = 30, from?: string, to?: string) {
+  const ctx = await getSessionWithOrg();
+  if (!ctx) return [];
+
+  const orgId = ctx.organization.id;
+  const { since, until } = getDateRange(days, from, to);
+  const dateFilter = until ? { gte: since, lte: until } : { gte: since };
+
+  // Get orders in period with customer emails
+  const orders = await prisma.order.findMany({
+    where: { organizationId: orgId, orderDate: dateFilter, customerEmail: { not: null } },
+    select: { customerEmail: true, orderDate: true },
+    orderBy: { orderDate: "asc" },
+  });
+
+  // Get all customer emails that ordered BEFORE the period (returning customers)
+  const priorCustomers = await prisma.order.findMany({
+    where: { organizationId: orgId, orderDate: { lt: since }, customerEmail: { not: null } },
+    select: { customerEmail: true },
+    distinct: ["customerEmail"],
+  });
+
+  const priorSet = new Set(priorCustomers.map((o) => o.customerEmail!));
+
+  // Group by month
+  const monthly: Record<string, { month: string; novos: number; recorrentes: number; seenNew: Set<string>; seenRec: Set<string> }> = {};
+
+  for (const o of orders) {
+    if (!o.customerEmail) continue;
+    const d = o.orderDate;
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+
+    if (!monthly[key]) {
+      monthly[key] = { month: key, novos: 0, recorrentes: 0, seenNew: new Set(), seenRec: new Set() };
+    }
+
+    const entry = monthly[key];
+    const isReturning = priorSet.has(o.customerEmail);
+
+    if (isReturning) {
+      if (!entry.seenRec.has(o.customerEmail)) {
+        entry.recorrentes += 1;
+        entry.seenRec.add(o.customerEmail);
+      }
+    } else {
+      if (!entry.seenNew.has(o.customerEmail)) {
+        entry.novos += 1;
+        entry.seenNew.add(o.customerEmail);
+        // Once seen as new, also add to prior set for subsequent months
+        priorSet.add(o.customerEmail);
+      }
+    }
+  }
+
+  return Object.values(monthly)
+    .map(({ month, novos, recorrentes }) => ({
+      month,
+      novos,
+      recorrentes,
+      taxaRecorrencia: (novos + recorrentes) > 0 ? (recorrentes / (novos + recorrentes)) * 100 : 0,
+    }))
+    .sort((a, b) => a.month.localeCompare(b.month));
+}
+
 export async function getRecentOrders(limit: number = 5) {
   const ctx = await getSessionWithOrg();
   if (!ctx) return [];
