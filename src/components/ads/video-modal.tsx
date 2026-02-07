@@ -4,8 +4,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import Image from "next/image";
-import { Play, ExternalLink } from "lucide-react";
+import { Play, ExternalLink, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
 
 // Re-using the Creative type structure roughly, or defining a props interface
 interface Creative {
@@ -53,9 +54,34 @@ export function VideoModal({ isOpen, onClose, creative }: VideoModalProps) {
         return new Intl.NumberFormat("pt-BR").format(n);
     }
 
-    const isVideo = false; // We don't have a reliable 'isVideo' flag yet from the backend transformation.
-    // However, the prompt implies "If video cannot be loaded, show fallback".
-    // We will try to show the thumbnail as the "media" for now.
+    const [fetchedVideoUrl, setFetchedVideoUrl] = useState<string | null>(null);
+    const [isLoadingVideo, setIsLoadingVideo] = useState(false);
+
+    // Reset state when creative changes
+    useEffect(() => {
+        setFetchedVideoUrl(null);
+        setIsLoadingVideo(false);
+
+        // If open, has adId, has thumbnail but no videoUrl, try to fetch it
+        if (isOpen && creative && !creative.videoUrl && creative.adId) {
+            setIsLoadingVideo(true);
+            fetch(`/api/ads/${creative.adId}/video`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.videoUrl) {
+                        setFetchedVideoUrl(data.videoUrl);
+                    }
+                })
+                .catch(err => console.error("Failed to lazy fetch video:", err))
+                .finally(() => setIsLoadingVideo(false));
+        }
+    }, [isOpen, creative]);
+
+    const finalVideoUrl = creative?.videoUrl || fetchedVideoUrl;
+
+    // Helper to determine if we should show video player or image
+    // Show video player if we have a URL OR if we are loading (to show spinner)
+    const showVideoPlayer = !!finalVideoUrl || isLoadingVideo;
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
@@ -71,10 +97,15 @@ export function VideoModal({ isOpen, onClose, creative }: VideoModalProps) {
                     {/* Media Column */}
                     <div className="space-y-4">
                         <div className="relative aspect-video w-full bg-black/50 rounded-lg overflow-hidden flex items-center justify-center border border-border/50">
-                            {creative.videoUrl ? (
+                            {isLoadingVideo ? (
+                                <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                                    <Loader2 className="w-8 h-8 animate-spin" />
+                                    <span className="text-sm">Buscando vídeo...</span>
+                                </div>
+                            ) : finalVideoUrl ? (
                                 // Video player with controls
                                 <video
-                                    src={creative.videoUrl}
+                                    src={finalVideoUrl}
                                     controls
                                     autoPlay
                                     loop
@@ -100,7 +131,8 @@ export function VideoModal({ isOpen, onClose, creative }: VideoModalProps) {
                             )}
                         </div>
 
-                        {creative.videoUrl && (
+                        {/* Show indicator if playing fetched video */}
+                        {finalVideoUrl && (
                             <p className="text-xs text-muted-foreground text-center">
                                 🎬 Clique no player acima para controlar o video
                             </p>
