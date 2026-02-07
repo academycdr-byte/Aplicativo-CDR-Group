@@ -134,6 +134,7 @@ function IntegrationsContent() {
   const [fbAccountDialog, setFbAccountDialog] = useState(false);
   const [fbAccounts, setFbAccounts] = useState<FacebookAdAccount[]>([]);
   const [selectedFbAccount, setSelectedFbAccount] = useState<string>("");
+  const [fbSearch, setFbSearch] = useState("");
   const searchParams = useSearchParams();
 
   useEffect(() => {
@@ -552,47 +553,71 @@ function IntegrationsContent() {
       </Dialog>
 
       {/* Facebook Ad Account Selection Dialog */}
-      <Dialog open={fbAccountDialog} onOpenChange={setFbAccountDialog}>
+      <Dialog open={fbAccountDialog} onOpenChange={(open) => { setFbAccountDialog(open); if (!open) setFbSearch(""); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Selecione a Conta de Anuncio</DialogTitle>
             <DialogDescription>
-              Escolha qual conta de anuncio do Facebook voce deseja conectar.
+              {fbAccounts.length} conta{fbAccounts.length !== 1 ? "s" : ""} encontrada{fbAccounts.length !== 1 ? "s" : ""}. Escolha qual deseja conectar.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
-            {fbAccounts.map((account) => {
-              const isActive = account.account_status === 1;
-              return (
-                <label
-                  key={account.id}
-                  className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                    selectedFbAccount === account.id
-                      ? "border-primary bg-primary/5"
-                      : "border-border hover:bg-muted/50"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="fb_account"
-                    value={account.id}
-                    checked={selectedFbAccount === account.id}
-                    onChange={() => setSelectedFbAccount(account.id)}
-                    className="accent-primary"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate">{account.name || account.id}</p>
-                    <p className="text-xs text-muted-foreground">{account.id}</p>
-                  </div>
-                  {isActive !== undefined && (
-                    <Badge variant={isActive ? "default" : "secondary"} className="shrink-0 text-xs">
-                      {isActive ? "Ativa" : "Inativa"}
-                    </Badge>
-                  )}
-                </label>
-              );
-            })}
+          <Input
+            placeholder="Pesquisar por nome ou ID..."
+            value={fbSearch}
+            onChange={(e) => setFbSearch(e.target.value)}
+          />
+
+          <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+            {(() => {
+              const query = fbSearch.toLowerCase().trim();
+              const filtered = query
+                ? fbAccounts.filter((a) =>
+                    (a.name || "").toLowerCase().includes(query) ||
+                    a.id.toLowerCase().includes(query)
+                  )
+                : fbAccounts;
+
+              if (filtered.length === 0) {
+                return (
+                  <p className="text-sm text-muted-foreground text-center py-6">
+                    Nenhuma conta encontrada para &quot;{fbSearch}&quot;
+                  </p>
+                );
+              }
+
+              return filtered.map((account) => {
+                const isActive = account.account_status === 1;
+                return (
+                  <label
+                    key={account.id}
+                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                      selectedFbAccount === account.id
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:bg-muted/50"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="fb_account"
+                      value={account.id}
+                      checked={selectedFbAccount === account.id}
+                      onChange={() => setSelectedFbAccount(account.id)}
+                      className="accent-primary"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">{account.name || account.id}</p>
+                      <p className="text-xs text-muted-foreground">{account.id}</p>
+                    </div>
+                    {isActive !== undefined && (
+                      <Badge variant={isActive ? "default" : "secondary"} className="shrink-0 text-xs">
+                        {isActive ? "Ativa" : "Inativa"}
+                      </Badge>
+                    )}
+                  </label>
+                );
+              });
+            })()}
           </div>
 
           <div className="flex justify-end gap-3 mt-2">
