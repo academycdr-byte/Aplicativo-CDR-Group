@@ -212,6 +212,8 @@ model AdMetric {
   clicks         Int      @default(0)
   spend          Decimal  @db.Decimal(10, 2) @default(0)
   conversions    Int      @default(0)
+  addToCart      Int      @default(0)
+  initiateCheckout Int    @default(0)
   revenue        Decimal  @db.Decimal(10, 2) @default(0)
   currency       String   @default("BRL")
   rawData        Json?

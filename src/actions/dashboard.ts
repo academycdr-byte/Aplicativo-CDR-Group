@@ -205,8 +205,8 @@ export async function getMetricsAnalysis(days: number = 30, from?: string, to?: 
 
 /**
  * E-commerce funnel: Sessoes → Adicoes ao Carrinho → Checkouts Iniciados → Pedidos Gerados
- * Sessions = ad clicks + Reportana "session" events
- * Add-to-cart = Reportana "add_to_cart" events
+ * Sessions = ad clicks
+ * Add-to-cart = AdMetric.addToCart + rawData fallback for legacy records + Reportana events
  * Checkouts = abandoned carts + total orders
  * Orders = total orders
  */
@@ -224,9 +224,9 @@ export async function getFunnelData(days: number = 30, from?: string, to?: strin
     shippedOrders,
     deliveredOrders,
     abandonedCarts,
-    addToCartEvents,
-    sessionEvents,
-    adClicks,
+    addToCartReportana,
+    adAggregates,
+    adMetricsRaw,
   ] = await Promise.all([
     prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter } }),
     prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter, status: "paid" } }),
@@ -238,20 +238,39 @@ export async function getFunnelData(days: number = 30, from?: string, to?: strin
     prisma.reportanaEvent.count({
       where: { organizationId: orgId, eventType: "add_to_cart", eventDate: dateFilter },
     }).catch(() => 0),
-    prisma.reportanaEvent.count({
-      where: { organizationId: orgId, eventType: "session", eventDate: dateFilter },
-    }).catch(() => 0),
     prisma.adMetric.aggregate({
       where: { organizationId: orgId, date: dateFilter },
-      _sum: { clicks: true },
+      _sum: { clicks: true, addToCart: true, initiateCheckout: true },
+    }).catch(() => ({ _sum: { clicks: 0, addToCart: 0, initiateCheckout: 0 } })),
+    // Fallback: parse rawData for legacy records where addToCart=0
+    prisma.adMetric.findMany({
+      where: { organizationId: orgId, date: dateFilter, addToCart: 0 },
+      select: { rawData: true },
     }),
   ]);
 
-  // Sessions = ad clicks + tracked session events
-  const sessoes = (adClicks._sum.clicks || 0) + sessionEvents;
-  // Add to cart from Reportana events
-  const adicoesCarrinho = addToCartEvents;
-  // Checkouts = abandoned carts + total orders
+  // Extract add_to_cart from rawData for legacy records (before schema field existed)
+  let rawAddToCart = 0;
+  let rawInitiateCheckout = 0;
+  for (const m of adMetricsRaw) {
+    if (m.rawData && typeof m.rawData === "object") {
+      const raw = m.rawData as Record<string, unknown>;
+      const actions = raw.actions as Array<{ action_type: string; value: string }> | undefined;
+      if (actions) {
+        const atc = actions.find((a) =>
+          a.action_type === "add_to_cart" || a.action_type === "offsite_conversion.fb_pixel_add_to_cart"
+        );
+        const ic = actions.find((a) =>
+          a.action_type === "initiate_checkout" || a.action_type === "offsite_conversion.fb_pixel_initiate_checkout"
+        );
+        if (atc) rawAddToCart += parseInt(atc.value || "0");
+        if (ic) rawInitiateCheckout += parseInt(ic.value || "0");
+      }
+    }
+  }
+
+  const sessoes = adAggregates._sum.clicks || 0;
+  const adicoesCarrinho = (adAggregates._sum.addToCart || 0) + rawAddToCart + addToCartReportana;
   const checkoutsIniciados = abandonedCarts + totalOrders;
 
   return {

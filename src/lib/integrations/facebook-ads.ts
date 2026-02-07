@@ -161,17 +161,23 @@ export async function syncFacebookAdsMetrics(organizationId: string) {
     let synced = 0;
 
     for (const insight of allInsights) {
-      const purchases = insight.actions
-        ?.find((a: { action_type: string }) =>
-          a.action_type === "purchase" || a.action_type === "offsite_conversion.fb_pixel_purchase"
-        );
-      const purchaseValue = insight.action_values
-        ?.find((a: { action_type: string }) =>
-          a.action_type === "purchase" || a.action_type === "offsite_conversion.fb_pixel_purchase"
-        );
+      const actions = insight.actions || [];
+      const actionValues = insight.action_values || [];
+
+      const findAction = (types: string[]) =>
+        actions.find((a: { action_type: string }) => types.includes(a.action_type));
+      const findActionValue = (types: string[]) =>
+        actionValues.find((a: { action_type: string }) => types.includes(a.action_type));
+
+      const purchases = findAction(["purchase", "offsite_conversion.fb_pixel_purchase"]);
+      const purchaseValue = findActionValue(["purchase", "offsite_conversion.fb_pixel_purchase"]);
+      const addToCartAction = findAction(["add_to_cart", "offsite_conversion.fb_pixel_add_to_cart"]);
+      const initiateCheckoutAction = findAction(["initiate_checkout", "offsite_conversion.fb_pixel_initiate_checkout"]);
 
       const conversions = parseInt(purchases?.value || "0");
       const revenue = parseFloat(purchaseValue?.value || "0");
+      const addToCart = parseInt(addToCartAction?.value || "0");
+      const initiateCheckout = parseInt(initiateCheckoutAction?.value || "0");
 
       await prisma.adMetric.upsert({
         where: {
@@ -199,6 +205,8 @@ export async function syncFacebookAdsMetrics(organizationId: string) {
           clicks: parseInt(insight.clicks || "0"),
           spend: parseFloat(insight.spend || "0"),
           conversions,
+          addToCart,
+          initiateCheckout,
           revenue,
           currency: "BRL",
           rawData: insight,
@@ -213,6 +221,8 @@ export async function syncFacebookAdsMetrics(organizationId: string) {
           clicks: parseInt(insight.clicks || "0"),
           spend: parseFloat(insight.spend || "0"),
           conversions,
+          addToCart,
+          initiateCheckout,
           revenue,
           rawData: insight,
         },
