@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -106,6 +106,14 @@ type IntegrationData = {
 };
 
 export default function IntegrationsPage() {
+  return (
+    <Suspense fallback={<div className="text-muted-foreground text-sm p-4">Carregando...</div>}>
+      <IntegrationsContent />
+    </Suspense>
+  );
+}
+
+function IntegrationsContent() {
   const [integrations, setIntegrations] = useState<IntegrationData[]>([]);
   const [connectDialog, setConnectDialog] = useState<PlatformConfig | null>(null);
   const [shopifyDialog, setShopifyDialog] = useState(false);
