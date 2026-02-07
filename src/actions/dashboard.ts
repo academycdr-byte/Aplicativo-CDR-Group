@@ -204,8 +204,11 @@ export async function getMetricsAnalysis(days: number = 30, from?: string, to?: 
 }
 
 /**
- * E-commerce funnel: total orders → paid → shipped → delivered
- * Plus Reportana abandoned carts if available
+ * E-commerce funnel: Sessoes → Adicoes ao Carrinho → Checkouts Iniciados → Pedidos Gerados
+ * Sessions = ad clicks + Reportana "session" events
+ * Add-to-cart = Reportana "add_to_cart" events
+ * Checkouts = abandoned carts + total orders
+ * Orders = total orders
  */
 export async function getFunnelData(days: number = 30, from?: string, to?: string) {
   const ctx = await getSessionWithOrg();
@@ -215,7 +218,16 @@ export async function getFunnelData(days: number = 30, from?: string, to?: strin
   const { since, until } = getDateRange(days, from, to);
   const dateFilter = until ? { gte: since, lte: until } : { gte: since };
 
-  const [totalOrders, paidOrders, shippedOrders, deliveredOrders, abandonedCarts] = await Promise.all([
+  const [
+    totalOrders,
+    paidOrders,
+    shippedOrders,
+    deliveredOrders,
+    abandonedCarts,
+    addToCartEvents,
+    sessionEvents,
+    adClicks,
+  ] = await Promise.all([
     prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter } }),
     prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter, status: "paid" } }),
     prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter, status: { in: ["shipped", "delivered"] } } }),
@@ -223,13 +235,29 @@ export async function getFunnelData(days: number = 30, from?: string, to?: strin
     prisma.reportanaEvent.count({
       where: { organizationId: orgId, eventType: "abandoned_checkout", eventDate: dateFilter },
     }).catch(() => 0),
+    prisma.reportanaEvent.count({
+      where: { organizationId: orgId, eventType: "add_to_cart", eventDate: dateFilter },
+    }).catch(() => 0),
+    prisma.reportanaEvent.count({
+      where: { organizationId: orgId, eventType: "session", eventDate: dateFilter },
+    }).catch(() => 0),
+    prisma.adMetric.aggregate({
+      where: { organizationId: orgId, date: dateFilter },
+      _sum: { clicks: true },
+    }),
   ]);
 
-  // Top of funnel = abandoned carts + total orders (interest)
-  const topFunnel = abandonedCarts + totalOrders;
+  // Sessions = ad clicks + tracked session events
+  const sessoes = (adClicks._sum.clicks || 0) + sessionEvents;
+  // Add to cart from Reportana events
+  const adicoesCarrinho = addToCartEvents;
+  // Checkouts = abandoned carts + total orders
+  const checkoutsIniciados = abandonedCarts + totalOrders;
 
   return {
-    checkouts: topFunnel,
+    sessoes,
+    adicoesCarrinho,
+    checkoutsIniciados,
     pedidosGerados: totalOrders,
     pedidosPagos: paidOrders,
     pedidosEnviados: shippedOrders,
