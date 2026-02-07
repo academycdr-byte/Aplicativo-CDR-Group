@@ -387,6 +387,7 @@ export async function syncShopifyFunnel(organizationId: string) {
 
     const salesSessions = await fetchSalesSessionData(shop, accessToken);
     const abandonedByDate = await fetchAbandonedCheckoutsByDate(shop, accessToken, thirtyDaysAgo);
+    const hasSalesSessionData = Object.keys(salesSessions).length > 0;
 
     // Merge all dates
     const allDates = new Set([
@@ -401,6 +402,16 @@ export async function syncShopifyFunnel(organizationId: string) {
       const abandoned = abandonedByDate[dateKey] || 0;
       const dayOrders = ordersByDate[dateKey] || 0;
 
+      // IMPORTANT: Only include sessions in the update if we actually got session data.
+      // Never overwrite existing session data with 0.
+      const updateData: Record<string, number> = {
+        checkoutsInitiated: abandoned + dayOrders,
+        ordersGenerated: dayOrders,
+      };
+      if (hasSalesSessionData && sessions > 0) {
+        updateData.sessions = sessions;
+      }
+
       await prisma.storeFunnel.upsert({
         where: {
           organizationId_platform_date: {
@@ -414,16 +425,11 @@ export async function syncShopifyFunnel(organizationId: string) {
           platform: "SHOPIFY",
           date: new Date(dateKey),
           sessions,
-          addToCart: 0, // Not available from sales dataset
-          checkoutsInitiated: abandoned + dayOrders,
-          ordersGenerated: dayOrders,
-        },
-        update: {
-          sessions,
           addToCart: 0,
           checkoutsInitiated: abandoned + dayOrders,
           ordersGenerated: dayOrders,
         },
+        update: updateData,
       });
       synced++;
     }
