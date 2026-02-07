@@ -13,9 +13,9 @@ export async function getReportanaData() {
   return fetchData(ctx.organization.id);
 }
 
-export async function getReportanaMetrics(days: number = 30) {
+export async function getReportanaMetrics(days: number = 30, from?: string, to?: string) {
   const ctx = await getSessionWithOrg();
   if (!ctx) return { error: "Not authenticated" };
 
-  return fetchReportanaMetrics(ctx.organization.id, days);
+  return fetchReportanaMetrics(ctx.organization.id, days, from, to);
 }

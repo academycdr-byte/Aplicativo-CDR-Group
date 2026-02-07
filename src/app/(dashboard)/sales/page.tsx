@@ -1,16 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { DollarSign, ShoppingBag, Receipt } from "lucide-react";
+import { PeriodSelector, periodToParams, type PeriodValue } from "@/components/period-selector";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -48,23 +42,23 @@ export default function SalesPage() {
   const [stats, setStats] = useState<SalesStats | null>(null);
   const [dailyData, setDailyData] = useState<DaySale[]>([]);
   const [statusData, setStatusData] = useState<StatusData[]>([]);
-  const [days, setDays] = useState("30");
+  const [period, setPeriod] = useState<PeriodValue>({ type: "preset", days: 30 });
 
-  useEffect(() => {
-    loadData();
-  }, [days]);
-
-  async function loadData() {
-    const d = parseInt(days);
+  const loadData = useCallback(async () => {
+    const { days, from, to } = periodToParams(period);
     const [s, daily, status] = await Promise.all([
-      getSalesData(d),
-      getSalesByDay(d),
+      getSalesData(days, from, to),
+      getSalesByDay(days, from, to),
       getSalesByStatus(),
     ]);
     if (s) setStats(s);
     setDailyData(daily);
     setStatusData(status);
-  }
+  }, [period]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   function fmt(amount: number) {
     return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(amount);
@@ -79,17 +73,7 @@ export default function SalesPage() {
             Analise suas vendas em todas as plataformas.
           </p>
         </div>
-        <Select value={days} onValueChange={setDays}>
-          <SelectTrigger className="w-[120px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="0">Hoje</SelectItem>
-            <SelectItem value="7">7 dias</SelectItem>
-            <SelectItem value="30">30 dias</SelectItem>
-            <SelectItem value="90">90 dias</SelectItem>
-          </SelectContent>
-        </Select>
+        <PeriodSelector value={period} onChange={setPeriod} />
       </div>
 
       {/* KPI Cards */}

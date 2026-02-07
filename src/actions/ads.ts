@@ -3,29 +3,35 @@
 import { prisma } from "@/lib/prisma";
 import { getSessionWithOrg } from "@/lib/session";
 
-function getSince(days: number): Date {
+function getDateRange(days: number, from?: string, to?: string): { since: Date; until?: Date } {
+  if (from && to) {
+    return { since: new Date(from), until: new Date(to) };
+  }
   const since = new Date();
   if (days === 0) {
     since.setHours(0, 0, 0, 0);
   } else {
     since.setDate(since.getDate() - days);
   }
-  return since;
+  return { since };
 }
 
 export async function getAdMetrics(params?: {
   platform?: string;
   days?: number;
+  from?: string;
+  to?: string;
 }) {
   const ctx = await getSessionWithOrg();
   if (!ctx) return { metrics: [], totals: null };
 
   const days = params?.days || 30;
-  const since = getSince(days);
+  const { since, until } = getDateRange(days, params?.from, params?.to);
+  const dateFilter = until ? { gte: since, lte: until } : { gte: since };
 
   const where: Record<string, unknown> = {
     organizationId: ctx.organization.id,
-    date: { gte: since },
+    date: dateFilter,
   };
 
   if (params?.platform) {
@@ -84,16 +90,17 @@ export async function getAdMetrics(params?: {
   };
 }
 
-export async function getAdMetricsByDay(days: number = 30) {
+export async function getAdMetricsByDay(days: number = 30, from?: string, to?: string) {
   const ctx = await getSessionWithOrg();
   if (!ctx) return [];
 
-  const since = getSince(days);
+  const { since, until } = getDateRange(days, from, to);
+  const dateFilter = until ? { gte: since, lte: until } : { gte: since };
 
   const metrics = await prisma.adMetric.findMany({
     where: {
       organizationId: ctx.organization.id,
-      date: { gte: since },
+      date: dateFilter,
     },
     select: { date: true, spend: true, impressions: true, clicks: true, conversions: true, revenue: true },
     orderBy: { date: "asc" },
@@ -124,16 +131,19 @@ export async function getAdMetricsByDay(days: number = 30) {
 export async function getCreativePerformance(params?: {
   platform?: string;
   days?: number;
+  from?: string;
+  to?: string;
 }) {
   const ctx = await getSessionWithOrg();
   if (!ctx) return [];
 
   const days = params?.days || 30;
-  const since = getSince(days);
+  const { since, until } = getDateRange(days, params?.from, params?.to);
+  const dateFilter = until ? { gte: since, lte: until } : { gte: since };
 
   const where: Record<string, unknown> = {
     organizationId: ctx.organization.id,
-    date: { gte: since },
+    date: dateFilter,
     adId: { not: null },
   };
 

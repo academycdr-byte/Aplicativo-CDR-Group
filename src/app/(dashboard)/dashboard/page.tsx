@@ -1,15 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
-  RefreshCw,
   DollarSign,
   ShoppingBag,
-  Megaphone,
   TrendingUp,
   ArrowUpRight,
   ArrowDownRight,
@@ -29,6 +26,7 @@ import {
 import { toast } from "sonner";
 import { getDashboardData, getRevenueByDay, getOrdersByPlatform, getRecentOrders } from "@/actions/dashboard";
 import { syncAll } from "@/actions/sync";
+import { PeriodSelector, periodToParams, type PeriodValue } from "@/components/period-selector";
 
 type DashboardStats = {
   totalOrders: number;
@@ -69,32 +67,21 @@ const statusLabels: Record<string, { label: string; variant: "default" | "second
   delivered: { label: "Entregue", variant: "default" },
 };
 
-const periodOptions = [
-  { value: "0", label: "Hoje" },
-  { value: "7", label: "7d" },
-  { value: "30", label: "Mes" },
-  { value: "90", label: "90d" },
-];
-
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [revenueData, setRevenueData] = useState<RevenuePoint[]>([]);
   const [platformData, setPlatformData] = useState<PlatformData[]>([]);
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
-  const [period, setPeriod] = useState("30");
+  const [period, setPeriod] = useState<PeriodValue>({ type: "preset", days: 30 });
   const [syncing, setSyncing] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadData();
-  }, [period]);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true);
-    const days = parseInt(period);
+    const { days, from, to } = periodToParams(period);
     const [s, r, p, o] = await Promise.all([
-      getDashboardData(days),
-      getRevenueByDay(days),
+      getDashboardData(days, from, to),
+      getRevenueByDay(days, from, to),
       getOrdersByPlatform(),
       getRecentOrders(5),
     ]);
@@ -103,7 +90,11 @@ export default function DashboardPage() {
     setPlatformData(p);
     setRecentOrders(o);
     setLoading(false);
-  }
+  }, [period]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   async function handleSync() {
     setSyncing(true);
@@ -170,34 +161,12 @@ export default function DashboardPage() {
             Acompanhe o desempenho das suas plataformas.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          {/* Inline period pills */}
-          <div className="flex items-center bg-muted rounded-lg p-0.5">
-            {periodOptions.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => setPeriod(opt.value)}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                  period === opt.value
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleSync}
-            disabled={syncing}
-            className="gap-2"
-          >
-            <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />
-            Atualizar
-          </Button>
-        </div>
+        <PeriodSelector
+          value={period}
+          onChange={setPeriod}
+          onRefresh={handleSync}
+          refreshing={syncing}
+        />
       </div>
 
       {/* KPI Cards */}

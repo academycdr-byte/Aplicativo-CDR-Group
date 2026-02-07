@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PeriodSelector, periodToParams, type PeriodValue } from "@/components/period-selector";
 import {
   Table,
   TableBody,
@@ -106,7 +107,7 @@ export default function AdsPage() {
   const [dayData, setDayData] = useState<DayMetric[]>([]);
   const [creatives, setCreatives] = useState<Creative[]>([]);
   const [platformFilter, setPlatformFilter] = useState("all");
-  const [days, setDays] = useState("30");
+  const [period, setPeriod] = useState<PeriodValue>({ type: "preset", days: 30 });
   const [view, setView] = useState<"overview" | "creatives">("overview");
   const [metricsPage, setMetricsPage] = useState(1);
   const [creativesPage, setCreativesPage] = useState(1);
@@ -172,17 +173,13 @@ export default function AdsPage() {
     });
   }, [creatives, creativesSortKey, creativesSortDir]);
 
-  useEffect(() => {
-    loadData();
-  }, [platformFilter, days]);
-
-  async function loadData() {
-    const d = parseInt(days);
+  const loadData = useCallback(async () => {
+    const { days, from, to } = periodToParams(period);
     const platform = platformFilter === "all" ? undefined : platformFilter;
     const [metricsData, dayMetrics, creativeData] = await Promise.all([
-      getAdMetrics({ platform, days: d }),
-      getAdMetricsByDay(d),
-      getCreativePerformance({ platform, days: d }),
+      getAdMetrics({ platform, days, from, to }),
+      getAdMetricsByDay(days, from, to),
+      getCreativePerformance({ platform, days, from, to }),
     ]);
     setTotals(metricsData.totals);
     setMetrics(metricsData.metrics);
@@ -190,7 +187,11 @@ export default function AdsPage() {
     setCreatives(creativeData);
     setMetricsPage(1);
     setCreativesPage(1);
-  }
+  }, [period, platformFilter]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   function fmt(amount: number) {
     return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(amount);
@@ -213,17 +214,7 @@ export default function AdsPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Select value={days} onValueChange={setDays}>
-            <SelectTrigger className="w-[120px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="0">Hoje</SelectItem>
-              <SelectItem value="7">7 dias</SelectItem>
-              <SelectItem value="30">30 dias</SelectItem>
-              <SelectItem value="90">90 dias</SelectItem>
-            </SelectContent>
-          </Select>
+          <PeriodSelector value={period} onChange={setPeriod} />
           <Select value={platformFilter} onValueChange={setPlatformFilter}>
             <SelectTrigger className="w-[160px]">
               <SelectValue placeholder="Plataforma" />
