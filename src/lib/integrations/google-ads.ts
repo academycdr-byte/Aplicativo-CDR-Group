@@ -76,10 +76,11 @@ export async function syncGoogleAdsMetrics(organizationId: string) {
     for (const row of results) {
       await prisma.adMetric.upsert({
         where: {
-          organizationId_platform_campaignId_date: {
+          organizationId_platform_campaignId_adId_date: {
             organizationId,
             platform: "GOOGLE_ADS",
             campaignId: row.campaign?.id || "unknown",
+            adId: row.adGroup?.id || "unknown",
             date: new Date(row.segments?.date),
           },
         },

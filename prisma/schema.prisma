@@ -203,8 +203,12 @@ model AdMetric {
   campaignName   String?
   adSetId        String?
   adSetName      String?
+  adId           String?
+  adName         String?
+  thumbnailUrl   String?
   date           DateTime @db.Date
   impressions    Int      @default(0)
+  reach          Int      @default(0)
   clicks         Int      @default(0)
   spend          Decimal  @db.Decimal(10, 2) @default(0)
   conversions    Int      @default(0)
@@ -215,7 +219,7 @@ model AdMetric {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  @@unique([organizationId, platform, campaignId, date])
+  @@unique([organizationId, platform, campaignId, adId, date])
   @@index([organizationId, date])
   @@index([organizationId, platform])
   @@map("ad_metrics")

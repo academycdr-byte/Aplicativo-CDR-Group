@@ -14,9 +14,11 @@ async function refreshFacebookToken(integrationId: string): Promise<string> {
   }
 
   const currentToken = decrypt(integration.accessToken);
+  const clientId = process.env.FACEBOOK_APP_ID?.trim();
+  const clientSecret = process.env.FACEBOOK_APP_SECRET?.trim();
 
   const response = await fetch(
-    `https://graph.facebook.com/${FB_GRAPH_VERSION}/oauth/access_token?grant_type=fb_exchange_token&client_id=${process.env.FACEBOOK_APP_ID}&client_secret=${process.env.FACEBOOK_APP_SECRET}&fb_exchange_token=${currentToken}`
+    `https://graph.facebook.com/${FB_GRAPH_VERSION}/oauth/access_token?grant_type=fb_exchange_token&client_id=${clientId}&client_secret=${clientSecret}&fb_exchange_token=${currentToken}`
   );
 
   if (!response.ok) {
@@ -37,6 +39,45 @@ async function refreshFacebookToken(integrationId: string): Promise<string> {
   });
 
   return newAccessToken;
+}
+
+/**
+ * Busca thumbnails dos criativos dos anuncios.
+ */
+async function fetchAdThumbnails(
+  adIds: string[],
+  accessToken: string
+): Promise<Record<string, string>> {
+  const thumbnails: Record<string, string> = {};
+  if (adIds.length === 0) return thumbnails;
+
+  // Batch fetch (max 50 per request)
+  const batches = [];
+  for (let i = 0; i < adIds.length; i += 50) {
+    batches.push(adIds.slice(i, i + 50));
+  }
+
+  for (const batch of batches) {
+    const ids = batch.join(",");
+    try {
+      const response = await fetch(
+        `https://graph.facebook.com/${FB_GRAPH_VERSION}/?ids=${ids}&fields=creative{thumbnail_url}&access_token=${accessToken}`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        for (const [adId, adData] of Object.entries(data)) {
+          const creative = (adData as { creative?: { thumbnail_url?: string } })?.creative;
+          if (creative?.thumbnail_url) {
+            thumbnails[adId] = creative.thumbnail_url;
+          }
+        }
+      }
+    } catch {
+      // Continue without thumbnails if fetch fails
+    }
+  }
+
+  return thumbnails;
 }
 
 export async function syncFacebookAdsMetrics(organizationId: string) {
@@ -74,38 +115,71 @@ export async function syncFacebookAdsMetrics(organizationId: string) {
 
     const adAccountId = integration.externalAccountId || "";
 
-    // Fetch insights for the last 30 days
+    // Fetch insights at AD level for the last 30 days
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const since = thirtyDaysAgo.toISOString().split("T")[0];
     const until = new Date().toISOString().split("T")[0];
 
-    const insightsUrl = `https://graph.facebook.com/${FB_GRAPH_VERSION}/act_${adAccountId}/insights?fields=campaign_id,campaign_name,adset_id,adset_name,impressions,clicks,spend,actions,action_values&level=adset&time_range={"since":"${since}","until":"${until}"}&time_increment=1&access_token=${accessToken}`;
+    const fields = [
+      "campaign_id", "campaign_name",
+      "adset_id", "adset_name",
+      "ad_id", "ad_name",
+      "impressions", "reach", "clicks", "spend",
+      "actions", "action_values",
+      "cost_per_action_type",
+    ].join(",");
+
+    const timeRange = JSON.stringify({ since, until });
+    const insightsUrl = `https://graph.facebook.com/${FB_GRAPH_VERSION}/act_${adAccountId}/insights?fields=${fields}&level=ad&time_range=${encodeURIComponent(timeRange)}&time_increment=1&limit=500&access_token=${accessToken}`;
 
     const response = await fetch(insightsUrl);
 
     if (!response.ok) {
+      const errorBody = await response.text();
+      console.error("[Facebook Ads] Insights fetch failed:", response.status, errorBody);
       throw new Error(`Facebook API error: ${response.status}`);
     }
 
     const data = await response.json();
-    const insights = data.data || [];
+    let allInsights = data.data || [];
+
+    // Handle pagination
+    let nextUrl = data.paging?.next;
+    while (nextUrl) {
+      const nextResponse = await fetch(nextUrl);
+      if (!nextResponse.ok) break;
+      const nextData = await nextResponse.json();
+      allInsights = allInsights.concat(nextData.data || []);
+      nextUrl = nextData.paging?.next;
+    }
+
+    // Fetch creative thumbnails for unique ad IDs
+    const uniqueAdIds = [...new Set(allInsights.map((i: { ad_id: string }) => i.ad_id).filter(Boolean))] as string[];
+    const thumbnails = await fetchAdThumbnails(uniqueAdIds, accessToken);
+
     let synced = 0;
 
-    for (const insight of insights) {
-      const conversions = insight.actions
-        ?.find((a: { action_type: string }) => a.action_type === "offsite_conversion.fb_pixel_purchase")
-        ?.value || 0;
-      const revenue = insight.action_values
-        ?.find((a: { action_type: string }) => a.action_type === "offsite_conversion.fb_pixel_purchase")
-        ?.value || 0;
+    for (const insight of allInsights) {
+      const purchases = insight.actions
+        ?.find((a: { action_type: string }) =>
+          a.action_type === "purchase" || a.action_type === "offsite_conversion.fb_pixel_purchase"
+        );
+      const purchaseValue = insight.action_values
+        ?.find((a: { action_type: string }) =>
+          a.action_type === "purchase" || a.action_type === "offsite_conversion.fb_pixel_purchase"
+        );
+
+      const conversions = parseInt(purchases?.value || "0");
+      const revenue = parseFloat(purchaseValue?.value || "0");
 
       await prisma.adMetric.upsert({
         where: {
-          organizationId_platform_campaignId_date: {
+          organizationId_platform_campaignId_adId_date: {
             organizationId,
             platform: "FACEBOOK_ADS",
             campaignId: insight.campaign_id || "unknown",
+            adId: insight.ad_id || "unknown",
             date: new Date(insight.date_start),
           },
         },
@@ -116,23 +190,30 @@ export async function syncFacebookAdsMetrics(organizationId: string) {
           campaignName: insight.campaign_name,
           adSetId: insight.adset_id,
           adSetName: insight.adset_name,
+          adId: insight.ad_id,
+          adName: insight.ad_name,
+          thumbnailUrl: thumbnails[insight.ad_id] || null,
           date: new Date(insight.date_start),
           impressions: parseInt(insight.impressions || "0"),
+          reach: parseInt(insight.reach || "0"),
           clicks: parseInt(insight.clicks || "0"),
           spend: parseFloat(insight.spend || "0"),
-          conversions: parseInt(conversions),
-          revenue: parseFloat(revenue),
+          conversions,
+          revenue,
           currency: "BRL",
           rawData: insight,
         },
         update: {
           campaignName: insight.campaign_name,
           adSetName: insight.adset_name,
+          adName: insight.ad_name,
+          thumbnailUrl: thumbnails[insight.ad_id] || null,
           impressions: parseInt(insight.impressions || "0"),
+          reach: parseInt(insight.reach || "0"),
           clicks: parseInt(insight.clicks || "0"),
           spend: parseFloat(insight.spend || "0"),
-          conversions: parseInt(conversions),
-          revenue: parseFloat(revenue),
+          conversions,
+          revenue,
           rawData: insight,
         },
       });
