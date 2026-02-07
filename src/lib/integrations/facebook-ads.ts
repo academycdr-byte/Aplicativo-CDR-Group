@@ -113,7 +113,11 @@ export async function syncFacebookAdsMetrics(organizationId: string) {
       }
     }
 
-    const adAccountId = integration.externalAccountId || "";
+    // Support multiple ad account IDs (comma-separated)
+    const adAccountIds = (integration.externalAccountId || "").split(",").filter(Boolean);
+    if (adAccountIds.length === 0) {
+      throw new Error("No ad account selected");
+    }
 
     // Fetch insights at AD level for the last 30 days
     const thirtyDaysAgo = new Date();
@@ -131,27 +135,33 @@ export async function syncFacebookAdsMetrics(organizationId: string) {
     ].join(",");
 
     const timeRange = JSON.stringify({ since, until });
-    const insightsUrl = `https://graph.facebook.com/${FB_GRAPH_VERSION}/act_${adAccountId}/insights?fields=${fields}&level=ad&time_range=${encodeURIComponent(timeRange)}&time_increment=1&limit=500&access_token=${accessToken}`;
 
-    const response = await fetch(insightsUrl);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let allInsights: any[] = [];
 
-    if (!response.ok) {
-      const errorBody = await response.text();
-      console.error("[Facebook Ads] Insights fetch failed:", response.status, errorBody);
-      throw new Error(`Facebook API error: ${response.status}`);
-    }
+    for (const adAccountId of adAccountIds) {
+      const insightsUrl = `https://graph.facebook.com/${FB_GRAPH_VERSION}/act_${adAccountId}/insights?fields=${fields}&level=ad&time_range=${encodeURIComponent(timeRange)}&time_increment=1&limit=500&access_token=${accessToken}`;
 
-    const data = await response.json();
-    let allInsights = data.data || [];
+      const response = await fetch(insightsUrl);
 
-    // Handle pagination
-    let nextUrl = data.paging?.next;
-    while (nextUrl) {
-      const nextResponse = await fetch(nextUrl);
-      if (!nextResponse.ok) break;
-      const nextData = await nextResponse.json();
-      allInsights = allInsights.concat(nextData.data || []);
-      nextUrl = nextData.paging?.next;
+      if (!response.ok) {
+        const errorBody = await response.text();
+        console.error(`[Facebook Ads] Insights fetch failed for act_${adAccountId}:`, response.status, errorBody);
+        continue; // Skip this account but continue with others
+      }
+
+      const data = await response.json();
+      allInsights = allInsights.concat(data.data || []);
+
+      // Handle pagination
+      let nextUrl = data.paging?.next;
+      while (nextUrl) {
+        const nextResponse = await fetch(nextUrl);
+        if (!nextResponse.ok) break;
+        const nextData = await nextResponse.json();
+        allInsights = allInsights.concat(nextData.data || []);
+        nextUrl = nextData.paging?.next;
+      }
     }
 
     // Fetch creative thumbnails for unique ad IDs

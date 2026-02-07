@@ -133,7 +133,7 @@ function IntegrationsContent() {
   const [msg, setMsg] = useState("");
   const [fbAccountDialog, setFbAccountDialog] = useState(false);
   const [fbAccounts, setFbAccounts] = useState<FacebookAdAccount[]>([]);
-  const [selectedFbAccount, setSelectedFbAccount] = useState<string>("");
+  const [selectedFbAccounts, setSelectedFbAccounts] = useState<string[]>([]);
   const [fbSearch, setFbSearch] = useState("");
   const searchParams = useSearchParams();
 
@@ -188,7 +188,7 @@ function IntegrationsContent() {
         const accounts = (fbIntegration?.metadata as { adAccounts?: FacebookAdAccount[] })?.adAccounts || [];
         if (accounts.length > 0) {
           setFbAccounts(accounts);
-          setSelectedFbAccount(accounts[0]?.id || "");
+          setSelectedFbAccounts([]);
           setFbAccountDialog(true);
         }
         setIntegrations(data);
@@ -301,15 +301,16 @@ function IntegrationsContent() {
   }
 
   async function handleSelectFbAccount() {
-    if (!selectedFbAccount) return;
+    if (selectedFbAccounts.length === 0) return;
     setLoading(true);
 
-    const result = await selectFacebookAdAccount(selectedFbAccount);
+    const result = await selectFacebookAdAccount(selectedFbAccounts);
     if (result.error) {
       toast.error(result.error);
     } else {
       setFbAccountDialog(false);
-      toast.success(`Conta "${result.accountName}" conectada! Sincronizando metricas...`);
+      const count = selectedFbAccounts.length;
+      toast.success(`${count} conta${count > 1 ? "s" : ""} conectada${count > 1 ? "s" : ""}! Sincronizando metricas...`);
       loadIntegrations();
       // Auto-sync after selection
       syncPlatform("FACEBOOK_ADS").then((syncResult) => {
@@ -406,7 +407,7 @@ function IntegrationsContent() {
                       const accounts = (fbIntegration?.metadata as { adAccounts?: FacebookAdAccount[] })?.adAccounts || [];
                       if (accounts.length > 0) {
                         setFbAccounts(accounts);
-                        setSelectedFbAccount(accounts[0]?.id || "");
+                        setSelectedFbAccounts([]);
                         setFbAccountDialog(true);
                       }
                     }}>
@@ -588,21 +589,27 @@ function IntegrationsContent() {
 
               return filtered.map((account) => {
                 const isActive = account.account_status === 1;
+                const isChecked = selectedFbAccounts.includes(account.id);
                 return (
                   <label
                     key={account.id}
                     className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                      selectedFbAccount === account.id
+                      isChecked
                         ? "border-primary bg-primary/5"
                         : "border-border hover:bg-muted/50"
                     }`}
                   >
                     <input
-                      type="radio"
-                      name="fb_account"
+                      type="checkbox"
                       value={account.id}
-                      checked={selectedFbAccount === account.id}
-                      onChange={() => setSelectedFbAccount(account.id)}
+                      checked={isChecked}
+                      onChange={() => {
+                        setSelectedFbAccounts((prev) =>
+                          prev.includes(account.id)
+                            ? prev.filter((id) => id !== account.id)
+                            : [...prev, account.id]
+                        );
+                      }}
                       className="accent-primary"
                     />
                     <div className="flex-1 min-w-0">
@@ -620,13 +627,18 @@ function IntegrationsContent() {
             })()}
           </div>
 
-          <div className="flex justify-end gap-3 mt-2">
-            <Button variant="outline" onClick={() => setFbAccountDialog(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleSelectFbAccount} disabled={loading || !selectedFbAccount}>
-              {loading ? "Conectando..." : "Conectar Conta"}
-            </Button>
+          <div className="flex items-center justify-between mt-2">
+            <p className="text-sm text-muted-foreground">
+              {selectedFbAccounts.length} selecionada{selectedFbAccounts.length !== 1 ? "s" : ""}
+            </p>
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={() => setFbAccountDialog(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSelectFbAccount} disabled={loading || selectedFbAccounts.length === 0}>
+                {loading ? "Conectando..." : `Conectar ${selectedFbAccounts.length > 0 ? `(${selectedFbAccounts.length})` : ""}`}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

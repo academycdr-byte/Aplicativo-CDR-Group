@@ -172,7 +172,7 @@ export async function disconnectIntegration(platform: Platform) {
   return { success: true };
 }
 
-export async function selectFacebookAdAccount(accountId: string) {
+export async function selectFacebookAdAccount(accountIds: string | string[]) {
   const ctx = await getSessionWithOrg();
   if (!ctx) return { error: "Nao autenticado." };
 
@@ -189,26 +189,40 @@ export async function selectFacebookAdAccount(accountId: string) {
     return { error: "Facebook Ads nao conectado. Faca login novamente." };
   }
 
-  // Validate that the accountId is in the list of available accounts
-  const metadata = integration.metadata as { adAccounts?: { id: string; name: string }[] } | null;
-  const accounts = metadata?.adAccounts || [];
-  const selected = accounts.find((a) => a.id === accountId);
-
-  if (!selected) {
-    return { error: "Conta de anuncio nao encontrada." };
+  const ids = Array.isArray(accountIds) ? accountIds : [accountIds];
+  if (ids.length === 0) {
+    return { error: "Selecione ao menos uma conta." };
   }
 
-  // Update integration with selected account
+  // Validate that all accountIds are in the list of available accounts
+  const metadata = integration.metadata as { adAccounts?: { id: string; name: string }[] } | null;
+  const accounts = metadata?.adAccounts || [];
+
+  for (const id of ids) {
+    if (!accounts.find((a) => a.id === id)) {
+      return { error: `Conta de anuncio ${id} nao encontrada.` };
+    }
+  }
+
+  // Store selected accounts as comma-separated IDs (without act_ prefix)
+  const externalIds = ids.map((id) => id.replace("act_", "")).join(",");
+
+  // Update integration with selected accounts
   await prisma.integration.update({
     where: { id: integration.id },
     data: {
       status: "CONNECTED",
-      externalAccountId: accountId.replace("act_", ""),
+      externalAccountId: externalIds,
       errorMessage: null,
+      metadata: {
+        ...((integration.metadata as Record<string, unknown>) || {}),
+        selectedAccountIds: ids,
+      },
     },
   });
 
-  return { success: true, accountName: selected.name };
+  const names = ids.map((id) => accounts.find((a) => a.id === id)?.name || id).join(", ");
+  return { success: true, accountName: names };
 }
 
 export async function getIntegrationCredentials(platform: Platform) {
