@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Link2, Unlink, RefreshCw, AlertCircle, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
-import { getIntegrations, connectApiKeyIntegration, disconnectIntegration } from "@/actions/integrations";
+import { getIntegrations, connectApiKeyIntegration, connectShopifyDirect, disconnectIntegration } from "@/actions/integrations";
 import { syncPlatform } from "@/actions/sync";
 import { Platform } from "@prisma/client";
 import { useSearchParams } from "next/navigation";
@@ -165,6 +165,7 @@ function IntegrationsContent() {
   function openConnect(platform: PlatformConfig) {
     if (platform.platform === "SHOPIFY") {
       setShopDomain("");
+      setMsg("");
       setShopifyDialog(true);
       return;
     }
@@ -186,18 +187,24 @@ function IntegrationsContent() {
     setConnectDialog(platform);
   }
 
-  function handleShopifyConnect(e: React.FormEvent) {
+  async function handleShopifyConnect(e: React.FormEvent) {
     e.preventDefault();
-    let domain = shopDomain.trim().toLowerCase();
+    const domain = shopDomain.trim().toLowerCase();
     if (!domain) return;
 
-    // Normalizar dominio
-    if (!domain.includes(".myshopify.com")) {
-      domain = `${domain}.myshopify.com`;
-    }
+    setLoading(true);
+    setMsg("");
 
-    // Redirecionar para o OAuth flow
-    window.location.href = `/api/integrations/shopify?shop=${encodeURIComponent(domain)}`;
+    const result = await connectShopifyDirect(domain);
+
+    if (result.error) {
+      setMsg(result.error);
+    } else {
+      setShopifyDialog(false);
+      toast.success("Shopify conectada com sucesso!");
+      loadIntegrations();
+    }
+    setLoading(false);
   }
 
   async function handleSync(platform: Platform) {
@@ -324,27 +331,28 @@ function IntegrationsContent() {
         })}
       </div>
 
-      {/* Shopify Connect Dialog - pede o dominio antes de redirecionar para OAuth */}
+      {/* Shopify Connect Dialog - conexao direta via Client Credentials */}
       <Dialog open={shopifyDialog} onOpenChange={setShopifyDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Conectar Shopify</DialogTitle>
             <DialogDescription>
-              Digite o dominio da sua loja Shopify. Voce sera redirecionado para autorizar o acesso.
+              Digite o dominio da sua loja Shopify para conectar automaticamente.
             </DialogDescription>
           </DialogHeader>
 
           <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-200 text-sm rounded-lg p-3 flex gap-2">
             <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-            <div>
-              <p className="font-medium">Antes de conectar:</p>
-              <ol className="list-decimal list-inside mt-1 space-y-0.5 text-xs">
-                <li>O app CDR Group deve estar criado no Shopify Partners</li>
-                <li>O app deve estar instalado na sua loja Shopify</li>
-                <li>As credenciais (API Key e Secret) devem estar configuradas no Vercel</li>
-              </ol>
-            </div>
+            <span className="text-xs">
+              O app CDR Group deve estar instalado na loja via Shopify Partners antes de conectar.
+            </span>
           </div>
+
+          {msg && (
+            <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-lg p-3">
+              {msg}
+            </div>
+          )}
 
           <form onSubmit={handleShopifyConnect} className="space-y-4">
             <div className="space-y-2">
@@ -367,8 +375,8 @@ function IntegrationsContent() {
               >
                 Cancelar
               </Button>
-              <Button type="submit">
-                Conectar via OAuth
+              <Button type="submit" disabled={loading}>
+                {loading ? "Conectando..." : "Conectar"}
               </Button>
             </div>
           </form>
