@@ -1,11 +1,106 @@
 import { prisma } from "@/lib/prisma";
 import { decrypt } from "@/lib/encryption";
+import crypto from "crypto";
 
 const SHOPIFY_API_VERSION = "2024-01";
+const SHOPIFY_SCOPES = "read_orders,read_products,read_customers";
 
 /**
- * Valida um Access Token de Custom App da Shopify fazendo uma chamada de teste.
- * Custom Apps geram tokens permanentes (nao expiram), entao nao precisa de refresh.
+ * Gera a URL de autorizacao OAuth do Shopify (Authorization Code Grant).
+ * O usuario e redirecionado para esta URL para autorizar o app.
+ */
+export function getShopifyAuthUrl(shop: string, redirectUri: string, state: string): string {
+  const clientId = process.env.SHOPIFY_CLIENT_ID?.trim();
+  if (!clientId) throw new Error("SHOPIFY_CLIENT_ID nao configurado");
+
+  const params = new URLSearchParams({
+    client_id: clientId,
+    scope: SHOPIFY_SCOPES,
+    redirect_uri: redirectUri,
+    state,
+  });
+
+  return `https://${shop}/admin/oauth/authorize?${params.toString()}`;
+}
+
+/**
+ * Troca o authorization code por um access token.
+ * IMPORTANTE: Usa application/x-www-form-urlencoded (NAO JSON).
+ * Tokens do Dev Dashboard expiram em 24h.
+ */
+export async function exchangeShopifyCode(
+  shop: string,
+  code: string
+): Promise<{ access_token: string; scope: string }> {
+  const clientId = process.env.SHOPIFY_CLIENT_ID?.trim();
+  const clientSecret = process.env.SHOPIFY_CLIENT_SECRET?.trim();
+
+  if (!clientId || !clientSecret) {
+    throw new Error("SHOPIFY_CLIENT_ID ou SHOPIFY_CLIENT_SECRET nao configurado");
+  }
+
+  const body = new URLSearchParams({
+    client_id: clientId,
+    client_secret: clientSecret,
+    code,
+  });
+
+  console.log("[Shopify OAuth] Exchanging code for token on shop:", shop);
+
+  const response = await fetch(`https://${shop}/admin/oauth/access_token`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: body.toString(),
+  });
+
+  const responseText = await response.text();
+
+  if (!response.ok) {
+    console.error("[Shopify OAuth] Token exchange failed:", response.status, responseText);
+    throw new Error(`Shopify token exchange falhou (${response.status}): ${responseText}`);
+  }
+
+  const data = JSON.parse(responseText);
+  console.log("[Shopify OAuth] Token obtained! Scopes:", data.scope);
+  return { access_token: data.access_token, scope: data.scope };
+}
+
+/**
+ * Gera um nonce aleatório para o state parameter do OAuth.
+ */
+export function generateOAuthState(): string {
+  return crypto.randomBytes(16).toString("hex");
+}
+
+/**
+ * Valida o HMAC da query string do callback Shopify.
+ */
+export function validateShopifyHmac(query: Record<string, string>): boolean {
+  const clientSecret = process.env.SHOPIFY_CLIENT_SECRET?.trim();
+  if (!clientSecret) return false;
+
+  const hmac = query.hmac;
+  if (!hmac) return false;
+
+  // Construir a mensagem sem o hmac
+  const entries = Object.entries(query)
+    .filter(([key]) => key !== "hmac")
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, value]) => `${key}=${value}`)
+    .join("&");
+
+  const computed = crypto
+    .createHmac("sha256", clientSecret)
+    .update(entries)
+    .digest("hex");
+
+  return crypto.timingSafeEqual(Buffer.from(computed), Buffer.from(hmac));
+}
+
+/**
+ * Valida um Access Token fazendo uma chamada de teste a API da Shopify.
  */
 export async function validateShopifyAccessToken(
   shop: string,
@@ -27,30 +122,27 @@ export async function validateShopifyAccessToken(
       console.error("[Shopify] Token validation failed:", response.status, errorBody);
 
       if (response.status === 401) {
-        return { valid: false, error: "Access Token invalido. Verifique se copiou o token corretamente." };
+        return { valid: false, error: "Access Token invalido." };
       }
       if (response.status === 403) {
-        return { valid: false, error: "Token sem permissao. Verifique os escopos do Custom App." };
+        return { valid: false, error: "Token sem permissao. Verifique os escopos." };
       }
       if (response.status === 404) {
-        return { valid: false, error: "Loja nao encontrada. Verifique o dominio informado." };
+        return { valid: false, error: "Loja nao encontrada. Verifique o dominio." };
       }
-      return { valid: false, error: `Erro Shopify (${response.status}): ${errorBody}` };
+      return { valid: false, error: `Erro Shopify (${response.status})` };
     }
 
     const data = await response.json();
-    console.log("[Shopify] Token validated! Shop:", data.shop?.name);
     return { valid: true, shopName: data.shop?.name };
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Erro de conexao";
-    console.error("[Shopify] Token validation error:", msg);
     return { valid: false, error: `Erro ao conectar: ${msg}` };
   }
 }
 
 /**
  * Busca pedidos da Shopify usando o access token armazenado.
- * Custom App tokens sao permanentes, nao precisam de refresh.
  */
 export async function fetchShopifyOrders(integrationId: string) {
   const integration = await prisma.integration.findUnique({
@@ -70,8 +162,6 @@ export async function fetchShopifyOrders(integrationId: string) {
 
   const url = `https://${shop}/admin/api/${SHOPIFY_API_VERSION}/orders.json?status=any&limit=250`;
 
-  console.log("[Shopify API] Fetching orders from:", shop);
-
   const response = await fetch(url, {
     headers: {
       "X-Shopify-Access-Token": accessToken,
@@ -88,17 +178,16 @@ export async function fetchShopifyOrders(integrationId: string) {
         where: { id: integrationId },
         data: {
           status: "DISCONNECTED",
-          errorMessage: "Token invalido. Reconecte a loja Shopify com um novo Access Token.",
+          errorMessage: "Token expirado ou invalido. Reconecte a Shopify.",
         },
       });
-      throw new Error("Token Shopify invalido. Reconecte a integracao com um novo Access Token.");
+      throw new Error("Token Shopify expirado. Reconecte a integracao.");
     }
 
     throw new Error(`Shopify API error: ${response.status}`);
   }
 
   const data = await response.json();
-  console.log("[Shopify API] Fetched", (data.orders || []).length, "orders");
   return data.orders || [];
 }
 

@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
 // GET /api/integrations/shopify/check-config
-// Endpoint de diagnostico para validar configuracao Shopify
+// Endpoint de diagnostico para verificar status da integracao Shopify
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) {
@@ -19,16 +19,25 @@ export async function GET() {
     return NextResponse.json({ error: "Acesso restrito a admins" }, { status: 403 });
   }
 
-  const clientId = (process.env.SHOPIFY_CLIENT_ID || "").trim();
-  const clientSecret = (process.env.SHOPIFY_CLIENT_SECRET || "").trim();
+  const integration = await prisma.integration.findFirst({
+    where: {
+      organization: { memberships: { some: { userId: session.user.id } } },
+      platform: "SHOPIFY",
+    },
+  });
 
   return NextResponse.json({
-    valid: !!clientId && !!clientSecret,
-    config: {
-      clientIdSet: !!clientId,
-      clientIdPreview: clientId ? `${clientId.substring(0, 8)}...${clientId.substring(clientId.length - 4)}` : null,
-      clientSecretSet: !!clientSecret,
-      grantType: "client_credentials",
-    },
+    connected: integration?.status === "CONNECTED",
+    authMethod: "custom_app_token",
+    integration: integration
+      ? {
+          status: integration.status,
+          hasToken: !!integration.accessToken,
+          storeDomain: integration.externalStoreId,
+          lastSync: integration.lastSyncAt,
+          syncStatus: integration.syncStatus,
+          error: integration.errorMessage,
+        }
+      : null,
   });
 }

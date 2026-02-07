@@ -98,37 +98,42 @@ export async function connectShopifyDirect(shop: string, accessToken: string) {
     return { error: "Access Token e obrigatorio." };
   }
 
-  // Validar token fazendo chamada de teste a API da Shopify
-  const validation = await validateShopifyAccessToken(domain, token);
+  try {
+    // Validar token fazendo chamada de teste a API da Shopify
+    const validation = await validateShopifyAccessToken(domain, token);
 
-  if (!validation.valid) {
-    return { error: validation.error || "Token invalido." };
-  }
+    if (!validation.valid) {
+      return { error: validation.error || "Token invalido." };
+    }
 
-  // Salvar integracao
-  await prisma.integration.upsert({
-    where: {
-      organizationId_platform: {
+    // Salvar integracao
+    await prisma.integration.upsert({
+      where: {
+        organizationId_platform: {
+          organizationId: ctx.organization.id,
+          platform: "SHOPIFY",
+        },
+      },
+      create: {
         organizationId: ctx.organization.id,
         platform: "SHOPIFY",
+        status: "CONNECTED",
+        accessToken: encrypt(token),
+        externalStoreId: domain,
       },
-    },
-    create: {
-      organizationId: ctx.organization.id,
-      platform: "SHOPIFY",
-      status: "CONNECTED",
-      accessToken: encrypt(token),
-      externalStoreId: domain,
-    },
-    update: {
-      status: "CONNECTED",
-      accessToken: encrypt(token),
-      externalStoreId: domain,
-      errorMessage: null,
-    },
-  });
+      update: {
+        status: "CONNECTED",
+        accessToken: encrypt(token),
+        externalStoreId: domain,
+        errorMessage: null,
+      },
+    });
 
-  return { success: true, shopName: validation.shopName };
+    return { success: true, shopName: validation.shopName };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Erro desconhecido";
+    return { error: `Erro ao conectar Shopify: ${msg}` };
+  }
 }
 
 export async function disconnectIntegration(platform: Platform) {
