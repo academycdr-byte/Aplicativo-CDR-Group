@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,7 +46,9 @@ export default function LoginPage() {
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="text-center">
+        <div className="flex justify-center mb-4">
+        </div>
         <CardTitle className="text-2xl">Entrar</CardTitle>
         <CardDescription>Acesse o painel da CDR Group</CardDescription>
       </CardHeader>

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -350,14 +351,16 @@ function IntegrationsContent() {
           const isConnected = status === "CONNECTED";
 
           return (
-            <Card key={platform.platform} className="flex flex-col">
+            <Card key={platform.platform} className="flex flex-col group hover:shadow-md transition-all duration-200 border-border/60">
               <CardContent className="pt-6 flex flex-col flex-1">
                 <div className="flex items-center gap-3 mb-3">
-                  <div
-                    className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-xs"
-                    style={{ backgroundColor: platform.color }}
-                  >
-                    {platform.name.slice(0, 2).toUpperCase()}
+                  <div className="relative w-12 h-12 rounded-full overflow-hidden flex-shrink-0 bg-white shadow-sm border border-gray-100 flex items-center justify-center group-hover:scale-105 transition-transform duration-200">
+                    <Image
+                      src={`/platforms/${platform.name.toLowerCase().replace(" ", "")}.png`}
+                      alt={platform.name}
+                      fill
+                      className="object-cover"
+                    />
                   </div>
                   <div>
                     <h3 className="font-semibold">{platform.name}</h3>
@@ -374,9 +377,8 @@ function IntegrationsContent() {
                 <div className="flex items-center justify-between">
                   <Badge variant={isConnected ? "default" : "secondary"} className="gap-1.5">
                     <span
-                      className={`w-2 h-2 rounded-full ${
-                        isConnected ? "bg-green-400" : status === "PENDING" ? "bg-amber-400" : "bg-muted-foreground"
-                      }`}
+                      className={`w-2 h-2 rounded-full ${isConnected ? "bg-green-400" : status === "PENDING" ? "bg-amber-400" : "bg-muted-foreground"
+                        }`}
                     />
                     {isConnected ? "Conectado" : status === "PENDING" ? "Pendente" : "Desconectado"}
                   </Badge>
@@ -439,21 +441,19 @@ function IntegrationsContent() {
           {/* Toggle between OAuth and Token mode */}
           <div className="flex gap-2 border rounded-lg p-1">
             <button
-              className={`flex-1 text-sm py-1.5 px-3 rounded-md transition-colors ${
-                shopifyMode === "oauth"
-                  ? "bg-primary text-primary-foreground"
-                  : "hover:bg-muted"
-              }`}
+              className={`flex-1 text-sm py-1.5 px-3 rounded-md transition-colors ${shopifyMode === "oauth"
+                ? "bg-primary text-primary-foreground"
+                : "hover:bg-muted"
+                }`}
               onClick={() => { setShopifyMode("oauth"); setMsg(""); }}
             >
               OAuth (Dev Dashboard)
             </button>
             <button
-              className={`flex-1 text-sm py-1.5 px-3 rounded-md transition-colors ${
-                shopifyMode === "token"
-                  ? "bg-primary text-primary-foreground"
-                  : "hover:bg-muted"
-              }`}
+              className={`flex-1 text-sm py-1.5 px-3 rounded-md transition-colors ${shopifyMode === "token"
+                ? "bg-primary text-primary-foreground"
+                : "hover:bg-muted"
+                }`}
               onClick={() => { setShopifyMode("token"); setMsg(""); }}
             >
               Access Token (Manual)
@@ -573,9 +573,9 @@ function IntegrationsContent() {
               const query = fbSearch.toLowerCase().trim();
               const filtered = query
                 ? fbAccounts.filter((a) =>
-                    (a.name || "").toLowerCase().includes(query) ||
-                    a.id.toLowerCase().includes(query)
-                  )
+                  (a.name || "").toLowerCase().includes(query) ||
+                  a.id.toLowerCase().includes(query)
+                )
                 : fbAccounts;
 
               if (filtered.length === 0) {
@@ -591,11 +591,10 @@ function IntegrationsContent() {
                 return (
                   <label
                     key={account.id}
-                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                      selectedFbAccount === account.id
-                        ? "border-primary bg-primary/5"
-                        : "border-border hover:bg-muted/50"
-                    }`}
+                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${selectedFbAccount === account.id
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover:bg-muted/50"
+                      }`}
                   >
                     <input
                       type="radio"

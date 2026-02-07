@@ -1,0 +1,48 @@
+
+> aplicativo-cdr-group@1.0.0 build
+> prisma generate && next build
+
+Environment variables loaded from .env
+Prisma schema loaded from prisma\schema.prisma
+
+Ô£ö Generated Prisma Client (v6.19.2) to .\node_modules\@prisma\client in 92ms
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+Tip: Want to turn off tips and other hints? https://pris.ly/tip-4-nohints
+
+Ôû▓ Next.js 16.1.6 (Turbopack)
+- Environments: .env
+
+ÔÜá The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+  Creating an optimized production build ...
+
+> Build error occurred
+Error: Turbopack build failed with 1 errors:
+./src/app/best-sellers/page.tsx:13:1
+Module not found: Can't resolve '@/components/ui/alert'
+  11 | import { Loader2, ShoppingBag, TrendingUp, Filter, AlertCircle, ExternalLink, Package } from "lucide-react";
+  12 | import Image from "next/image";
+> 13 | import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  14 | import { motion } from "framer-motion";
+  15 |
+  16 | export default function BestSellersPage() {
+
+Import map: aliased to relative './src/components/ui/alert' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./src/app/best-sellers/page.tsx [Client Component Browser]
+    ./src/app/best-sellers/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/best-sellers/page.tsx [Client Component SSR]
+    ./src/app/best-sellers/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+    at <unknown> (./src/app/best-sellers/page.tsx:13:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)

@@ -276,3 +276,85 @@ export async function exchangeNuvemshopToken(code: string) {
 
   return response.json();
 }
+
+/**
+ * Fetch products from Nuvemshop.
+ * Supports filtering by category (collection).
+ */
+export async function fetchNuvemshopProducts(
+  integrationId: string,
+  collectionId?: string // This corresponds to 'category_id' in Nuvemshop
+): Promise<any[]> {
+  const integration = await prisma.integration.findUnique({
+    where: { id: integrationId },
+  });
+
+  if (!integration || !integration.accessToken || !integration.externalStoreId) {
+    throw new Error("Nuvemshop integration not found or invalid");
+  }
+
+  const accessToken = decrypt(integration.accessToken);
+  const storeId = integration.externalStoreId;
+
+  let url = `https://api.nuvemshop.com.br/v1/${storeId}/products?per_page=50&published=true`;
+
+  if (collectionId && collectionId !== 'all') {
+    url += `&category_id=${collectionId}`;
+  }
+
+  // Nuvemshop allows sorting by 'total_sold_amount', 'created_at', etc.
+  // For "Best Sellers", 'total_sold_amount' (desc) is ideal if available, 
+  // but often 'sort_by=popular' or manual sorting is needed.
+  // The API doc isn't explicit on "best seller" sort param for public API, 
+  // checking standard params: sort_by=sell_count_desc?
+  // We'll stick to default for now and sort if needed.
+
+  const response = await fetch(url, {
+    headers: {
+      Authentication: `bearer ${accessToken}`,
+      "User-Agent": "CDR Group Hub (cdrgroup.com)",
+      "Content-Type": "application/json",
+    },
+    next: { revalidate: 300 }
+  });
+
+  if (!response.ok) {
+    console.error("[Nuvemshop API] Products fetch failed:", response.status);
+    throw new Error(`Failed to fetch products from Nuvemshop: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return Array.isArray(data) ? data : [];
+}
+
+/**
+ * Fetch categories (collections) from Nuvemshop
+ */
+export async function fetchNuvemshopCollections(integrationId: string): Promise<any[]> {
+  const integration = await prisma.integration.findUnique({
+    where: { id: integrationId },
+  });
+
+  if (!integration || !integration.accessToken || !integration.externalStoreId) {
+    throw new Error("Nuvemshop integration not found or invalid");
+  }
+
+  const accessToken = decrypt(integration.accessToken);
+  const storeId = integration.externalStoreId;
+
+  const response = await fetch(`https://api.nuvemshop.com.br/v1/${storeId}/categories?per_page=100`, {
+    headers: {
+      Authentication: `bearer ${accessToken}`,
+      "User-Agent": "CDR Group Hub (cdrgroup.com)",
+      "Content-Type": "application/json",
+    },
+    next: { revalidate: 3600 }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch categories from Nuvemshop: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return Array.isArray(data) ? data : [];
+}

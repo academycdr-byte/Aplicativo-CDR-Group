@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
@@ -20,6 +21,7 @@ const mainNav: NavItem[] = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Pedidos", href: "/orders", icon: ShoppingBag },
   { name: "Vendas", href: "/sales", icon: TrendingUp },
+  { name: "Mais Vendidos", href: "/best-sellers", icon: ShoppingBag },
   { name: "Anuncios", href: "/ads", icon: Megaphone },
   { name: "Relatorios", href: "/reports", icon: BarChart3 },
 ];
@@ -36,11 +38,10 @@ function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
   return (
     <Link
       href={item.href}
-      className={`group flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all relative ${
-        isActive
-          ? "bg-primary/10 text-primary"
-          : "text-sidebar-text/70 hover:text-sidebar-text hover:bg-sidebar-hover"
-      }`}
+      className={`group flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all relative ${isActive
+        ? "bg-primary/10 text-primary"
+        : "text-sidebar-text/70 hover:text-sidebar-text hover:bg-sidebar-hover"
+        }`}
     >
       {isActive && (
         <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-primary rounded-r-full" />
@@ -58,8 +59,14 @@ export function Sidebar() {
     <aside className="hidden md:flex md:w-60 md:flex-col bg-sidebar-bg text-sidebar-text min-h-screen border-r border-white/5">
       {/* Logo */}
       <div className="flex items-center gap-3 px-5 py-5">
-        <div className="w-9 h-9 bg-primary rounded-xl flex items-center justify-center text-primary-foreground font-bold text-[10px] tracking-wider">
-          CDR
+        <div className="relative w-9 h-9 flex items-center justify-center">
+          <Image
+            src="/logo.png.png"
+            alt="CDR Group"
+            fill
+            className="object-contain"
+            priority
+          />
         </div>
         <div>
           <p className="font-semibold text-sm leading-tight">CDR Group</p>

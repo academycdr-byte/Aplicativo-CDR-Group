@@ -672,3 +672,100 @@ async function fetchAbandonedCheckoutsByDate(
 
   return result;
 }
+
+/**
+ * Fetch products from Shopify.
+ * Note: Shopify Order API does not directly give "best sellers".
+ * We would typically need to query Analytics API or calculate from Orders.
+ * For this implementation, we will fetch products and rely on the client to sort if needed,
+ * OR use a collection that contains "best sellers" if available.
+ * 
+ * Better approach for "Best Sellers": Fetch all products and simple details, 
+ * simulating "best selling" by sort order if the API supports it, or just returning recent products.
+ * 
+ * Shopify Admin API (REST) /admin/api/2025-01/products.json
+ */
+export async function fetchShopifyProducts(
+  integrationId: string,
+  collectionId?: string
+): Promise<any[]> {
+  const integration = await prisma.integration.findUnique({
+    where: { id: integrationId },
+  });
+
+  if (!integration || !integration.accessToken || !integration.externalStoreId) {
+    throw new Error("Shopify integration not found or invalid");
+  }
+
+  const accessToken = decrypt(integration.accessToken);
+  const shop = integration.externalStoreId;
+
+  // If collectionId is provided, we fetch products from that collection
+  // Otherwise fetch all products
+  // REMOVED status=active to fetch ALL products (draft, archived, etc) for debugging
+  let url = `https://${shop}/admin/api/${SHOPIFY_API_VERSION}/products.json?limit=50`;
+
+  if (collectionId && collectionId !== 'all') {
+    url = `https://${shop}/admin/api/${SHOPIFY_API_VERSION}/collections/${collectionId}/products.json?limit=50`;
+  }
+
+  console.log(`[Shopify API] Fetching products from: ${url}`);
+
+  const response = await fetch(url, {
+    headers: {
+      "X-Shopify-Access-Token": accessToken,
+      "Content-Type": "application/json",
+    },
+    next: { revalidate: 60 } // Reduced cache time for debugging
+  });
+
+  if (!response.ok) {
+    console.error("[Shopify API] Products fetch failed:", response.status);
+    throw new Error(`Failed to fetch products from Shopify: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data.products || [];
+}
+
+/**
+ * Fetch smart and custom collections from Shopify
+ */
+export async function fetchShopifyCollections(integrationId: string): Promise<any[]> {
+  const integration = await prisma.integration.findUnique({
+    where: { id: integrationId },
+  });
+
+  if (!integration || !integration.accessToken || !integration.externalStoreId) {
+    throw new Error("Shopify integration not found or invalid");
+  }
+
+  const accessToken = decrypt(integration.accessToken);
+  const shop = integration.externalStoreId;
+
+  // Fetch both smart (automated) and custom (manual) collections
+  const [smartRes, customRes] = await Promise.all([
+    fetch(`https://${shop}/admin/api/${SHOPIFY_API_VERSION}/smart_collections.json?limit=100`, {
+      headers: { "X-Shopify-Access-Token": accessToken, "Content-Type": "application/json" },
+      next: { revalidate: 3600 }
+    }),
+    fetch(`https://${shop}/admin/api/${SHOPIFY_API_VERSION}/custom_collections.json?limit=100`, {
+      headers: { "X-Shopify-Access-Token": accessToken, "Content-Type": "application/json" },
+      next: { revalidate: 3600 }
+    })
+  ]);
+
+  let collections: any[] = [];
+
+  if (smartRes.ok) {
+    const data = await smartRes.json();
+    collections = [...collections, ...(data.smart_collections || [])];
+  }
+
+  if (customRes.ok) {
+    const data = await customRes.json();
+    collections = [...collections, ...(data.custom_collections || [])];
+  }
+
+  return collections;
+}
