@@ -150,6 +150,7 @@ export default function ReportsPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="0">Hoje</SelectItem>
             <SelectItem value="7">7 dias</SelectItem>
             <SelectItem value="30">30 dias</SelectItem>
             <SelectItem value="90">90 dias</SelectItem>

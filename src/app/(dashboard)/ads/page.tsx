@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,6 +30,9 @@ import {
   ChevronRight,
   Users,
   ImageIcon,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -110,6 +113,65 @@ export default function AdsPage() {
   const metricsPerPage = 20;
   const creativesPerPage = 12;
 
+  // Sorting state
+  type SortDir = "asc" | "desc";
+  const [metricsSortKey, setMetricsSortKey] = useState<string>("spend");
+  const [metricsSortDir, setMetricsSortDir] = useState<SortDir>("desc");
+  const [creativesSortKey, setCreativesSortKey] = useState<string>("spend");
+  const [creativesSortDir, setCreativesSortDir] = useState<SortDir>("desc");
+
+  function toggleSort(
+    key: string,
+    currentKey: string,
+    currentDir: SortDir,
+    setKey: (k: string) => void,
+    setDir: (d: SortDir) => void
+  ) {
+    if (key === currentKey) {
+      setDir(currentDir === "desc" ? "asc" : "desc");
+    } else {
+      setKey(key);
+      setDir("desc");
+    }
+  }
+
+  function SortIcon({ column, activeKey, activeDir }: { column: string; activeKey: string; activeDir: SortDir }) {
+    if (column !== activeKey) return <ArrowUpDown className="w-3 h-3 ml-1 opacity-40" />;
+    return activeDir === "desc"
+      ? <ArrowDown className="w-3 h-3 ml-1" />
+      : <ArrowUp className="w-3 h-3 ml-1" />;
+  }
+
+  // Compute derived metric values and sort for the overview table
+  const sortedMetrics = useMemo(() => {
+    const withDerived = metrics.map((m) => ({
+      ...m,
+      ctr: m.impressions > 0 ? (m.clicks / m.impressions) * 100 : 0,
+      roas: m.spend > 0 ? m.revenue / m.spend : 0,
+    }));
+    return withDerived.sort((a, b) => {
+      const aVal = (a as Record<string, unknown>)[metricsSortKey] as number ?? 0;
+      const bVal = (b as Record<string, unknown>)[metricsSortKey] as number ?? 0;
+      return metricsSortDir === "desc" ? bVal - aVal : aVal - bVal;
+    });
+  }, [metrics, metricsSortKey, metricsSortDir]);
+
+  // Sort creatives
+  const sortedCreatives = useMemo(() => {
+    const withDerived = creatives.map((c) => ({
+      ...c,
+      ctr: c.impressions > 0 ? (c.clicks / c.impressions) * 100 : 0,
+      cpc: c.clicks > 0 ? c.spend / c.clicks : 0,
+      cpm: c.impressions > 0 ? (c.spend / c.impressions) * 1000 : 0,
+      roas: c.spend > 0 ? c.revenue / c.spend : 0,
+    }));
+    return withDerived.sort((a, b) => {
+      const aVal = (a as Record<string, unknown>)[creativesSortKey] as number ?? 0;
+      const bVal = (b as Record<string, unknown>)[creativesSortKey] as number ?? 0;
+      return creativesSortDir === "desc" ? bVal - aVal : aVal - bVal;
+    });
+  }, [creatives, creativesSortKey, creativesSortDir]);
+
   useEffect(() => {
     loadData();
   }, [platformFilter, days]);
@@ -156,6 +218,7 @@ export default function AdsPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="0">Hoje</SelectItem>
               <SelectItem value="7">7 dias</SelectItem>
               <SelectItem value="30">30 dias</SelectItem>
               <SelectItem value="90">90 dias</SelectItem>
@@ -327,18 +390,20 @@ export default function AdsPage() {
           </Card>
 
           {/* Campaigns Table with Pagination */}
-          {metrics.length > 0 && (() => {
-            const totalMetricsPages = Math.ceil(metrics.length / metricsPerPage);
-            const paginatedMetrics = metrics.slice(
+          {sortedMetrics.length > 0 && (() => {
+            const totalMetricsPages = Math.ceil(sortedMetrics.length / metricsPerPage);
+            const paginatedMetrics = sortedMetrics.slice(
               (metricsPage - 1) * metricsPerPage,
               metricsPage * metricsPerPage
             );
+
+            const mSort = (key: string) => toggleSort(key, metricsSortKey, metricsSortDir, setMetricsSortKey, setMetricsSortDir);
 
             return (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base">
-                    Detalhamento por Anuncio ({metrics.length} resultado{metrics.length !== 1 ? "s" : ""})
+                    Detalhamento por Anuncio ({sortedMetrics.length} resultado{sortedMetrics.length !== 1 ? "s" : ""})
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -347,18 +412,30 @@ export default function AdsPage() {
                       <TableRow>
                         <TableHead>Anuncio</TableHead>
                         <TableHead>Plataforma</TableHead>
-                        <TableHead className="text-right">Impressoes</TableHead>
-                        <TableHead className="text-right">Cliques</TableHead>
-                        <TableHead className="text-right">CTR</TableHead>
-                        <TableHead className="text-right">Gasto</TableHead>
-                        <TableHead className="text-right">Conv.</TableHead>
-                        <TableHead className="text-right">ROAS</TableHead>
+                        <TableHead className="text-right cursor-pointer select-none hover:text-foreground" onClick={() => mSort("impressions")}>
+                          <span className="inline-flex items-center">Impressoes<SortIcon column="impressions" activeKey={metricsSortKey} activeDir={metricsSortDir} /></span>
+                        </TableHead>
+                        <TableHead className="text-right cursor-pointer select-none hover:text-foreground" onClick={() => mSort("clicks")}>
+                          <span className="inline-flex items-center">Cliques<SortIcon column="clicks" activeKey={metricsSortKey} activeDir={metricsSortDir} /></span>
+                        </TableHead>
+                        <TableHead className="text-right cursor-pointer select-none hover:text-foreground" onClick={() => mSort("ctr")}>
+                          <span className="inline-flex items-center">CTR<SortIcon column="ctr" activeKey={metricsSortKey} activeDir={metricsSortDir} /></span>
+                        </TableHead>
+                        <TableHead className="text-right cursor-pointer select-none hover:text-foreground" onClick={() => mSort("spend")}>
+                          <span className="inline-flex items-center">Gasto<SortIcon column="spend" activeKey={metricsSortKey} activeDir={metricsSortDir} /></span>
+                        </TableHead>
+                        <TableHead className="text-right cursor-pointer select-none hover:text-foreground" onClick={() => mSort("conversions")}>
+                          <span className="inline-flex items-center">Conv.<SortIcon column="conversions" activeKey={metricsSortKey} activeDir={metricsSortDir} /></span>
+                        </TableHead>
+                        <TableHead className="text-right cursor-pointer select-none hover:text-foreground" onClick={() => mSort("roas")}>
+                          <span className="inline-flex items-center">ROAS<SortIcon column="roas" activeKey={metricsSortKey} activeDir={metricsSortDir} /></span>
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {paginatedMetrics.map((m) => {
-                        const mCtr = m.impressions > 0 ? (m.clicks / m.impressions) * 100 : 0;
-                        const mRoas = m.spend > 0 ? m.revenue / m.spend : 0;
+                        const mCtr = m.ctr;
+                        const mRoas = m.roas;
                         return (
                           <TableRow key={m.id}>
                             <TableCell>
@@ -455,7 +532,7 @@ export default function AdsPage() {
             <>
               {/* Creative Cards Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {creatives
+                {sortedCreatives
                   .slice((creativesPage - 1) * creativesPerPage, creativesPage * creativesPerPage)
                   .map((c) => {
                     const cCtr = c.impressions > 0 ? (c.clicks / c.impressions) * 100 : 0;
@@ -545,10 +622,10 @@ export default function AdsPage() {
               </div>
 
               {/* Creatives Pagination */}
-              {creatives.length > creativesPerPage && (
+              {sortedCreatives.length > creativesPerPage && (
                 <div className="flex items-center justify-between">
                   <p className="text-sm text-muted-foreground">
-                    Mostrando {((creativesPage - 1) * creativesPerPage) + 1}-{Math.min(creativesPage * creativesPerPage, creatives.length)} de {creatives.length} criativos
+                    Mostrando {((creativesPage - 1) * creativesPerPage) + 1}-{Math.min(creativesPage * creativesPerPage, sortedCreatives.length)} de {sortedCreatives.length} criativos
                   </p>
                   <div className="flex gap-2">
                     <Button
@@ -562,7 +639,7 @@ export default function AdsPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      disabled={creativesPage * creativesPerPage >= creatives.length}
+                      disabled={creativesPage * creativesPerPage >= sortedCreatives.length}
                       onClick={() => setCreativesPage(creativesPage + 1)}
                     >
                       <ChevronRight className="w-4 h-4" />
@@ -581,22 +658,32 @@ export default function AdsPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Criativo</TableHead>
-                        <TableHead className="text-right">Gasto</TableHead>
-                        <TableHead className="text-right">Impressoes</TableHead>
-                        <TableHead className="text-right">Cliques</TableHead>
-                        <TableHead className="text-right">CTR</TableHead>
-                        <TableHead className="text-right">CPC</TableHead>
-                        <TableHead className="text-right">CPM</TableHead>
-                        <TableHead className="text-right">Conv.</TableHead>
-                        <TableHead className="text-right">ROAS</TableHead>
+                        {([
+                          ["spend", "Gasto"],
+                          ["impressions", "Impressoes"],
+                          ["clicks", "Cliques"],
+                          ["ctr", "CTR"],
+                          ["cpc", "CPC"],
+                          ["cpm", "CPM"],
+                          ["conversions", "Conv."],
+                          ["roas", "ROAS"],
+                        ] as const).map(([key, label]) => (
+                          <TableHead
+                            key={key}
+                            className="text-right cursor-pointer select-none hover:text-foreground"
+                            onClick={() => toggleSort(key, creativesSortKey, creativesSortDir, setCreativesSortKey, setCreativesSortDir)}
+                          >
+                            <span className="inline-flex items-center">{label}<SortIcon column={key} activeKey={creativesSortKey} activeDir={creativesSortDir} /></span>
+                          </TableHead>
+                        ))}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {creatives.map((c, idx) => {
-                        const cCtr = c.impressions > 0 ? (c.clicks / c.impressions) * 100 : 0;
-                        const cCpc = c.clicks > 0 ? c.spend / c.clicks : 0;
-                        const cCpm = c.impressions > 0 ? (c.spend / c.impressions) * 1000 : 0;
-                        const cRoas = c.spend > 0 ? c.revenue / c.spend : 0;
+                      {sortedCreatives.map((c, idx) => {
+                        const cCtr = c.ctr;
+                        const cCpc = c.cpc;
+                        const cCpm = c.cpm;
+                        const cRoas = c.roas;
 
                         return (
                           <TableRow key={c.adId}>
