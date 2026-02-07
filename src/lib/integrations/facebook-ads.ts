@@ -91,27 +91,30 @@ async function fetchAdVideoUrls(
   const videoUrls: Record<string, string> = {};
   if (adIds.length === 0) return videoUrls;
 
-  // Batch fetch (max 50 per request)
+  // Batch fetch (reduced to 25 to avoid timeouts)
   const batches = [];
-  for (let i = 0; i < adIds.length; i += 50) {
-    batches.push(adIds.slice(i, i + 50));
+  for (let i = 0; i < adIds.length; i += 25) {
+    batches.push(adIds.slice(i, i + 25));
   }
 
   for (const batch of batches) {
     const ids = batch.join(",");
     try {
-      // Fetch creative with video_id
+      // Fetch creative with video_id - explicit nested fields
       const response = await fetch(
-        `https://graph.facebook.com/${FB_GRAPH_VERSION}/?ids=${ids}&fields=creative{video_id,object_story_spec}&access_token=${accessToken}`
+        `https://graph.facebook.com/${FB_GRAPH_VERSION}/?ids=${ids}&fields=creative{video_id,object_story_spec{video_data{video_id}}}&access_token=${accessToken}`
       );
+
       if (response.ok) {
         const data = await response.json();
         const videoIds: string[] = [];
         const adToVideoMap: Record<string, string> = {};
 
         for (const [adId, adData] of Object.entries(data)) {
-          const creative = (adData as { creative?: { video_id?: string; object_story_spec?: { video_data?: { video_id?: string } } } })?.creative;
-          const videoId = creative?.video_id || creative?.object_story_spec?.video_data?.video_id;
+          const creative = (adData as any)?.creative;
+          if (!creative) continue;
+
+          const videoId = creative.video_id || creative.object_story_spec?.video_data?.video_id;
           if (videoId) {
             videoIds.push(videoId);
             adToVideoMap[adId] = videoId;
@@ -121,21 +124,24 @@ async function fetchAdVideoUrls(
         // Fetch video source URLs
         if (videoIds.length > 0) {
           const uniqueVideoIds = [...new Set(videoIds)];
+          // Breaking down video fetch into smaller chunks too if needed, but usually IDs are fewer
           const videoResponse = await fetch(
             `https://graph.facebook.com/${FB_GRAPH_VERSION}/?ids=${uniqueVideoIds.join(",")}&fields=source&access_token=${accessToken}`
           );
+
           if (videoResponse.ok) {
             const videoData = await videoResponse.json();
             for (const [adId, videoId] of Object.entries(adToVideoMap)) {
-              const video = videoData[videoId] as { source?: string };
-              if (video?.source) {
+              const video = videoData[videoId];
+              if (video && video.source) {
                 videoUrls[adId] = video.source;
               }
             }
           }
         }
       }
-    } catch {
+    } catch (error) {
+      console.error("Error fetching video URLs for batch:", error);
       // Continue without video URLs if fetch fails
     }
   }
