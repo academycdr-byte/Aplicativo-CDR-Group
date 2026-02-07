@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { getSessionWithOrg } from "@/lib/session";
 import { encrypt, decrypt } from "@/lib/encryption";
-import { Platform } from "@prisma/client";
+import { Platform, Prisma } from "@prisma/client";
 import { validateShopifyAccessToken } from "@/lib/integrations/shopify";
 
 export async function getIntegrations() {
@@ -158,16 +158,44 @@ export async function disconnectIntegration(platform: Platform) {
     return { error: "Integracao nao encontrada." };
   }
 
-  await prisma.integration.update({
-    where: { id: integration.id },
-    data: {
-      status: "DISCONNECTED",
-      accessToken: null,
-      refreshToken: null,
-      apiKey: null,
-      apiSecret: null,
-    },
-  });
+  // Delete all data associated with this platform
+  const orgId = ctx.organization.id;
+  const isAdPlatform = ["FACEBOOK_ADS", "GOOGLE_ADS"].includes(platform);
+  const isOrderPlatform = ["SHOPIFY", "CARTPANDA", "YAMPI", "NUVEMSHOP"].includes(platform);
+
+  await prisma.$transaction([
+    // Delete orders for order platforms
+    ...(isOrderPlatform
+      ? [prisma.order.deleteMany({ where: { organizationId: orgId, platform } })]
+      : []),
+    // Delete ad metrics for ad platforms
+    ...(isAdPlatform
+      ? [prisma.adMetric.deleteMany({ where: { organizationId: orgId, platform } })]
+      : []),
+    // Delete reportana events if applicable
+    ...(platform === "REPORTANA"
+      ? [prisma.reportanaEvent.deleteMany({ where: { organizationId: orgId } })]
+      : []),
+    // Delete sync logs for this platform
+    prisma.syncLog.deleteMany({ where: { organizationId: orgId, platform } }),
+    // Update integration status
+    prisma.integration.update({
+      where: { id: integration.id },
+      data: {
+        status: "DISCONNECTED",
+        accessToken: null,
+        refreshToken: null,
+        apiKey: null,
+        apiSecret: null,
+        externalAccountId: null,
+        externalStoreId: null,
+        metadata: Prisma.JsonNull,
+        lastSyncAt: null,
+        syncStatus: "IDLE",
+        errorMessage: null,
+      },
+    }),
+  ]);
 
   return { success: true };
 }

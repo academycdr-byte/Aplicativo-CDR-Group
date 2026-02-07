@@ -3,6 +3,16 @@
 import { prisma } from "@/lib/prisma";
 import { getSessionWithOrg } from "@/lib/session";
 
+function getSince(days: number): Date {
+  const since = new Date();
+  if (days === 0) {
+    since.setHours(0, 0, 0, 0);
+  } else {
+    since.setDate(since.getDate() - days);
+  }
+  return since;
+}
+
 export async function getAdMetrics(params?: {
   platform?: string;
   days?: number;
@@ -11,8 +21,7 @@ export async function getAdMetrics(params?: {
   if (!ctx) return { metrics: [], totals: null };
 
   const days = params?.days || 30;
-  const since = new Date();
-  since.setDate(since.getDate() - days);
+  const since = getSince(days);
 
   const where: Record<string, unknown> = {
     organizationId: ctx.organization.id,
@@ -23,22 +32,26 @@ export async function getAdMetrics(params?: {
     where.platform = params.platform;
   }
 
-  const metrics = await prisma.adMetric.findMany({
-    where,
-    orderBy: { date: "desc" },
-  });
-
-  const totals = await prisma.adMetric.aggregate({
-    where,
-    _sum: {
-      impressions: true,
-      reach: true,
-      clicks: true,
-      spend: true,
-      conversions: true,
-      revenue: true,
-    },
-  });
+  // Run both queries in parallel for speed
+  const [metrics, totals] = await Promise.all([
+    prisma.adMetric.findMany({
+      where,
+      orderBy: { date: "desc" },
+      select: {
+        id: true, platform: true, campaignId: true, campaignName: true,
+        adSetId: true, adSetName: true, adId: true, adName: true,
+        thumbnailUrl: true, date: true, impressions: true, reach: true,
+        clicks: true, spend: true, conversions: true, revenue: true, currency: true,
+      },
+    }),
+    prisma.adMetric.aggregate({
+      where,
+      _sum: {
+        impressions: true, reach: true, clicks: true,
+        spend: true, conversions: true, revenue: true,
+      },
+    }),
+  ]);
 
   return {
     metrics: metrics.map((m) => ({
@@ -75,14 +88,14 @@ export async function getAdMetricsByDay(days: number = 30) {
   const ctx = await getSessionWithOrg();
   if (!ctx) return [];
 
-  const since = new Date();
-  since.setDate(since.getDate() - days);
+  const since = getSince(days);
 
   const metrics = await prisma.adMetric.findMany({
     where: {
       organizationId: ctx.organization.id,
       date: { gte: since },
     },
+    select: { date: true, spend: true, impressions: true, clicks: true, conversions: true, revenue: true },
     orderBy: { date: "asc" },
   });
 
@@ -116,8 +129,7 @@ export async function getCreativePerformance(params?: {
   if (!ctx) return [];
 
   const days = params?.days || 30;
-  const since = new Date();
-  since.setDate(since.getDate() - days);
+  const since = getSince(days);
 
   const where: Record<string, unknown> = {
     organizationId: ctx.organization.id,
@@ -131,6 +143,11 @@ export async function getCreativePerformance(params?: {
 
   const metrics = await prisma.adMetric.findMany({
     where,
+    select: {
+      adId: true, adName: true, campaignName: true, adSetName: true,
+      platform: true, thumbnailUrl: true, impressions: true, reach: true,
+      clicks: true, spend: true, conversions: true, revenue: true,
+    },
     orderBy: { date: "desc" },
   });
 

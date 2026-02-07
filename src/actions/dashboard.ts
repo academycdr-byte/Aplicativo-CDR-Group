@@ -3,16 +3,26 @@
 import { prisma } from "@/lib/prisma";
 import { getSessionWithOrg } from "@/lib/session";
 
+function getSince(days: number): Date {
+  const since = new Date();
+  if (days === 0) {
+    since.setHours(0, 0, 0, 0);
+  } else {
+    since.setDate(since.getDate() - days);
+  }
+  return since;
+}
+
 export async function getDashboardData(days: number = 30) {
   const ctx = await getSessionWithOrg();
   if (!ctx) return null;
 
   const orgId = ctx.organization.id;
-  const since = new Date();
-  since.setDate(since.getDate() - days);
+  const since = getSince(days);
 
+  const compareDays = days === 0 ? 1 : days;
   const prevSince = new Date();
-  prevSince.setDate(prevSince.getDate() - days * 2);
+  prevSince.setDate(prevSince.getDate() - compareDays * 2);
 
   const [
     totalOrders,
@@ -78,8 +88,7 @@ export async function getRevenueByDay(days: number = 30) {
   const ctx = await getSessionWithOrg();
   if (!ctx) return [];
 
-  const since = new Date();
-  since.setDate(since.getDate() - days);
+  const since = getSince(days);
 
   const orders = await prisma.order.findMany({
     where: {
