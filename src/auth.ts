@@ -28,13 +28,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
       }
 
-      // Allow updating the token from session update
-      if (trigger === "update" && session) {
+      // Validar no servidor antes de atualizar token
+      if (trigger === "update" && session && token.sub) {
         if (session.organizationId) {
-          token.organizationId = session.organizationId;
-        }
-        if (session.role) {
-          token.role = session.role;
+          const membership = await prisma.membership.findFirst({
+            where: {
+              userId: token.sub,
+              organizationId: session.organizationId,
+            },
+          });
+
+          if (membership) {
+            token.organizationId = membership.organizationId;
+            token.role = membership.role;
+          }
         }
       }
 

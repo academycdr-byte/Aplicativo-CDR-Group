@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
-import { encrypt, decrypt } from "@/lib/encryption";
+import { decrypt } from "@/lib/encryption";
 
-const SHOPIFY_API_VERSION = "2024-01";
+const SHOPIFY_API_VERSION = "2025-01";
 
 export async function fetchShopifyOrders(integrationId: string) {
   const integration = await prisma.integration.findUnique({
@@ -15,21 +15,40 @@ export async function fetchShopifyOrders(integrationId: string) {
   const accessToken = decrypt(integration.accessToken);
   const shop = integration.externalStoreId;
 
-  const url = `https://${shop}/admin/api/${SHOPIFY_API_VERSION}/orders.json?status=any&limit=250`;
+  const allOrders: Record<string, unknown>[] = [];
+  let pageInfo: string | null = null;
 
-  const response = await fetch(url, {
-    headers: {
-      "X-Shopify-Access-Token": accessToken,
-      "Content-Type": "application/json",
-    },
-  });
+  do {
+    const url = pageInfo
+      ? `https://${shop}/admin/api/${SHOPIFY_API_VERSION}/orders.json?limit=250&page_info=${pageInfo}`
+      : `https://${shop}/admin/api/${SHOPIFY_API_VERSION}/orders.json?status=any&limit=250`;
 
-  if (!response.ok) {
-    throw new Error(`Shopify API error: ${response.status}`);
-  }
+    const response = await fetch(url, {
+      headers: {
+        "X-Shopify-Access-Token": accessToken,
+        "Content-Type": "application/json",
+      },
+    });
 
-  const data = await response.json();
-  return data.orders || [];
+    if (!response.ok) {
+      throw new Error(`Shopify API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    allOrders.push(...(data.orders || []));
+
+    // Extrair cursor de paginação do header Link
+    pageInfo = getNextPageInfo(response.headers.get("link"));
+  } while (pageInfo);
+
+  return allOrders;
+}
+
+function getNextPageInfo(linkHeader: string | null): string | null {
+  if (!linkHeader) return null;
+
+  const nextMatch = linkHeader.match(/<[^>]*page_info=([^>&]*)[^>]*>;\s*rel="next"/);
+  return nextMatch ? nextMatch[1] : null;
 }
 
 export async function syncShopifyOrders(organizationId: string) {
@@ -71,25 +90,25 @@ export async function syncShopifyOrders(organizationId: string) {
           organizationId,
           platform: "SHOPIFY",
           externalOrderId: String(order.id),
-          status: mapShopifyStatus(order.financial_status),
+          status: mapShopifyStatus(order.financial_status as string),
           customerName: order.customer
-            ? `${order.customer.first_name || ""} ${order.customer.last_name || ""}`.trim()
+            ? `${(order.customer as Record<string, string>).first_name || ""} ${(order.customer as Record<string, string>).last_name || ""}`.trim()
             : null,
-          customerEmail: order.customer?.email || null,
-          totalAmount: parseFloat(order.total_price || "0"),
-          currency: order.currency || "BRL",
-          itemCount: order.line_items?.length || 0,
-          orderDate: new Date(order.created_at),
+          customerEmail: (order.customer as Record<string, string>)?.email || null,
+          totalAmount: parseFloat((order.total_price as string) || "0"),
+          currency: (order.currency as string) || "BRL",
+          itemCount: (order.line_items as unknown[])?.length || 0,
+          orderDate: new Date(order.created_at as string),
           rawData: order,
         },
         update: {
-          status: mapShopifyStatus(order.financial_status),
-          totalAmount: parseFloat(order.total_price || "0"),
+          status: mapShopifyStatus(order.financial_status as string),
+          totalAmount: parseFloat((order.total_price as string) || "0"),
           customerName: order.customer
-            ? `${order.customer.first_name || ""} ${order.customer.last_name || ""}`.trim()
+            ? `${(order.customer as Record<string, string>).first_name || ""} ${(order.customer as Record<string, string>).last_name || ""}`.trim()
             : null,
-          customerEmail: order.customer?.email || null,
-          itemCount: order.line_items?.length || 0,
+          customerEmail: (order.customer as Record<string, string>)?.email || null,
+          itemCount: (order.line_items as unknown[])?.length || 0,
           rawData: order,
         },
       });

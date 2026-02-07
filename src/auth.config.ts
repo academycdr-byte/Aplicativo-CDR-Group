@@ -43,21 +43,6 @@ export const authConfig = {
       }
       return session;
     },
-    jwt({ token, user, trigger, session }) {
-      if (user) {
-        token.sub = user.id;
-      }
-      // Allow updating the token from session update
-      if (trigger === "update" && session) {
-        if (session.organizationId) {
-          token.organizationId = session.organizationId;
-        }
-        if (session.role) {
-          token.role = session.role;
-        }
-      }
-      return token;
-    },
   },
   providers: [], // configured in auth.ts
 } satisfies NextAuthConfig;

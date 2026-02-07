@@ -5,7 +5,12 @@ const IV_LENGTH = 16;
 const TAG_LENGTH = 16;
 
 function getKey(): Buffer {
-  const secret = process.env.ENCRYPTION_KEY || process.env.AUTH_SECRET || "";
+  const secret = process.env.ENCRYPTION_KEY || process.env.AUTH_SECRET;
+  if (!secret) {
+    throw new Error(
+      "ENCRYPTION_KEY ou AUTH_SECRET deve ser configurado nas variáveis de ambiente"
+    );
+  }
   return crypto.createHash("sha256").update(secret).digest();
 }
 
@@ -34,6 +39,13 @@ export function decrypt(encryptedText: string): string {
   const iv = Buffer.from(parts[0], "hex");
   const tag = Buffer.from(parts[1], "hex");
   const encrypted = parts[2];
+
+  if (iv.length !== IV_LENGTH) {
+    throw new Error(`IV inválido: esperado ${IV_LENGTH} bytes, recebido ${iv.length}`);
+  }
+  if (tag.length !== TAG_LENGTH) {
+    throw new Error(`Auth tag inválido: esperado ${TAG_LENGTH} bytes, recebido ${tag.length}`);
+  }
 
   const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
   decipher.setAuthTag(tag);
