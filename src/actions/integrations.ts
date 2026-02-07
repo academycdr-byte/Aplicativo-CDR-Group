@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getSessionWithOrg } from "@/lib/session";
 import { encrypt, decrypt } from "@/lib/encryption";
 import { Platform } from "@prisma/client";
-import { connectShopifyViaClientCredentials } from "@/lib/integrations/shopify";
+import { validateShopifyAccessToken } from "@/lib/integrations/shopify";
 
 export async function getIntegrations() {
   const ctx = await getSessionWithOrg();
@@ -79,7 +79,7 @@ export async function connectApiKeyIntegration(data: {
   return { success: true };
 }
 
-export async function connectShopifyDirect(shop: string) {
+export async function connectShopifyDirect(shop: string, accessToken: string) {
   const ctx = await getSessionWithOrg();
   if (!ctx) return { error: "Nao autenticado." };
 
@@ -93,40 +93,42 @@ export async function connectShopifyDirect(shop: string) {
     domain = `${domain}.myshopify.com`;
   }
 
-  try {
-    // Obter token via Client Credentials Grant
-    const tokenData = await connectShopifyViaClientCredentials(domain);
+  const token = accessToken.trim();
+  if (!token) {
+    return { error: "Access Token e obrigatorio." };
+  }
 
-    // Salvar integracao
-    await prisma.integration.upsert({
-      where: {
-        organizationId_platform: {
-          organizationId: ctx.organization.id,
-          platform: "SHOPIFY",
-        },
-      },
-      create: {
+  // Validar token fazendo chamada de teste a API da Shopify
+  const validation = await validateShopifyAccessToken(domain, token);
+
+  if (!validation.valid) {
+    return { error: validation.error || "Token invalido." };
+  }
+
+  // Salvar integracao
+  await prisma.integration.upsert({
+    where: {
+      organizationId_platform: {
         organizationId: ctx.organization.id,
         platform: "SHOPIFY",
-        status: "CONNECTED",
-        accessToken: encrypt(tokenData.access_token),
-        externalStoreId: domain,
-        scopes: tokenData.scope || "",
       },
-      update: {
-        status: "CONNECTED",
-        accessToken: encrypt(tokenData.access_token),
-        externalStoreId: domain,
-        scopes: tokenData.scope || "",
-        errorMessage: null,
-      },
-    });
+    },
+    create: {
+      organizationId: ctx.organization.id,
+      platform: "SHOPIFY",
+      status: "CONNECTED",
+      accessToken: encrypt(token),
+      externalStoreId: domain,
+    },
+    update: {
+      status: "CONNECTED",
+      accessToken: encrypt(token),
+      externalStoreId: domain,
+      errorMessage: null,
+    },
+  });
 
-    return { success: true };
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : "Erro desconhecido";
-    return { error: msg };
-  }
+  return { success: true, shopName: validation.shopName };
 }
 
 export async function disconnectIntegration(platform: Platform) {

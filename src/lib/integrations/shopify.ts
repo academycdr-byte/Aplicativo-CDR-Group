@@ -1,126 +1,56 @@
 import { prisma } from "@/lib/prisma";
-import { encrypt, decrypt } from "@/lib/encryption";
+import { decrypt } from "@/lib/encryption";
 
 const SHOPIFY_API_VERSION = "2024-01";
 
 /**
- * Conecta a Shopify usando Client Credentials Grant.
- * Este fluxo e para apps do Dev Dashboard instalados em lojas proprias.
- * O token expira em 24h e deve ser renovado automaticamente.
+ * Valida um Access Token de Custom App da Shopify fazendo uma chamada de teste.
+ * Custom Apps geram tokens permanentes (nao expiram), entao nao precisa de refresh.
  */
-export async function connectShopifyViaClientCredentials(shop: string): Promise<{
-  access_token: string;
-  scope: string;
-  expires_in: number;
-}> {
-  const clientId = (process.env.SHOPIFY_CLIENT_ID || "").trim();
-  const clientSecret = (process.env.SHOPIFY_CLIENT_SECRET || "").trim();
-
-  if (!clientId || !clientSecret) {
-    throw new Error("SHOPIFY_CLIENT_ID ou SHOPIFY_CLIENT_SECRET nao configurados no Vercel.");
-  }
-
-  console.log("[Shopify] Client Credentials Grant for shop:", shop);
-
-  const response = await fetch(`https://${shop}/admin/oauth/access_token`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Accept": "application/json",
-    },
-    body: JSON.stringify({
-      client_id: clientId,
-      client_secret: clientSecret,
-      grant_type: "client_credentials",
-    }),
-  });
-
-  if (!response.ok) {
-    const errorBody = await response.text();
-    console.error("[Shopify] Client Credentials FAILED:", response.status, errorBody);
-
-    try {
-      const parsed = JSON.parse(errorBody);
-      const error = parsed.error || "";
-      const desc = parsed.error_description || "";
-
-      if (error === "application_cannot_be_found") {
-        throw new Error(
-          "App nao encontrado. Verifique se o app CDR Group esta instalado nesta loja. "
-          + "Use o link de instalacao do Shopify Partners > Distribuicao."
-        );
-      }
-      if (error === "invalid_client") {
-        throw new Error("Client Secret invalido. Verifique SHOPIFY_CLIENT_SECRET no Vercel.");
-      }
-      if (desc.includes("not installed")) {
-        throw new Error("O app CDR Group nao esta instalado nesta loja. Instale primeiro via Shopify Partners.");
-      }
-      throw new Error(`Erro Shopify: ${desc || error || errorBody}`);
-    } catch (e) {
-      if (e instanceof Error && !e.message.startsWith("Erro Shopify")) throw e;
-      throw new Error(`Erro Shopify (${response.status}): ${errorBody}`);
-    }
-  }
-
-  const data = await response.json();
-  console.log("[Shopify] Token obtained! Scopes:", data.scope, "Expires in:", data.expires_in);
-  return data;
-}
-
-/**
- * Renova o access token da Shopify via Client Credentials.
- * Deve ser chamada antes de qualquer API call se o token expirou.
- */
-export async function refreshShopifyTokenIfNeeded(integrationId: string): Promise<string> {
-  const integration = await prisma.integration.findUnique({
-    where: { id: integrationId },
-  });
-
-  if (!integration || !integration.externalStoreId) {
-    throw new Error("Integration not found");
-  }
-
-  // Verificar se o token precisa ser renovado (mais de 23h desde a ultima atualizacao)
-  const tokenAge = Date.now() - new Date(integration.updatedAt).getTime();
-  const TOKEN_MAX_AGE = 23 * 60 * 60 * 1000; // 23 horas (margem de seguranca)
-
-  if (integration.accessToken && tokenAge < TOKEN_MAX_AGE) {
-    return decrypt(integration.accessToken);
-  }
-
-  // Token expirado ou ausente - renovar via Client Credentials
-  console.log("[Shopify] Refreshing token for shop:", integration.externalStoreId);
-
+export async function validateShopifyAccessToken(
+  shop: string,
+  accessToken: string
+): Promise<{ valid: boolean; shopName?: string; error?: string }> {
   try {
-    const tokenData = await connectShopifyViaClientCredentials(integration.externalStoreId);
+    const response = await fetch(
+      `https://${shop}/admin/api/${SHOPIFY_API_VERSION}/shop.json`,
+      {
+        headers: {
+          "X-Shopify-Access-Token": accessToken,
+          "Content-Type": "application/json",
+        },
+      }
+    );
 
-    await prisma.integration.update({
-      where: { id: integrationId },
-      data: {
-        accessToken: encrypt(tokenData.access_token),
-        scopes: tokenData.scope || "",
-        errorMessage: null,
-      },
-    });
+    if (!response.ok) {
+      const errorBody = await response.text();
+      console.error("[Shopify] Token validation failed:", response.status, errorBody);
 
-    return tokenData.access_token;
+      if (response.status === 401) {
+        return { valid: false, error: "Access Token invalido. Verifique se copiou o token corretamente." };
+      }
+      if (response.status === 403) {
+        return { valid: false, error: "Token sem permissao. Verifique os escopos do Custom App." };
+      }
+      if (response.status === 404) {
+        return { valid: false, error: "Loja nao encontrada. Verifique o dominio informado." };
+      }
+      return { valid: false, error: `Erro Shopify (${response.status}): ${errorBody}` };
+    }
+
+    const data = await response.json();
+    console.log("[Shopify] Token validated! Shop:", data.shop?.name);
+    return { valid: true, shopName: data.shop?.name };
   } catch (error) {
-    const msg = error instanceof Error ? error.message : "Token refresh failed";
-    console.error("[Shopify] Token refresh failed:", msg);
-
-    await prisma.integration.update({
-      where: { id: integrationId },
-      data: { errorMessage: msg },
-    });
-
-    throw error;
+    const msg = error instanceof Error ? error.message : "Erro de conexao";
+    console.error("[Shopify] Token validation error:", msg);
+    return { valid: false, error: `Erro ao conectar: ${msg}` };
   }
 }
 
 /**
  * Busca pedidos da Shopify usando o access token armazenado.
- * Renova o token automaticamente se necessario.
+ * Custom App tokens sao permanentes, nao precisam de refresh.
  */
 export async function fetchShopifyOrders(integrationId: string) {
   const integration = await prisma.integration.findUnique({
@@ -131,8 +61,11 @@ export async function fetchShopifyOrders(integrationId: string) {
     throw new Error("Integration not found or missing store domain");
   }
 
-  // Obter token valido (renova automaticamente se expirado)
-  const accessToken = await refreshShopifyTokenIfNeeded(integrationId);
+  if (!integration.accessToken) {
+    throw new Error("Access token nao encontrado. Reconecte a loja Shopify.");
+  }
+
+  const accessToken = decrypt(integration.accessToken);
   const shop = integration.externalStoreId;
 
   const url = `https://${shop}/admin/api/${SHOPIFY_API_VERSION}/orders.json?status=any&limit=250`;
@@ -151,32 +84,14 @@ export async function fetchShopifyOrders(integrationId: string) {
     console.error("[Shopify API] Orders fetch failed:", response.status, errorBody);
 
     if (response.status === 401) {
-      // Token invalido - tentar renovar uma vez
-      console.log("[Shopify API] Token expired, forcing refresh...");
-      try {
-        const newToken = await forceRefreshShopifyToken(integrationId);
-        const retryResponse = await fetch(url, {
-          headers: {
-            "X-Shopify-Access-Token": newToken,
-            "Content-Type": "application/json",
-          },
-        });
-        if (retryResponse.ok) {
-          const retryData = await retryResponse.json();
-          return retryData.orders || [];
-        }
-      } catch {
-        // Refresh tambem falhou
-      }
-
       await prisma.integration.update({
         where: { id: integrationId },
         data: {
           status: "DISCONNECTED",
-          errorMessage: "Token invalido. Reconecte a loja Shopify.",
+          errorMessage: "Token invalido. Reconecte a loja Shopify com um novo Access Token.",
         },
       });
-      throw new Error("Token Shopify invalido. Reconecte a integracao.");
+      throw new Error("Token Shopify invalido. Reconecte a integracao com um novo Access Token.");
     }
 
     throw new Error(`Shopify API error: ${response.status}`);
@@ -185,32 +100,6 @@ export async function fetchShopifyOrders(integrationId: string) {
   const data = await response.json();
   console.log("[Shopify API] Fetched", (data.orders || []).length, "orders");
   return data.orders || [];
-}
-
-/**
- * Forca a renovacao do token ignorando o cache de tempo.
- */
-async function forceRefreshShopifyToken(integrationId: string): Promise<string> {
-  const integration = await prisma.integration.findUnique({
-    where: { id: integrationId },
-  });
-
-  if (!integration || !integration.externalStoreId) {
-    throw new Error("Integration not found");
-  }
-
-  const tokenData = await connectShopifyViaClientCredentials(integration.externalStoreId);
-
-  await prisma.integration.update({
-    where: { id: integrationId },
-    data: {
-      accessToken: encrypt(tokenData.access_token),
-      scopes: tokenData.scope || "",
-      errorMessage: null,
-    },
-  });
-
-  return tokenData.access_token;
 }
 
 export async function syncShopifyOrders(organizationId: string) {
