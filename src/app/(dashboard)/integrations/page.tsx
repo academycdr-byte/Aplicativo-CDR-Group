@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Link2, Unlink, RefreshCw, AlertCircle, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
-import { getIntegrations, connectApiKeyIntegration, disconnectIntegration } from "@/actions/integrations";
+import { getIntegrations, connectApiKeyIntegration, connectShopifyDirect, disconnectIntegration } from "@/actions/integrations";
 import { syncPlatform } from "@/actions/sync";
 import { Platform } from "@prisma/client";
 import { useSearchParams } from "next/navigation";
@@ -118,6 +118,7 @@ function IntegrationsContent() {
   const [connectDialog, setConnectDialog] = useState<PlatformConfig | null>(null);
   const [shopifyDialog, setShopifyDialog] = useState(false);
   const [shopDomain, setShopDomain] = useState("");
+  const [shopifyToken, setShopifyToken] = useState("");
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState<string | null>(null);
@@ -135,7 +136,14 @@ function IntegrationsContent() {
     if (success === "shopify") {
       toast.success("Shopify conectada com sucesso!");
     } else if (error === "shopify_oauth_failed") {
-      toast.error(`Erro ao conectar Shopify${detail ? `: ${detail}` : ""}`);
+      const isAppNotFound = detail?.includes("nao encontrado") || detail?.includes("application_cannot_be_found");
+      if (isAppNotFound) {
+        toast.error("App Shopify nao encontrado. Verifique as credenciais (API Key) no Shopify Partners e nas variaveis de ambiente do Vercel.", { duration: 10000 });
+      } else {
+        toast.error(`Erro ao conectar Shopify${detail ? `: ${detail}` : ""}`, { duration: 8000 });
+      }
+    } else if (error === "shopify_config_error") {
+      toast.error(`Configuracao Shopify incorreta${detail ? `: ${detail}` : ""}. Verifique as variaveis de ambiente no Vercel.`, { duration: 10000 });
     } else if (error === "shopify_denied") {
       toast.error(`Shopify negou acesso${detail ? `: ${detail}` : ""}`);
     } else if (error === "missing_params") {
@@ -158,6 +166,8 @@ function IntegrationsContent() {
   function openConnect(platform: PlatformConfig) {
     if (platform.platform === "SHOPIFY") {
       setShopDomain("");
+      setShopifyToken("");
+      setMsg("");
       setShopifyDialog(true);
       return;
     }
@@ -179,18 +189,25 @@ function IntegrationsContent() {
     setConnectDialog(platform);
   }
 
-  function handleShopifyConnect(e: React.FormEvent) {
+  async function handleShopifyConnect(e: React.FormEvent) {
     e.preventDefault();
-    let domain = shopDomain.trim().toLowerCase();
-    if (!domain) return;
+    const domain = shopDomain.trim().toLowerCase();
+    const token = shopifyToken.trim();
+    if (!domain || !token) return;
 
-    // Normalizar dominio
-    if (!domain.includes(".myshopify.com")) {
-      domain = `${domain}.myshopify.com`;
+    setLoading(true);
+    setMsg("");
+
+    const result = await connectShopifyDirect(domain, token);
+
+    if (result.error) {
+      setMsg(result.error);
+    } else {
+      setShopifyDialog(false);
+      toast.success(`Shopify conectada com sucesso!${result.shopName ? ` Loja: ${result.shopName}` : ""}`);
+      loadIntegrations();
     }
-
-    // Redirecionar para o OAuth flow
-    window.location.href = `/api/integrations/shopify?shop=${encodeURIComponent(domain)}`;
+    setLoading(false);
   }
 
   async function handleSync(platform: Platform) {
@@ -317,23 +334,37 @@ function IntegrationsContent() {
         })}
       </div>
 
-      {/* Shopify Connect Dialog - pede o dominio antes de redirecionar para OAuth */}
+      {/* Shopify Connect Dialog - conexao via Custom App Access Token */}
       <Dialog open={shopifyDialog} onOpenChange={setShopifyDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Conectar Shopify</DialogTitle>
             <DialogDescription>
-              Digite o dominio da sua loja Shopify. Voce sera redirecionado para autorizar o acesso.
+              Conecte usando um Custom App criado no admin da sua loja Shopify.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-200 text-sm rounded-lg p-3 flex gap-2">
-            <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-            <span>
-              O app CDR Group precisa estar instalado na sua loja Shopify antes de conectar.
-              Use o link de instalacao fornecido pelo administrador.
-            </span>
+          <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-200 text-sm rounded-lg p-3 space-y-2">
+            <div className="flex gap-2">
+              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+              <span className="text-xs font-semibold">Como obter o Access Token:</span>
+            </div>
+            <ol className="text-xs space-y-1 ml-6 list-decimal">
+              <li>No admin da Shopify, va em <strong>Configuracoes &gt; Apps e canais de vendas</strong></li>
+              <li>Clique em <strong>Desenvolver apps</strong> (no topo)</li>
+              <li>Clique <strong>Criar um app</strong> e de um nome (ex: CDR Group)</li>
+              <li>Em <strong>Configuracao</strong>, clique em <strong>Configurar escopos da Admin API</strong></li>
+              <li>Selecione: <strong>read_orders</strong>, <strong>read_products</strong>, <strong>read_customers</strong></li>
+              <li>Clique <strong>Salvar</strong> e depois <strong>Instalar app</strong></li>
+              <li>Copie o <strong>Admin API access token</strong> (comeca com <code>shpat_</code>)</li>
+            </ol>
           </div>
+
+          {msg && (
+            <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-lg p-3">
+              {msg}
+            </div>
+          )}
 
           <form onSubmit={handleShopifyConnect} className="space-y-4">
             <div className="space-y-2">
@@ -348,6 +379,19 @@ function IntegrationsContent() {
                 Ex: minha-loja.myshopify.com ou apenas minha-loja
               </p>
             </div>
+            <div className="space-y-2">
+              <Label>Admin API Access Token</Label>
+              <Input
+                value={shopifyToken}
+                onChange={(e) => setShopifyToken(e.target.value)}
+                placeholder="shpat_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                required
+                type="password"
+              />
+              <p className="text-xs text-muted-foreground">
+                Token do Custom App (comeca com shpat_). Este token nao expira.
+              </p>
+            </div>
             <div className="flex justify-end gap-3">
               <Button
                 type="button"
@@ -356,8 +400,8 @@ function IntegrationsContent() {
               >
                 Cancelar
               </Button>
-              <Button type="submit">
-                Conectar via OAuth
+              <Button type="submit" disabled={loading}>
+                {loading ? "Validando e conectando..." : "Conectar"}
               </Button>
             </div>
           </form>

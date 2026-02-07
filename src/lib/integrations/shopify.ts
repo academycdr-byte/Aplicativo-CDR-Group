@@ -1,100 +1,68 @@
 import { prisma } from "@/lib/prisma";
-import { encrypt, decrypt } from "@/lib/encryption";
+import { decrypt } from "@/lib/encryption";
 
 const SHOPIFY_API_VERSION = "2024-01";
 
 /**
- * Gera a URL de autorizacao OAuth do Shopify (Authorization Code Grant)
- * Este e o fluxo correto para apps criados no Dev Dashboard com distribuicao personalizada.
- * O token gerado e PERMANENTE (offline access token) — nao expira.
+ * Valida um Access Token de Custom App da Shopify fazendo uma chamada de teste.
+ * Custom Apps geram tokens permanentes (nao expiram), entao nao precisa de refresh.
  */
-export function getShopifyAuthUrl(shop: string, state: string) {
-  const clientId = process.env.SHOPIFY_CLIENT_ID;
-  const redirectUri = `${process.env.AUTH_URL}/api/integrations/shopify/callback`;
-  const scopes = "read_orders,read_products,read_customers";
+export async function validateShopifyAccessToken(
+  shop: string,
+  accessToken: string
+): Promise<{ valid: boolean; shopName?: string; error?: string }> {
+  try {
+    const response = await fetch(
+      `https://${shop}/admin/api/${SHOPIFY_API_VERSION}/shop.json`,
+      {
+        headers: {
+          "X-Shopify-Access-Token": accessToken,
+          "Content-Type": "application/json",
+        },
+      }
+    );
 
-  console.log("[Shopify OAuth] Generating auth URL for shop:", shop);
-  console.log("[Shopify OAuth] Client ID:", clientId);
-  console.log("[Shopify OAuth] Redirect URI:", redirectUri);
+    if (!response.ok) {
+      const errorBody = await response.text();
+      console.error("[Shopify] Token validation failed:", response.status, errorBody);
 
-  return `https://${shop}/admin/oauth/authorize?client_id=${clientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`;
-}
+      if (response.status === 401) {
+        return { valid: false, error: "Access Token invalido. Verifique se copiou o token corretamente." };
+      }
+      if (response.status === 403) {
+        return { valid: false, error: "Token sem permissao. Verifique os escopos do Custom App." };
+      }
+      if (response.status === 404) {
+        return { valid: false, error: "Loja nao encontrada. Verifique o dominio informado." };
+      }
+      return { valid: false, error: `Erro Shopify (${response.status}): ${errorBody}` };
+    }
 
-/**
- * Troca o authorization code por um access token permanente.
- * IMPORTANTE: Usa application/x-www-form-urlencoded conforme documentacao Shopify.
- */
-export async function exchangeShopifyToken(shop: string, code: string): Promise<{
-  access_token: string;
-  scope: string;
-}> {
-  const clientId = process.env.SHOPIFY_CLIENT_ID;
-  const clientSecret = process.env.SHOPIFY_CLIENT_SECRET;
-
-  if (!clientId || !clientSecret) {
-    throw new Error("SHOPIFY_CLIENT_ID ou SHOPIFY_CLIENT_SECRET nao configurados");
+    const data = await response.json();
+    console.log("[Shopify] Token validated! Shop:", data.shop?.name);
+    return { valid: true, shopName: data.shop?.name };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Erro de conexao";
+    console.error("[Shopify] Token validation error:", msg);
+    return { valid: false, error: `Erro ao conectar: ${msg}` };
   }
-
-  console.log("[Shopify OAuth] Exchanging code for token...");
-  console.log("[Shopify OAuth] Shop:", shop);
-  console.log("[Shopify OAuth] Code (first 10 chars):", code.substring(0, 10) + "...");
-
-  // Tentar com application/x-www-form-urlencoded primeiro (formato recomendado)
-  let response = await fetch(`https://${shop}/admin/oauth/access_token`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      "Accept": "application/json",
-    },
-    body: new URLSearchParams({
-      client_id: clientId,
-      client_secret: clientSecret,
-      code,
-    }).toString(),
-  });
-
-  // Se falhar com form-urlencoded, tentar com JSON (fallback)
-  if (!response.ok) {
-    const errorBody1 = await response.text();
-    console.warn("[Shopify OAuth] form-urlencoded failed:", response.status, errorBody1);
-    console.log("[Shopify OAuth] Retrying with JSON body...");
-
-    response = await fetch(`https://${shop}/admin/oauth/access_token`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-      },
-      body: JSON.stringify({
-        client_id: clientId,
-        client_secret: clientSecret,
-        code,
-      }),
-    });
-  }
-
-  if (!response.ok) {
-    const errorBody = await response.text();
-    console.error("[Shopify OAuth] Token exchange FAILED:", response.status, errorBody);
-    throw new Error(`Falha ao trocar token Shopify: ${response.status} - ${errorBody}`);
-  }
-
-  const data = await response.json();
-  console.log("[Shopify OAuth] Token obtained! Scopes:", data.scope);
-  return data;
 }
 
 /**
  * Busca pedidos da Shopify usando o access token armazenado.
- * O token do authorization code grant e permanente — nao precisa renovar.
+ * Custom App tokens sao permanentes, nao precisam de refresh.
  */
 export async function fetchShopifyOrders(integrationId: string) {
   const integration = await prisma.integration.findUnique({
     where: { id: integrationId },
   });
 
-  if (!integration || !integration.externalStoreId || !integration.accessToken) {
-    throw new Error("Integration not found or missing credentials");
+  if (!integration || !integration.externalStoreId) {
+    throw new Error("Integration not found or missing store domain");
+  }
+
+  if (!integration.accessToken) {
+    throw new Error("Access token nao encontrado. Reconecte a loja Shopify.");
   }
 
   const accessToken = decrypt(integration.accessToken);
@@ -115,16 +83,15 @@ export async function fetchShopifyOrders(integrationId: string) {
     const errorBody = await response.text();
     console.error("[Shopify API] Orders fetch failed:", response.status, errorBody);
 
-    // Se o token for invalido (401), marcar integracao como erro
     if (response.status === 401) {
       await prisma.integration.update({
         where: { id: integrationId },
         data: {
           status: "DISCONNECTED",
-          errorMessage: "Token invalido. Reconecte a loja Shopify.",
+          errorMessage: "Token invalido. Reconecte a loja Shopify com um novo Access Token.",
         },
       });
-      throw new Error("Token Shopify invalido. Reconecte a integracao.");
+      throw new Error("Token Shopify invalido. Reconecte a integracao com um novo Access Token.");
     }
 
     throw new Error(`Shopify API error: ${response.status}`);
