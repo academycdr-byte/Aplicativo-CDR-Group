@@ -290,14 +290,24 @@ export async function exchangeFacebookToken(code: string) {
 }
 
 export async function getFacebookAdAccounts(accessToken: string) {
-  const response = await fetch(
-    `https://graph.facebook.com/${FB_GRAPH_VERSION}/me/adaccounts?fields=id,name,account_status&access_token=${accessToken}`
-  );
+  const allAccounts: { id: string; name: string; account_status: number }[] = [];
+  let url: string | null = `https://graph.facebook.com/${FB_GRAPH_VERSION}/me/adaccounts?fields=id,name,account_status&limit=100&access_token=${accessToken}`;
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch ad accounts: ${response.status}`);
+  while (url) {
+    const response: Response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch ad accounts: ${response.status}`);
+    }
+
+    const data: { data?: { id: string; name: string; account_status: number }[]; paging?: { next?: string } } = await response.json();
+    if (data.data) {
+      allAccounts.push(...data.data);
+    }
+
+    // Follow pagination
+    url = data.paging?.next || null;
   }
 
-  const data = await response.json();
-  return data.data || [];
+  return allAccounts;
 }
