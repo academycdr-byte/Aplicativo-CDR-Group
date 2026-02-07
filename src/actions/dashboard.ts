@@ -205,8 +205,15 @@ export async function getMetricsAnalysis(days: number = 30, from?: string, to?: 
 
 /**
  * E-commerce funnel: Sessoes → Adicoes ao Carrinho → Checkouts Iniciados → Pedidos Gerados
- * Primary source: StoreFunnel (synced from Shopify/Nuvemshop via ShopifyQL sessions dataset)
- * This matches the exact funnel shown in Shopify Admin → Analytics → Conversion rate breakdown
+ *
+ * Data sources (in priority order):
+ * 1. StoreFunnel (synced from Shopify/Nuvemshop) — sessions dataset or sales + REST fallback
+ * 2. Facebook Ads pixel data (rawData) — last resort for add-to-cart when store has no data
+ * 3. Ad clicks — last resort for sessions when store has no session data
+ *
+ * The sync process always writes SOMETHING to StoreFunnel, but some metrics may be 0
+ * when the Shopify `sessions` dataset is inaccessible. In that case, we supplement
+ * with Facebook Ads data so the funnel never shows all zeros.
  */
 export async function getFunnelData(days: number = 30, from?: string, to?: string) {
   const ctx = await getSessionWithOrg();
@@ -222,23 +229,55 @@ export async function getFunnelData(days: number = 30, from?: string, to?: strin
     shippedOrders,
     deliveredOrders,
     storeFunnelAgg,
+    adMetrics,
   ] = await Promise.all([
     prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter } }),
     prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter, status: "paid" } }),
     prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter, status: { in: ["shipped", "delivered"] } } }),
     prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter, status: "delivered" } }),
-    // Aggregate funnel data from store platforms (Shopify/Nuvemshop ShopifyQL sessions dataset)
+    // Primary: store platform funnel data
     prisma.storeFunnel.aggregate({
       where: { organizationId: orgId, date: dateFilter },
       _sum: { sessions: true, addToCart: true, checkoutsInitiated: true, ordersGenerated: true },
     }).catch(() => ({ _sum: { sessions: 0, addToCart: 0, checkoutsInitiated: 0, ordersGenerated: 0 } })),
+    // Fallback: Facebook Ads data for when store metrics are incomplete
+    prisma.adMetric.findMany({
+      where: { organizationId: orgId, date: dateFilter },
+      select: { rawData: true, clicks: true, addToCart: true },
+    }),
   ]);
 
-  // Use store platform data directly (from ShopifyQL sessions dataset)
-  const sessoes = storeFunnelAgg._sum.sessions || 0;
-  const adicoesCarrinho = storeFunnelAgg._sum.addToCart || 0;
+  // Store platform data (primary source)
+  let sessoes = storeFunnelAgg._sum.sessions || 0;
+  let adicoesCarrinho = storeFunnelAgg._sum.addToCart || 0;
   const checkoutsIniciados = storeFunnelAgg._sum.checkoutsInitiated || 0;
   const pedidosGerados = storeFunnelAgg._sum.ordersGenerated || totalOrders;
+
+  // Fallback: if store sessions or add-to-cart are 0, supplement with Facebook Ads data
+  if (sessoes === 0 || adicoesCarrinho === 0) {
+    let fbClicks = 0;
+    let fbAddToCart = 0;
+
+    for (const m of adMetrics) {
+      fbClicks += m.clicks || 0;
+      fbAddToCart += m.addToCart || 0;
+
+      // Also try parsing rawData for add_to_cart actions
+      if (fbAddToCart === 0 && m.rawData && typeof m.rawData === "object") {
+        const raw = m.rawData as Record<string, unknown>;
+        const actions = raw.actions as Array<{ action_type: string; value: string }> | undefined;
+        if (actions) {
+          const atc = actions.find((a) =>
+            a.action_type === "add_to_cart" || a.action_type === "offsite_conversion.fb_pixel_add_to_cart"
+          );
+          if (atc) fbAddToCart += parseInt(atc.value || "0");
+        }
+      }
+    }
+
+    if (sessoes === 0 && fbClicks > 0) sessoes = fbClicks;
+    if (adicoesCarrinho === 0 && fbAddToCart > 0) adicoesCarrinho = fbAddToCart;
+  }
 
   return {
     sessoes,
