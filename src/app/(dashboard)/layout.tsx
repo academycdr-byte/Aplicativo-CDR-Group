@@ -11,7 +11,7 @@ export default function DashboardLayout({
       <Sidebar />
       <div className="flex-1 flex flex-col">
         <Header />
-        <main className="flex-1 p-6 bg-[var(--muted)]">{children}</main>
+        <main className="flex-1 p-4 md:p-6 bg-muted/50">{children}</main>
       </div>
     </div>
   );

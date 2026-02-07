@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, DollarSign, ShoppingBag, Megaphone, TrendingUp } from "lucide-react";
+import { RefreshCw, DollarSign, ShoppingBag, Megaphone, TrendingUp, type LucideIcon } from "lucide-react";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -217,30 +217,43 @@ export default function DashboardPage() {
             {revenueData.length > 0 ? (
               <ResponsiveContainer width="100%" height={256}>
                 <AreaChart data={revenueData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis
                     dataKey="date"
-                    tick={{ fontSize: 12 }}
+                    tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
+                    tickLine={{ stroke: "var(--border)" }}
+                    axisLine={{ stroke: "var(--border)" }}
                     tickFormatter={(v) => {
                       const d = new Date(v + "T00:00:00");
                       return `${d.getDate()}/${d.getMonth() + 1}`;
                     }}
                   />
-                  <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `R$${v}`} />
+                  <YAxis
+                    tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
+                    tickLine={{ stroke: "var(--border)" }}
+                    axisLine={{ stroke: "var(--border)" }}
+                    tickFormatter={(v) => `R$${v}`}
+                  />
                   <Tooltip
                     formatter={(value) => [fmt(Number(value)), "Receita"]}
                     labelFormatter={(label) => {
                       const d = new Date(label + "T00:00:00");
                       return d.toLocaleDateString("pt-BR");
                     }}
+                    cursor={{ stroke: "var(--primary)", strokeOpacity: 0.3 }}
                   />
+                  <defs>
+                    <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.3} />
+                      <stop offset="100%" stopColor="var(--primary)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
                   <Area
                     type="monotone"
                     dataKey="revenue"
-                    stroke="hsl(var(--primary))"
-                    fill="hsl(var(--primary))"
-                    fillOpacity={0.1}
-                    strokeWidth={2}
+                    stroke="var(--primary)"
+                    fill="url(#revenueGradient)"
+                    strokeWidth={2.5}
                   />
                 </AreaChart>
               </ResponsiveContainer>
@@ -260,16 +273,26 @@ export default function DashboardPage() {
             {platformData.length > 0 ? (
               <ResponsiveContainer width="100%" height={256}>
                 <BarChart data={platformData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="platform" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis
+                    dataKey="platform"
+                    tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
+                    tickLine={{ stroke: "var(--border)" }}
+                    axisLine={{ stroke: "var(--border)" }}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
+                    tickLine={{ stroke: "var(--border)" }}
+                    axisLine={{ stroke: "var(--border)" }}
+                  />
                   <Tooltip
                     formatter={(value, name) => [
                       name === "revenue" ? fmt(Number(value)) : Number(value),
                       name === "revenue" ? "Receita" : "Pedidos",
                     ]}
+                    cursor={{ fill: "var(--primary)", fillOpacity: 0.08 }}
                   />
-                  <Bar dataKey="orders" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="orders" fill="var(--primary)" radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -331,22 +354,24 @@ function KPICard({
   value,
   change,
 }: {
-  icon: React.ElementType;
+  icon: LucideIcon;
   title: string;
   value: string;
   change: string;
 }) {
   const isPositive = change.startsWith("+");
   return (
-    <Card>
+    <Card className="transition-shadow hover:shadow-md">
       <CardContent className="pt-5">
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-sm text-muted-foreground">{title}</p>
-          <Icon className="w-4 h-4 text-muted-foreground" />
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm text-muted-foreground font-medium">{title}</p>
+          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+            <Icon className="w-4 h-4 text-primary" />
+          </div>
         </div>
-        <p className="text-2xl font-bold">{value}</p>
+        <p className="text-2xl font-bold tracking-tight">{value}</p>
         {change && (
-          <p className={`text-xs mt-1 ${isPositive ? "text-emerald-600" : "text-red-500"}`}>
+          <p className={`text-xs mt-1.5 font-medium ${isPositive ? "text-success" : "text-destructive"}`}>
             {change} vs periodo anterior
           </p>
         )}

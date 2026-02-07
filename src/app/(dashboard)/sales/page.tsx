@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { DollarSign, ShoppingBag, Receipt, PieChart } from "lucide-react";
+import { DollarSign, ShoppingBag, Receipt } from "lucide-react";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -35,7 +35,14 @@ type SalesStats = {
 type DaySale = { date: string; revenue: number; orders: number };
 type StatusData = { status: string; count: number };
 
-const COLORS = ["#3b82f6", "#22c55e", "#eab308", "#ef4444", "#a855f7", "#06b6d4"];
+const COLORS = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+  "var(--primary)",
+];
 
 export default function SalesPage() {
   const [stats, setStats] = useState<SalesStats | null>(null);
@@ -86,31 +93,37 @@ export default function SalesPage() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card>
+        <Card className="transition-shadow hover:shadow-md">
           <CardContent className="pt-5">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-muted-foreground">Receita Total</p>
-              <DollarSign className="w-4 h-4 text-muted-foreground" />
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm text-muted-foreground font-medium">Receita Total</p>
+              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                <DollarSign className="w-4 h-4 text-primary" />
+              </div>
             </div>
-            <p className="text-2xl font-bold">{fmt(stats?.totalRevenue || 0)}</p>
+            <p className="text-2xl font-bold tracking-tight">{fmt(stats?.totalRevenue || 0)}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="transition-shadow hover:shadow-md">
           <CardContent className="pt-5">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-muted-foreground">Total de Pedidos</p>
-              <ShoppingBag className="w-4 h-4 text-muted-foreground" />
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm text-muted-foreground font-medium">Total de Pedidos</p>
+              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                <ShoppingBag className="w-4 h-4 text-primary" />
+              </div>
             </div>
-            <p className="text-2xl font-bold">{stats?.totalOrders || 0}</p>
+            <p className="text-2xl font-bold tracking-tight">{stats?.totalOrders || 0}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="transition-shadow hover:shadow-md">
           <CardContent className="pt-5">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-muted-foreground">Ticket Medio</p>
-              <Receipt className="w-4 h-4 text-muted-foreground" />
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm text-muted-foreground font-medium">Ticket Medio</p>
+              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Receipt className="w-4 h-4 text-primary" />
+              </div>
             </div>
-            <p className="text-2xl font-bold">{fmt(stats?.avgTicket || 0)}</p>
+            <p className="text-2xl font-bold tracking-tight">{fmt(stats?.avgTicket || 0)}</p>
           </CardContent>
         </Card>
       </div>
@@ -124,16 +137,29 @@ export default function SalesPage() {
           {dailyData.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
               <AreaChart data={dailyData}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <defs>
+                  <linearGradient id="salesRevenueGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.3} />
+                    <stop offset="100%" stopColor="var(--primary)" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis
                   dataKey="date"
-                  tick={{ fontSize: 12 }}
+                  tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
+                  tickLine={{ stroke: "var(--border)" }}
+                  axisLine={{ stroke: "var(--border)" }}
                   tickFormatter={(v) => {
                     const d = new Date(v + "T00:00:00");
                     return `${d.getDate()}/${d.getMonth() + 1}`;
                   }}
                 />
-                <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `R$${v}`} />
+                <YAxis
+                  tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
+                  tickLine={{ stroke: "var(--border)" }}
+                  axisLine={{ stroke: "var(--border)" }}
+                  tickFormatter={(v) => `R$${v}`}
+                />
                 <Tooltip
                   formatter={(value, name) => [
                     name === "revenue" ? fmt(Number(value)) : Number(value),
@@ -143,14 +169,14 @@ export default function SalesPage() {
                     const d = new Date(label + "T00:00:00");
                     return d.toLocaleDateString("pt-BR");
                   }}
+                  cursor={{ stroke: "var(--primary)", strokeOpacity: 0.3 }}
                 />
                 <Area
                   type="monotone"
                   dataKey="revenue"
-                  stroke="hsl(var(--primary))"
-                  fill="hsl(var(--primary))"
-                  fillOpacity={0.1}
-                  strokeWidth={2}
+                  stroke="var(--primary)"
+                  fill="url(#salesRevenueGradient)"
+                  strokeWidth={2.5}
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -176,11 +202,24 @@ export default function SalesPage() {
             {stats && stats.byPlatform.length > 0 ? (
               <ResponsiveContainer width="100%" height={256}>
                 <BarChart data={stats.byPlatform}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="platform" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `R$${v}`} />
-                  <Tooltip formatter={(value) => [fmt(Number(value)), "Receita"]} />
-                  <Bar dataKey="revenue" radius={[4, 4, 0, 0]}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis
+                    dataKey="platform"
+                    tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
+                    tickLine={{ stroke: "var(--border)" }}
+                    axisLine={{ stroke: "var(--border)" }}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
+                    tickLine={{ stroke: "var(--border)" }}
+                    axisLine={{ stroke: "var(--border)" }}
+                    tickFormatter={(v) => `R$${v}`}
+                  />
+                  <Tooltip
+                    formatter={(value) => [fmt(Number(value)), "Receita"]}
+                    cursor={{ fill: "var(--primary)", fillOpacity: 0.08 }}
+                  />
+                  <Bar dataKey="revenue" radius={[6, 6, 0, 0]}>
                     {stats.byPlatform.map((_, i) => (
                       <Cell key={i} fill={COLORS[i % COLORS.length]} />
                     ))}
@@ -204,11 +243,23 @@ export default function SalesPage() {
             {statusData.length > 0 ? (
               <ResponsiveContainer width="100%" height={256}>
                 <BarChart data={statusData} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis type="number" tick={{ fontSize: 12 }} />
-                  <YAxis type="category" dataKey="status" tick={{ fontSize: 12 }} width={100} />
-                  <Tooltip />
-                  <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis
+                    type="number"
+                    tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
+                    tickLine={{ stroke: "var(--border)" }}
+                    axisLine={{ stroke: "var(--border)" }}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="status"
+                    tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
+                    tickLine={{ stroke: "var(--border)" }}
+                    axisLine={{ stroke: "var(--border)" }}
+                    width={100}
+                  />
+                  <Tooltip cursor={{ fill: "var(--primary)", fillOpacity: 0.08 }} />
+                  <Bar dataKey="count" radius={[0, 6, 6, 0]}>
                     {statusData.map((_, i) => (
                       <Cell key={i} fill={COLORS[i % COLORS.length]} />
                     ))}
