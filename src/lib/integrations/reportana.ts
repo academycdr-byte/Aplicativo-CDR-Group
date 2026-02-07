@@ -19,7 +19,7 @@ export async function fetchReportanaData(organizationId: string) {
 /**
  * Busca metricas de carrinhos abandonados e recuperados.
  */
-export async function fetchReportanaMetrics(organizationId: string, days: number = 30) {
+export async function fetchReportanaMetrics(organizationId: string, days: number = 30, from?: string, to?: string) {
   const integration = await prisma.integration.findUnique({
     where: { organizationId_platform: { organizationId, platform: "REPORTANA" } },
   });
@@ -28,32 +28,42 @@ export async function fetchReportanaMetrics(organizationId: string, days: number
     return { error: "Reportana not connected" };
   }
 
-  const since = new Date();
-  since.setDate(since.getDate() - days);
+  let dateFilter: { gte: Date; lte?: Date };
+  if (from && to) {
+    dateFilter = { gte: new Date(from), lte: new Date(to) };
+  } else {
+    const since = new Date();
+    if (days === 0) {
+      since.setHours(0, 0, 0, 0);
+    } else {
+      since.setDate(since.getDate() - days);
+    }
+    dateFilter = { gte: since };
+  }
 
   const [abandonedAgg, recoveredAgg, abandonedCount, recoveredCount, recentAbandoned, recentRecovered] =
     await Promise.all([
       prisma.reportanaEvent.aggregate({
-        where: { organizationId, eventType: "abandoned_checkout", eventDate: { gte: since } },
+        where: { organizationId, eventType: "abandoned_checkout", eventDate: dateFilter },
         _sum: { totalPrice: true },
       }),
       prisma.reportanaEvent.aggregate({
-        where: { organizationId, eventType: "checkout_recovered", eventDate: { gte: since } },
+        where: { organizationId, eventType: "checkout_recovered", eventDate: dateFilter },
         _sum: { totalPrice: true },
       }),
       prisma.reportanaEvent.count({
-        where: { organizationId, eventType: "abandoned_checkout", eventDate: { gte: since } },
+        where: { organizationId, eventType: "abandoned_checkout", eventDate: dateFilter },
       }),
       prisma.reportanaEvent.count({
-        where: { organizationId, eventType: "checkout_recovered", eventDate: { gte: since } },
+        where: { organizationId, eventType: "checkout_recovered", eventDate: dateFilter },
       }),
       prisma.reportanaEvent.findMany({
-        where: { organizationId, eventType: "abandoned_checkout", eventDate: { gte: since } },
+        where: { organizationId, eventType: "abandoned_checkout", eventDate: dateFilter },
         orderBy: { eventDate: "desc" },
         take: 10,
       }),
       prisma.reportanaEvent.findMany({
-        where: { organizationId, eventType: "checkout_recovered", eventDate: { gte: since } },
+        where: { organizationId, eventType: "checkout_recovered", eventDate: dateFilter },
         orderBy: { eventDate: "desc" },
         take: 10,
       }),

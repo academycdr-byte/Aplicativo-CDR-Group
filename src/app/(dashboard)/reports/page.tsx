@@ -1,16 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Download, FileSpreadsheet, FileText, BarChart3, RefreshCw, ShoppingCart, CheckCircle, AlertTriangle, Copy } from "lucide-react";
+import { PeriodSelector, periodToParams, type PeriodValue } from "@/components/period-selector";
 import { toast } from "sonner";
 import { getOrders } from "@/actions/orders";
 import { getAdMetrics } from "@/actions/ads";
@@ -36,24 +30,20 @@ type ReportanaEventItem = {
 
 export default function ReportsPage() {
   const [exporting, setExporting] = useState(false);
-  const [period, setPeriod] = useState("30");
+  const [period, setPeriod] = useState<PeriodValue>({ type: "preset", days: 30 });
   const [reportanaConnected, setReportanaConnected] = useState(false);
   const [loadingReportana, setLoadingReportana] = useState(false);
   const [metrics, setMetrics] = useState<ReportanaMetrics | null>(null);
   const [recentAbandoned, setRecentAbandoned] = useState<ReportanaEventItem[]>([]);
   const [recentRecovered, setRecentRecovered] = useState<ReportanaEventItem[]>([]);
 
-  useEffect(() => {
-    loadReportana();
-  }, [period]);
-
-  async function loadReportana() {
+  const loadReportana = useCallback(async () => {
     setLoadingReportana(true);
     const statusResult = await getReportanaData();
     if (statusResult && !statusResult.error) {
       setReportanaConnected(true);
-      const days = parseInt(period);
-      const metricsResult = await getReportanaMetrics(days);
+      const { days, from, to } = periodToParams(period);
+      const metricsResult = await getReportanaMetrics(days, from, to);
       if (metricsResult && "metrics" in metricsResult && metricsResult.metrics) {
         setMetrics(metricsResult.metrics);
         setRecentAbandoned(metricsResult.recentAbandoned || []);
@@ -61,7 +51,11 @@ export default function ReportsPage() {
       }
     }
     setLoadingReportana(false);
-  }
+  }, [period]);
+
+  useEffect(() => {
+    loadReportana();
+  }, [loadReportana]);
 
   async function exportOrdersCSV() {
     setExporting(true);
@@ -90,8 +84,8 @@ export default function ReportsPage() {
   async function exportAdsCSV() {
     setExporting(true);
     try {
-      const days = parseInt(period);
-      const data = await getAdMetrics({ days });
+      const { days, from, to } = periodToParams(period);
+      const data = await getAdMetrics({ days, from, to });
       const headers = ["Plataforma", "Campanha", "Ad Set", "Data", "Impressoes", "Cliques", "Gasto", "Conversoes", "Receita"];
       const rows = data.metrics.map((m) => [
         m.platform,
@@ -145,17 +139,7 @@ export default function ReportsPage() {
             Exporte seus dados e visualize metricas da Reportana.
           </p>
         </div>
-        <Select value={period} onValueChange={setPeriod}>
-          <SelectTrigger className="w-[120px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="0">Hoje</SelectItem>
-            <SelectItem value="7">7 dias</SelectItem>
-            <SelectItem value="30">30 dias</SelectItem>
-            <SelectItem value="90">90 dias</SelectItem>
-          </SelectContent>
-        </Select>
+        <PeriodSelector value={period} onChange={setPeriod} />
       </div>
 
       {/* Export Cards */}
@@ -187,7 +171,7 @@ export default function ReportsPage() {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground mb-4">
-              Exporta metricas de anuncios (Facebook Ads, Google Ads) dos ultimos {period} dias. Inclui gastos, cliques, conversoes e ROAS.
+              Exporta metricas de anuncios (Facebook Ads, Google Ads) do periodo selecionado. Inclui gastos, cliques, conversoes e ROAS.
             </p>
             <Button onClick={exportAdsCSV} disabled={exporting} className="w-full">
               <Download className="w-4 h-4 mr-2" />
@@ -273,7 +257,7 @@ export default function ReportsPage() {
                     {metrics?.recoveryRate || 0}%
                   </p>
                   <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-0.5">
-                    ultimos {period} dias
+                    periodo selecionado
                   </p>
                 </div>
               </div>
