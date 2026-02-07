@@ -205,9 +205,8 @@ export async function getMetricsAnalysis(days: number = 30, from?: string, to?: 
 
 /**
  * E-commerce funnel: Sessoes → Adicoes ao Carrinho → Checkouts Iniciados → Pedidos Gerados
- * Primary source: StoreFunnel (synced from Shopify/Nuvemshop)
- * Fallback for add-to-cart: Facebook Ads pixel data (rawData)
- * Fallback for sessions: ad clicks when store data unavailable
+ * Primary source: StoreFunnel (synced from Shopify/Nuvemshop via ShopifyQL sessions dataset)
+ * This matches the exact funnel shown in Shopify Admin → Analytics → Conversion rate breakdown
  */
 export async function getFunnelData(days: number = 30, from?: string, to?: string) {
   const ctx = await getSessionWithOrg();
@@ -223,56 +222,29 @@ export async function getFunnelData(days: number = 30, from?: string, to?: strin
     shippedOrders,
     deliveredOrders,
     storeFunnelAgg,
-    adMetricsRaw,
   ] = await Promise.all([
     prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter } }),
     prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter, status: "paid" } }),
     prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter, status: { in: ["shipped", "delivered"] } } }),
     prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter, status: "delivered" } }),
-    // Aggregate funnel data from store platforms (Shopify, Nuvemshop, etc.)
+    // Aggregate funnel data from store platforms (Shopify/Nuvemshop ShopifyQL sessions dataset)
     prisma.storeFunnel.aggregate({
       where: { organizationId: orgId, date: dateFilter },
       _sum: { sessions: true, addToCart: true, checkoutsInitiated: true, ordersGenerated: true },
     }).catch(() => ({ _sum: { sessions: 0, addToCart: 0, checkoutsInitiated: 0, ordersGenerated: 0 } })),
-    // Fallback: parse Facebook rawData for add-to-cart when store doesn't provide it
-    prisma.adMetric.findMany({
-      where: { organizationId: orgId, date: dateFilter },
-      select: { rawData: true, clicks: true },
-    }),
   ]);
 
-  // Store platform data (primary source)
-  const storeSessions = storeFunnelAgg._sum.sessions || 0;
-  const storeAddToCart = storeFunnelAgg._sum.addToCart || 0;
-  const storeCheckouts = storeFunnelAgg._sum.checkoutsInitiated || 0;
-
-  // Fallback: extract from Facebook Ads rawData for add-to-cart
-  let fbAddToCart = 0;
-  let fbClicks = 0;
-  for (const m of adMetricsRaw) {
-    fbClicks += m.clicks || 0;
-    if (m.rawData && typeof m.rawData === "object") {
-      const raw = m.rawData as Record<string, unknown>;
-      const actions = raw.actions as Array<{ action_type: string; value: string }> | undefined;
-      if (actions) {
-        const atc = actions.find((a) =>
-          a.action_type === "add_to_cart" || a.action_type === "offsite_conversion.fb_pixel_add_to_cart"
-        );
-        if (atc) fbAddToCart += parseInt(atc.value || "0");
-      }
-    }
-  }
-
-  // Use store data when available, fallback to Facebook/ad data
-  const sessoes = storeSessions > 0 ? storeSessions : fbClicks;
-  const adicoesCarrinho = storeAddToCart > 0 ? storeAddToCart : fbAddToCart;
-  const checkoutsIniciados = storeCheckouts > 0 ? storeCheckouts : totalOrders;
+  // Use store platform data directly (from ShopifyQL sessions dataset)
+  const sessoes = storeFunnelAgg._sum.sessions || 0;
+  const adicoesCarrinho = storeFunnelAgg._sum.addToCart || 0;
+  const checkoutsIniciados = storeFunnelAgg._sum.checkoutsInitiated || 0;
+  const pedidosGerados = storeFunnelAgg._sum.ordersGenerated || totalOrders;
 
   return {
     sessoes,
     adicoesCarrinho,
     checkoutsIniciados,
-    pedidosGerados: totalOrders,
+    pedidosGerados,
     pedidosPagos: paidOrders,
     pedidosEnviados: shippedOrders,
     pedidosEntregues: deliveredOrders,
