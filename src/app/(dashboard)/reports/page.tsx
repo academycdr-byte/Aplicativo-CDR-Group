@@ -995,8 +995,154 @@ function ClientFormDialog({
 
 // ─── TAB: WHATSAPP ─────────────────────────────────
 
-function WhatsAppTab({ status, onRefresh }: { status: string; onRefresh: () => void }) {
-  const isConnected = status === "CONNECTED";
+function WhatsAppTab({ status: initialStatus, onRefresh }: { status: string; onRefresh: () => void }) {
+  const [status, setStatus] = useState(initialStatus);
+  const [qrCode, setQrCode] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [connectionInfo, setConnectionInfo] = useState<{
+    me?: string;
+    pushName?: string;
+    profilePicUrl?: string;
+  } | null>(null);
+  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
+
+  const isConnected = status === "open" || status === "CONNECTED";
+
+  // Check connection status
+  async function checkStatus() {
+    try {
+      const res = await fetch("/api/whatsapp");
+      const data = await res.json();
+
+      setStatus(data.status);
+      if (data.me) {
+        setConnectionInfo({
+          me: data.me,
+          pushName: data.pushName,
+          profilePicUrl: data.profilePicUrl,
+        });
+      }
+
+      if (data.status === "open" || data.status === "CONNECTED") {
+        setQrCode(null);
+        if (pollingInterval) {
+          clearInterval(pollingInterval);
+          setPollingInterval(null);
+        }
+        onRefresh();
+      }
+    } catch (error) {
+      console.error("Error checking status:", error);
+    }
+  }
+
+  // Generate QR Code
+  async function generateQR() {
+    setLoading(true);
+    try {
+      // First check if instance exists
+      const statusRes = await fetch("/api/whatsapp");
+      const statusData = await statusRes.json();
+
+      let action = "connect";
+      if (statusData.status === "NOT_CREATED") {
+        action = "create";
+      }
+
+      const res = await fetch("/api/whatsapp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+
+      const data = await res.json();
+
+      if (data.success && data.qrcode) {
+        setQrCode(data.qrcode);
+        setStatus("CONNECTING");
+        toast.success("QR Code gerado! Escaneie com seu WhatsApp.");
+
+        // Start polling for connection status
+        const interval = setInterval(checkStatus, 3000);
+        setPollingInterval(interval);
+
+        // Stop polling after 2 minutes
+        setTimeout(() => {
+          clearInterval(interval);
+          setPollingInterval(null);
+        }, 120000);
+      } else if (data.error) {
+        toast.error(data.error);
+      }
+    } catch (error: any) {
+      toast.error("Erro ao gerar QR Code: " + error.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Refresh QR Code
+  async function refreshQR() {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/whatsapp/qr");
+      const data = await res.json();
+
+      if (data.qrcode) {
+        setQrCode(data.qrcode);
+        toast.success("QR Code atualizado!");
+      } else if (data.status === "CONNECTED") {
+        setStatus("CONNECTED");
+        setQrCode(null);
+        toast.success("WhatsApp já está conectado!");
+      }
+    } catch (error: any) {
+      toast.error("Erro ao atualizar QR Code");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Disconnect WhatsApp
+  async function disconnect() {
+    if (!confirm("Tem certeza que deseja desconectar o WhatsApp?")) return;
+
+    setLoading(true);
+    try {
+      const res = await fetch("/api/whatsapp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "disconnect" }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setStatus("DISCONNECTED");
+        setConnectionInfo(null);
+        setQrCode(null);
+        toast.success("WhatsApp desconectado com sucesso!");
+        onRefresh();
+      }
+    } catch (error: any) {
+      toast.error("Erro ao desconectar");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Cleanup interval on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+      }
+    };
+  }, [pollingInterval]);
+
+  // Initial status check
+  useEffect(() => {
+    checkStatus();
+  }, []);
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -1017,32 +1163,89 @@ function WhatsAppTab({ status, onRefresh }: { status: string; onRefresh: () => v
               </div>
               <div className="text-center space-y-2">
                 <p className="text-lg font-medium text-green-500">Conectado</p>
-                <p className="text-sm text-muted-foreground">WhatsApp Business vinculado com sucesso</p>
+                {connectionInfo?.pushName && (
+                  <p className="text-sm text-muted-foreground">
+                    {connectionInfo.pushName}
+                  </p>
+                )}
+                {connectionInfo?.me && (
+                  <p className="text-xs text-muted-foreground">
+                    {connectionInfo.me}
+                  </p>
+                )}
               </div>
-              <Button variant="destructive" onClick={() => toast.info("Funcionalidade em desenvolvimento")}>
-                Desconectar
+              <Button variant="destructive" onClick={disconnect} disabled={loading}>
+                {loading ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Desconectando...
+                  </>
+                ) : (
+                  "Desconectar"
+                )}
               </Button>
             </>
           ) : (
             <>
-              <div className="w-64 h-64 bg-white rounded-lg flex items-center justify-center border">
-                <div className="text-center space-y-4 p-4">
-                  <MessageSquare className="w-12 h-12 mx-auto text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">
-                    QR Code aparecerá aqui após configurar o backend WhatsApp
-                  </p>
-                </div>
+              <div className="w-64 h-64 bg-white rounded-lg flex items-center justify-center border overflow-hidden">
+                {qrCode ? (
+                  <img
+                    src={qrCode.startsWith("data:") ? qrCode : `data:image/png;base64,${qrCode}`}
+                    alt="QR Code WhatsApp"
+                    className="w-full h-full object-contain p-2"
+                  />
+                ) : (
+                  <div className="text-center space-y-4 p-4">
+                    <MessageSquare className="w-12 h-12 mx-auto text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">
+                      Clique em "Gerar QR Code" para conectar
+                    </p>
+                  </div>
+                )}
               </div>
               <div className="text-center space-y-2">
                 <p className="text-sm text-muted-foreground">
-                  Abra o WhatsApp Business no seu celular, vá em Configurações → Dispositivos Conectados →
-                  Conectar um dispositivo
+                  {qrCode
+                    ? "Escaneie o QR Code com seu WhatsApp Business"
+                    : "Abra o WhatsApp Business no seu celular, vá em Configurações → Dispositivos Conectados → Conectar um dispositivo"}
                 </p>
+                {qrCode && (
+                  <p className="text-xs text-yellow-500">
+                    O QR Code expira em 2 minutos. Se expirar, clique em "Atualizar".
+                  </p>
+                )}
               </div>
-              <Button onClick={() => toast.info("Gerando QR Code...")} disabled>
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Gerar QR Code
-              </Button>
+              <div className="flex gap-3">
+                {qrCode ? (
+                  <Button onClick={refreshQR} disabled={loading}>
+                    {loading ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        Atualizando...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        Atualizar QR Code
+                      </>
+                    )}
+                  </Button>
+                ) : (
+                  <Button onClick={generateQR} disabled={loading}>
+                    {loading ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        Gerando...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        Gerar QR Code
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
             </>
           )}
         </CardContent>
@@ -1050,35 +1253,70 @@ function WhatsAppTab({ status, onRefresh }: { status: string; onRefresh: () => v
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">⚠️ Configuração Necessária</CardTitle>
+          <CardTitle className="text-base">📋 Configuração do Servidor WhatsApp</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 text-sm text-muted-foreground">
           <p>
-            Para integração completa do WhatsApp, é necessário configurar um servidor backend separado com a
-            biblioteca <code className="bg-muted px-1 rounded">@whiskeysockets/baileys</code>.
+            Para que a geração do QR Code funcione, você precisa configurar a <strong>Evolution API</strong> no seu servidor.
           </p>
+
+          <div className="bg-muted/50 p-4 rounded-lg space-y-3">
+            <p className="font-medium text-foreground">Passo a passo:</p>
+            <ol className="list-decimal list-inside space-y-2 ml-2">
+              <li>
+                Instale a Evolution API usando Docker:
+                <pre className="bg-muted p-2 rounded mt-1 overflow-x-auto">
+                  {`docker run -d --name evolution-api \\
+  -p 8080:8080 \\
+  -e AUTHENTICATION_API_KEY=sua_chave_aqui \\
+  atendai/evolution-api`}
+                </pre>
+              </li>
+              <li>
+                Adicione as variáveis de ambiente na Vercel:
+                <pre className="bg-muted p-2 rounded mt-1">
+                  {`EVOLUTION_API_URL=https://seu-servidor.com
+EVOLUTION_API_KEY=sua_chave_aqui`}
+                </pre>
+              </li>
+              <li>
+                Faça redeploy do projeto na Vercel
+              </li>
+            </ol>
+          </div>
+
           <p>
-            <strong>Opções recomendadas:</strong>
+            <strong>Opções de hospedagem:</strong>
           </p>
           <ul className="list-disc list-inside space-y-2 ml-2">
-            <li>
-              <strong>Servidor Node.js dedicado:</strong> Manter conexão WebSocket persistente com WhatsApp
-            </li>
-            <li>
-              <strong>Serviço de terceiros:</strong> Evolution API, WPPConnect, ou Z-API
-            </li>
-            <li>
-              <strong>WhatsApp Business API oficial:</strong> Meta Cloud API (requer aprovação)
-            </li>
+            <li><strong>Railway.app:</strong> Deploy fácil com plano gratuito</li>
+            <li><strong>Render.com:</strong> Alternativa gratuita com Docker</li>
+            <li><strong>VPS:</strong> DigitalOcean, Vultr, ou similar (~$5/mês)</li>
+            <li><strong>Contabo:</strong> VPS barato para produção (~€4/mês)</li>
           </ul>
-          <p className="text-yellow-500">
-            A UI está pronta. A integração real requer configuração adicional do backend.
-          </p>
+
+          <div className="flex gap-2 pt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.open("https://doc.evolution-api.com", "_blank")}
+            >
+              📖 Documentação
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.open("https://github.com/EvolutionAPI/evolution-api", "_blank")}
+            >
+              GitHub
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>
   );
 }
+
 
 // ─── TAB: AGENDAMENTOS ─────────────────────────────
 
