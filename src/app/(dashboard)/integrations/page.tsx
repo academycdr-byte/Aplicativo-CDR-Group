@@ -135,7 +135,16 @@ function IntegrationsContent() {
     const detail = searchParams.get("detail");
 
     if (success === "shopify") {
-      toast.success("Shopify conectada com sucesso!");
+      toast.success("Shopify conectada com sucesso! Sincronizando pedidos...");
+      // Auto-trigger sync after successful connection
+      syncPlatform("SHOPIFY").then((result) => {
+        if ("error" in result && result.error) {
+          toast.error(`Erro ao sincronizar Shopify: ${result.error}`);
+        } else {
+          toast.success("Pedidos da Shopify sincronizados!");
+          loadIntegrations();
+        }
+      });
     } else if (error === "shopify_oauth_failed") {
       toast.error(`Erro ao conectar Shopify${detail ? `: ${detail}` : ""}`, { duration: 10000 });
     } else if (error === "shopify_config_error") {
