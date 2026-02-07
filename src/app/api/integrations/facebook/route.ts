@@ -7,7 +7,7 @@ import crypto from "crypto";
 export async function GET(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    return NextResponse.redirect(new URL("/integrations?error=unauthorized", request.url));
   }
 
   const membership = await prisma.membership.findFirst({
@@ -16,10 +16,20 @@ export async function GET(request: NextRequest) {
   });
 
   if (!membership) {
-    return NextResponse.json({ error: "No organization found" }, { status: 400 });
+    return NextResponse.redirect(
+      new URL("/integrations?error=facebook_oauth_failed&detail=Organizacao+nao+encontrada", request.url)
+    );
   }
 
-  const state = `${membership.organizationId}:${crypto.randomBytes(16).toString("hex")}`;
-  const authUrl = getFacebookAuthUrl(state);
-  return NextResponse.redirect(authUrl);
+  try {
+    const state = `${membership.organizationId}:${crypto.randomBytes(16).toString("hex")}`;
+    const authUrl = getFacebookAuthUrl(state);
+    return NextResponse.redirect(authUrl);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Erro desconhecido";
+    console.error("[Facebook OAuth] Error:", msg);
+    return NextResponse.redirect(
+      new URL(`/integrations?error=facebook_oauth_failed&detail=${encodeURIComponent(msg)}`, request.url)
+    );
+  }
 }
