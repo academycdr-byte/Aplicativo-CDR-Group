@@ -16,7 +16,8 @@ import {
   Users,
   ShoppingCart,
   Package,
-  Truck,
+  Eye,
+  MousePointerClick,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -65,7 +66,9 @@ type MetricPoint = {
 };
 
 type FunnelData = {
-  checkouts: number;
+  sessoes: number;
+  adicoesCarrinho: number;
+  checkoutsIniciados: number;
   pedidosGerados: number;
   pedidosPagos: number;
   pedidosEnviados: number;
@@ -237,15 +240,22 @@ export default function DashboardPage() {
 
   // Funnel steps
   const funnelSteps = funnel ? [
-    { label: "Checkouts Iniciados", value: funnel.checkouts, icon: ShoppingCart, color: "border-purple-500 bg-purple-500/10" },
-    { label: "Pedidos Gerados", value: funnel.pedidosGerados, icon: Package, color: "border-blue-500 bg-blue-500/10" },
-    { label: "Pedidos Pagos", value: funnel.pedidosPagos, icon: CheckCircle, color: "border-primary bg-primary/10" },
-    { label: "Pedidos Enviados", value: funnel.pedidosEnviados, icon: Truck, color: "border-success bg-success/10" },
+    { label: "Sessoes", value: funnel.sessoes, icon: Eye, color: "from-violet-500/20 to-violet-500/5 border-violet-500" },
+    { label: "Adicoes ao Carrinho", value: funnel.adicoesCarrinho, icon: ShoppingCart, color: "from-blue-500/20 to-blue-500/5 border-blue-500" },
+    { label: "Checkouts Iniciados", value: funnel.checkoutsIniciados, icon: MousePointerClick, color: "from-amber-500/20 to-amber-500/5 border-amber-500" },
+    { label: "Pedidos Gerados", value: funnel.pedidosGerados, icon: Package, color: "from-emerald-500/20 to-emerald-500/5 border-emerald-500" },
   ] : [];
 
-  const conversionRate = funnel && funnel.checkouts > 0
-    ? ((funnel.pedidosPagos / funnel.checkouts) * 100).toFixed(2)
-    : "0";
+  // Key funnel rates
+  const taxaConversaoSessao = funnel && funnel.sessoes > 0
+    ? ((funnel.pedidosGerados / funnel.sessoes) * 100)
+    : 0;
+  const taxaAdicaoCarrinho = funnel && funnel.sessoes > 0
+    ? ((funnel.adicoesCarrinho / funnel.sessoes) * 100)
+    : 0;
+  const taxaConversaoCheckout = funnel && funnel.checkoutsIniciados > 0
+    ? ((funnel.pedidosGerados / funnel.checkoutsIniciados) * 100)
+    : 0;
 
   return (
     <div className="space-y-6">
@@ -369,23 +379,47 @@ export default function DashboardPage() {
 
       {/* Funnel + Rates row */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        {/* Funil de Conversao */}
+        {/* Funil de Conversao E-commerce */}
         <Card className="xl:col-span-2">
-          <CardHeader className="flex-row items-center justify-between space-y-0 pb-4">
-            <CardTitle className="text-base font-semibold">Funil de Conversao</CardTitle>
-            <div className="text-right">
-              <p className="text-2xl font-bold text-primary">{conversionRate}%</p>
-              <p className="text-xs text-muted-foreground">Taxa de Conversao</p>
+          <CardHeader className="space-y-0 pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base font-semibold">Funil E-commerce</CardTitle>
             </div>
+            {/* Rate badges */}
+            {funnel && (
+              <div className="flex flex-wrap gap-2 pt-3">
+                <div className="flex items-center gap-2 rounded-lg border border-violet-500/30 bg-violet-500/5 px-3 py-2">
+                  <div className="w-2 h-2 rounded-full bg-violet-500" />
+                  <div>
+                    <p className="text-[10px] text-muted-foreground leading-tight">Conversao / Sessao</p>
+                    <p className="text-sm font-bold text-violet-600 dark:text-violet-400">{taxaConversaoSessao.toFixed(2)}%</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 rounded-lg border border-blue-500/30 bg-blue-500/5 px-3 py-2">
+                  <div className="w-2 h-2 rounded-full bg-blue-500" />
+                  <div>
+                    <p className="text-[10px] text-muted-foreground leading-tight">Adicao ao Carrinho</p>
+                    <p className="text-sm font-bold text-blue-600 dark:text-blue-400">{taxaAdicaoCarrinho.toFixed(2)}%</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2">
+                  <div className="w-2 h-2 rounded-full bg-amber-500" />
+                  <div>
+                    <p className="text-[10px] text-muted-foreground leading-tight">Conversao Checkout</p>
+                    <p className="text-sm font-bold text-amber-600 dark:text-amber-400">{taxaConversaoCheckout.toFixed(2)}%</p>
+                  </div>
+                </div>
+              </div>
+            )}
           </CardHeader>
           <CardContent>
             {funnel ? (
-              <div className="space-y-0">
+              <div className="space-y-0 pt-2">
                 {funnelSteps.map((step, i) => {
                   const pctOfTotal = funnelSteps[0].value > 0
                     ? ((step.value / funnelSteps[0].value) * 100)
                     : 0;
-                  const barWidth = Math.max(30, 100 - i * 18);
+                  const barWidth = Math.max(40, 100 - i * 15);
                   const prevValue = i > 0 ? funnelSteps[i - 1].value : 0;
                   const dropPct = prevValue > 0 ? (((prevValue - step.value) / prevValue) * 100).toFixed(1) : null;
                   const convPct = i > 0 && funnelSteps[i - 1].value > 0
@@ -396,30 +430,32 @@ export default function DashboardPage() {
                   return (
                     <div key={step.label}>
                       {/* Drop indicator between steps */}
-                      {i > 0 && dropPct && (
-                        <div className="flex items-center justify-center py-1.5">
+                      {i > 0 && (
+                        <div className="flex items-center justify-center py-1">
                           <div className="flex items-center gap-1 text-xs text-muted-foreground">
                             <ArrowDown className="w-3 h-3" />
-                            <span>{dropPct}% perda</span>
+                            <span>{dropPct ? `${dropPct}% perda` : "—"}</span>
                           </div>
                         </div>
                       )}
                       {/* Funnel bar */}
                       <div
-                        className={`relative rounded-xl border-l-4 px-4 py-3 transition-all ${step.color}`}
+                        className={`relative rounded-xl border-l-4 bg-gradient-to-r px-4 py-3.5 transition-all ${step.color}`}
                         style={{ width: `${barWidth}%`, marginLeft: `${(100 - barWidth) / 2}%` }}
                       >
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2.5">
                             <Icon className="w-4 h-4 opacity-70" />
                             <div>
-                              <p className="text-sm font-medium">{step.label}</p>
-                              <p className="text-[11px] text-muted-foreground">{pctOfTotal.toFixed(1)}% do total</p>
+                              <p className="text-sm font-semibold">{step.label}</p>
+                              <p className="text-[11px] text-muted-foreground">
+                                {i === 0 ? "100% do total" : `${pctOfTotal.toFixed(1)}% do total`}
+                              </p>
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className="text-lg font-bold">{fmtNum(step.value)}</p>
-                            {convPct && <p className="text-[11px] text-primary">{convPct}% conversao</p>}
+                            <p className="text-xl font-bold">{fmtNum(step.value)}</p>
+                            {convPct && <p className="text-[11px] text-primary font-medium">{convPct}% conversao</p>}
                           </div>
                         </div>
                       </div>
@@ -435,7 +471,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Paid % + Repurchase % */}
+        {/* Paid % + Repurchase % + Unique Customers */}
         <div className="space-y-4">
           <Card>
             <CardContent className="pt-5 pb-5">

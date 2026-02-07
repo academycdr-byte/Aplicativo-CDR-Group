@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const validTypes = ["abandoned_checkout", "checkout_recovered"];
+    const validTypes = ["abandoned_checkout", "checkout_recovered", "add_to_cart", "session"];
     if (!validTypes.includes(eventType)) {
       return NextResponse.json(
         { error: `Invalid event_type. Must be one of: ${validTypes.join(", ")}` },
