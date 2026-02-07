@@ -375,7 +375,7 @@ export async function getMetricsForReport(
             revenue: true,
         },
         orderBy: {
-            _sum: { revenue: true },
+            _sum: { revenue: 'desc' },
         },
         take: 10,
     });
