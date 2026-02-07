@@ -637,36 +637,29 @@ async function fetchAbandonedCheckoutsByDate(
 
   try {
     const sinceISO = since.toISOString();
-    let url: string | null = `https://${shop}/admin/api/${SHOPIFY_API_VERSION}/checkouts.json?created_at_min=${sinceISO}&limit=250`;
+    const url = `https://${shop}/admin/api/${SHOPIFY_API_VERSION}/checkouts.json?created_at_min=${sinceISO}&limit=250`;
 
-    while (url) {
-      const response = await fetch(url, {
-        headers: {
-          "X-Shopify-Access-Token": accessToken,
-          "Content-Type": "application/json",
-        },
-      });
+    const response = await fetch(url, {
+      headers: {
+        "X-Shopify-Access-Token": accessToken,
+        "Content-Type": "application/json",
+      },
+    });
 
-      if (!response.ok) {
-        console.warn("[Shopify] Abandoned checkouts fetch failed:", response.status);
-        break;
-      }
-
-      const data = await response.json();
-      const checkouts = data.checkouts || [];
-
-      for (const checkout of checkouts) {
-        const dateKey = new Date(checkout.created_at).toISOString().split("T")[0];
-        result[dateKey] = (result[dateKey] || 0) + 1;
-      }
-
-      // Pagination via Link header
-      const linkHeader = response.headers.get("Link") || "";
-      const nextMatch = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
-      url = nextMatch ? nextMatch[1] : null;
+    if (!response.ok) {
+      console.warn("[Shopify] Abandoned checkouts fetch failed:", response.status);
+      return result;
     }
 
-    console.log(`[Shopify Funnel] Abandoned checkouts: ${Object.values(result).reduce((a, b) => a + b, 0)} total`);
+    const data = await response.json();
+    const checkouts = data.checkouts || [];
+
+    for (const checkout of checkouts) {
+      const dateKey = new Date(checkout.created_at).toISOString().split("T")[0];
+      result[dateKey] = (result[dateKey] || 0) + 1;
+    }
+
+    console.log(`[Shopify Funnel] Abandoned checkouts: ${Object.values(result).reduce((a: number, b: number) => a + b, 0)} total`);
   } catch (error) {
     console.warn("[Shopify] Abandoned checkouts failed:", error);
   }
