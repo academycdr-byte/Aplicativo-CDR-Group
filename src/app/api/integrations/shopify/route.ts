@@ -24,9 +24,12 @@ export async function GET(request: NextRequest) {
 
   try {
     const state = generateOAuthState();
-    const baseUrl = process.env.NEXTAUTH_URL
+    // Sempre usar HTTPS em producao. VERCEL_URL nao inclui protocolo.
+    let baseUrl = process.env.NEXTAUTH_URL
       || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null)
       || request.nextUrl.origin;
+    // Forcar HTTPS (Shopify exige)
+    baseUrl = baseUrl.replace(/^http:\/\//i, "https://");
     const redirectUri = `${baseUrl}/api/integrations/shopify/callback`;
 
     // Salvar state e shop em cookies para validar no callback
