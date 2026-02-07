@@ -3,7 +3,7 @@ import { decrypt } from "@/lib/encryption";
 import crypto from "crypto";
 
 const SHOPIFY_API_VERSION = "2025-01";
-const SHOPIFY_SCOPES = "read_orders,read_products,read_customers";
+const SHOPIFY_SCOPES = "read_orders,read_products,read_customers,read_reports";
 
 /**
  * Gera a URL de autorizacao OAuth do Shopify (Authorization Code Grant).
@@ -293,4 +293,191 @@ function mapShopifyStatus(status: string): string {
     authorized: "pending",
   };
   return map[status] || status;
+}
+
+/**
+ * Sync funnel metrics from Shopify using ShopifyQL (sessions, orders by day).
+ * Also fetches abandoned checkouts count for the funnel.
+ * Requires read_reports scope.
+ */
+export async function syncShopifyFunnel(organizationId: string) {
+  const integration = await prisma.integration.findUnique({
+    where: { organizationId_platform: { organizationId, platform: "SHOPIFY" } },
+  });
+
+  if (!integration || integration.status !== "CONNECTED" || !integration.accessToken) {
+    return { error: "Shopify not connected" };
+  }
+
+  try {
+    const accessToken = decrypt(integration.accessToken);
+    const shop = integration.externalStoreId || "";
+
+    // 1. Fetch sessions via ShopifyQL GraphQL
+    const sessionsData = await fetchShopifyQLSessions(shop, accessToken);
+
+    // 2. Fetch abandoned checkouts via REST API
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const abandonedByDate = await fetchShopifyAbandonedCheckouts(shop, accessToken, thirtyDaysAgo);
+
+    // 3. Get orders by date from our database
+    const orders = await prisma.order.findMany({
+      where: {
+        organizationId,
+        platform: "SHOPIFY",
+        orderDate: { gte: thirtyDaysAgo },
+      },
+      select: { orderDate: true },
+    });
+
+    const ordersByDate: Record<string, number> = {};
+    for (const o of orders) {
+      const key = o.orderDate.toISOString().split("T")[0];
+      ordersByDate[key] = (ordersByDate[key] || 0) + 1;
+    }
+
+    // 4. Merge all data and upsert into StoreFunnel
+    const allDates = new Set([
+      ...Object.keys(sessionsData),
+      ...Object.keys(abandonedByDate),
+      ...Object.keys(ordersByDate),
+    ]);
+
+    let synced = 0;
+    for (const dateKey of allDates) {
+      const sessions = sessionsData[dateKey] || 0;
+      const abandoned = abandonedByDate[dateKey] || 0;
+      const dayOrders = ordersByDate[dateKey] || 0;
+
+      await prisma.storeFunnel.upsert({
+        where: {
+          organizationId_platform_date: {
+            organizationId,
+            platform: "SHOPIFY",
+            date: new Date(dateKey),
+          },
+        },
+        create: {
+          organizationId,
+          platform: "SHOPIFY",
+          date: new Date(dateKey),
+          sessions,
+          addToCart: 0,
+          checkoutsInitiated: abandoned + dayOrders,
+          ordersGenerated: dayOrders,
+        },
+        update: {
+          sessions,
+          checkoutsInitiated: abandoned + dayOrders,
+          ordersGenerated: dayOrders,
+        },
+      });
+      synced++;
+    }
+
+    return { success: true, synced };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : "Unknown error";
+    console.error("[Shopify Funnel] Error:", errorMsg);
+    return { error: errorMsg };
+  }
+}
+
+async function fetchShopifyQLSessions(
+  shop: string,
+  accessToken: string
+): Promise<Record<string, number>> {
+  const result: Record<string, number> = {};
+
+  try {
+    const query = `FROM sales SHOW sessions GROUP BY day SINCE -30d UNTIL today`;
+    const graphqlBody = JSON.stringify({
+      query: `{
+        shopifyqlQuery(query: "${query}") {
+          tableData {
+            columns { name dataType }
+            rows
+          }
+          parseErrors
+        }
+      }`,
+    });
+
+    const response = await fetch(
+      `https://${shop}/admin/api/${SHOPIFY_API_VERSION}/graphql.json`,
+      {
+        method: "POST",
+        headers: {
+          "X-Shopify-Access-Token": accessToken,
+          "Content-Type": "application/json",
+        },
+        body: graphqlBody,
+      }
+    );
+
+    if (!response.ok) {
+      console.warn("[Shopify ShopifyQL] Failed:", response.status);
+      return result;
+    }
+
+    const data = await response.json();
+    const table = data?.data?.shopifyqlQuery?.tableData;
+
+    if (!table?.columns || !table?.rows) return result;
+
+    const dayIdx = table.columns.findIndex((c: { name: string }) => c.name === "day");
+    const sessionsIdx = table.columns.findIndex((c: { name: string }) => c.name === "sessions");
+
+    if (dayIdx === -1 || sessionsIdx === -1) return result;
+
+    for (const row of table.rows) {
+      const dateKey = String(row[dayIdx]);
+      const sessions = parseInt(String(row[sessionsIdx])) || 0;
+      if (dateKey && sessions > 0) {
+        result[dateKey] = sessions;
+      }
+    }
+  } catch (error) {
+    console.warn("[Shopify ShopifyQL] Sessions query failed:", error);
+  }
+
+  return result;
+}
+
+async function fetchShopifyAbandonedCheckouts(
+  shop: string,
+  accessToken: string,
+  since: Date
+): Promise<Record<string, number>> {
+  const result: Record<string, number> = {};
+
+  try {
+    const sinceISO = since.toISOString();
+    const url = `https://${shop}/admin/api/${SHOPIFY_API_VERSION}/checkouts.json?created_at_min=${sinceISO}&limit=250`;
+
+    const response = await fetch(url, {
+      headers: {
+        "X-Shopify-Access-Token": accessToken,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      console.warn("[Shopify] Abandoned checkouts fetch failed:", response.status);
+      return result;
+    }
+
+    const data = await response.json();
+    const checkouts = data.checkouts || [];
+
+    for (const checkout of checkouts) {
+      const dateKey = new Date(checkout.created_at).toISOString().split("T")[0];
+      result[dateKey] = (result[dateKey] || 0) + 1;
+    }
+  } catch (error) {
+    console.warn("[Shopify] Abandoned checkouts failed:", error);
+  }
+
+  return result;
 }

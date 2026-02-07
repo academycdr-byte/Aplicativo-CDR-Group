@@ -115,6 +115,7 @@ model Organization {
   adMetrics       AdMetric[]
   syncLogs        SyncLog[]
   reportanaEvents ReportanaEvent[]
+  storeFunnels    StoreFunnel[]
 
   @@map("organizations")
 }
@@ -266,4 +267,24 @@ model ReportanaEvent {
   @@index([organizationId, eventType])
   @@index([organizationId, eventDate])
   @@map("reportana_events")
+}
+
+// ─── STORE FUNNEL METRICS ────────────────────────────
+
+model StoreFunnel {
+  id                 String   @id @default(cuid())
+  organizationId     String
+  platform           Platform
+  date               DateTime @db.Date
+  sessions           Int      @default(0)
+  addToCart           Int      @default(0)
+  checkoutsInitiated Int      @default(0)
+  ordersGenerated    Int      @default(0)
+  createdAt          DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, platform, date])
+  @@index([organizationId, date])
+  @@map("store_funnels")
 }

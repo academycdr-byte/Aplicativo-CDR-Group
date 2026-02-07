@@ -114,6 +114,143 @@ function mapNuvemshopStatus(status: string): string {
   return map[status] || status;
 }
 
+/**
+ * Sync funnel metrics from Nuvemshop using the abandoned checkout API.
+ * Nuvemshop does not provide sessions or add-to-cart analytics via API.
+ */
+export async function syncNuvemshopFunnel(organizationId: string) {
+  const integration = await prisma.integration.findUnique({
+    where: { organizationId_platform: { organizationId, platform: "NUVEMSHOP" } },
+  });
+
+  if (!integration || integration.status !== "CONNECTED" || !integration.accessToken) {
+    return { error: "Nuvemshop not connected" };
+  }
+
+  try {
+    const accessToken = decrypt(integration.accessToken);
+    const storeId = integration.externalStoreId || "";
+
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    // 1. Fetch abandoned checkouts
+    const abandonedByDate = await fetchNuvemshopAbandonedCheckouts(
+      storeId,
+      accessToken,
+      thirtyDaysAgo
+    );
+
+    // 2. Get orders by date from our database
+    const orders = await prisma.order.findMany({
+      where: {
+        organizationId,
+        platform: "NUVEMSHOP",
+        orderDate: { gte: thirtyDaysAgo },
+      },
+      select: { orderDate: true },
+    });
+
+    const ordersByDate: Record<string, number> = {};
+    for (const o of orders) {
+      const key = o.orderDate.toISOString().split("T")[0];
+      ordersByDate[key] = (ordersByDate[key] || 0) + 1;
+    }
+
+    // 3. Merge and upsert into StoreFunnel
+    const allDates = new Set([
+      ...Object.keys(abandonedByDate),
+      ...Object.keys(ordersByDate),
+    ]);
+
+    let synced = 0;
+    for (const dateKey of allDates) {
+      const abandoned = abandonedByDate[dateKey] || 0;
+      const dayOrders = ordersByDate[dateKey] || 0;
+
+      await prisma.storeFunnel.upsert({
+        where: {
+          organizationId_platform_date: {
+            organizationId,
+            platform: "NUVEMSHOP",
+            date: new Date(dateKey),
+          },
+        },
+        create: {
+          organizationId,
+          platform: "NUVEMSHOP",
+          date: new Date(dateKey),
+          sessions: 0,
+          addToCart: 0,
+          checkoutsInitiated: abandoned + dayOrders,
+          ordersGenerated: dayOrders,
+        },
+        update: {
+          checkoutsInitiated: abandoned + dayOrders,
+          ordersGenerated: dayOrders,
+        },
+      });
+      synced++;
+    }
+
+    return { success: true, synced };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : "Unknown error";
+    console.error("[Nuvemshop Funnel] Error:", errorMsg);
+    return { error: errorMsg };
+  }
+}
+
+async function fetchNuvemshopAbandonedCheckouts(
+  storeId: string,
+  accessToken: string,
+  since: Date
+): Promise<Record<string, number>> {
+  const result: Record<string, number> = {};
+
+  try {
+    const sinceISO = since.toISOString();
+    let page = 1;
+    let hasMore = true;
+
+    while (hasMore) {
+      const url = `https://api.nuvemshop.com.br/v1/${storeId}/checkouts?created_at_min=${sinceISO}&per_page=200&page=${page}`;
+
+      const response = await fetch(url, {
+        headers: {
+          Authentication: `bearer ${accessToken}`,
+          "User-Agent": "CDR Group Hub (cdrgroup.com)",
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        console.warn("[Nuvemshop] Abandoned checkouts fetch failed:", response.status);
+        break;
+      }
+
+      const checkouts = await response.json();
+
+      if (!Array.isArray(checkouts) || checkouts.length === 0) {
+        hasMore = false;
+        break;
+      }
+
+      for (const checkout of checkouts) {
+        const dateKey = new Date(checkout.created_at).toISOString().split("T")[0];
+        result[dateKey] = (result[dateKey] || 0) + 1;
+      }
+
+      hasMore = checkouts.length === 200;
+      page++;
+    }
+  } catch (error) {
+    console.warn("[Nuvemshop] Abandoned checkouts failed:", error);
+  }
+
+  return result;
+}
+
 export function getNuvemshopAuthUrl(state: string) {
   const clientId = process.env.NUVEMSHOP_CLIENT_ID;
   const redirectUri = `${process.env.AUTH_URL}/api/integrations/nuvemshop/callback`;

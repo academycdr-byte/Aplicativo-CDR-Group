@@ -205,10 +205,9 @@ export async function getMetricsAnalysis(days: number = 30, from?: string, to?: 
 
 /**
  * E-commerce funnel: Sessoes → Adicoes ao Carrinho → Checkouts Iniciados → Pedidos Gerados
- * Sessions = ad clicks
- * Add-to-cart = AdMetric.addToCart + rawData fallback for legacy records + Reportana events
- * Checkouts = abandoned carts + total orders
- * Orders = total orders
+ * Primary source: StoreFunnel (synced from Shopify/Nuvemshop)
+ * Fallback for add-to-cart: Facebook Ads pixel data (rawData)
+ * Fallback for sessions: ad clicks when store data unavailable
  */
 export async function getFunnelData(days: number = 30, from?: string, to?: string) {
   const ctx = await getSessionWithOrg();
@@ -223,36 +222,35 @@ export async function getFunnelData(days: number = 30, from?: string, to?: strin
     paidOrders,
     shippedOrders,
     deliveredOrders,
-    abandonedCarts,
-    addToCartReportana,
-    adAggregates,
+    storeFunnelAgg,
     adMetricsRaw,
   ] = await Promise.all([
     prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter } }),
     prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter, status: "paid" } }),
     prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter, status: { in: ["shipped", "delivered"] } } }),
     prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter, status: "delivered" } }),
-    prisma.reportanaEvent.count({
-      where: { organizationId: orgId, eventType: "abandoned_checkout", eventDate: dateFilter },
-    }).catch(() => 0),
-    prisma.reportanaEvent.count({
-      where: { organizationId: orgId, eventType: "add_to_cart", eventDate: dateFilter },
-    }).catch(() => 0),
-    prisma.adMetric.aggregate({
+    // Aggregate funnel data from store platforms (Shopify, Nuvemshop, etc.)
+    prisma.storeFunnel.aggregate({
       where: { organizationId: orgId, date: dateFilter },
-      _sum: { clicks: true, addToCart: true, initiateCheckout: true },
-    }).catch(() => ({ _sum: { clicks: 0, addToCart: 0, initiateCheckout: 0 } })),
-    // Fallback: parse rawData for legacy records where addToCart=0
+      _sum: { sessions: true, addToCart: true, checkoutsInitiated: true, ordersGenerated: true },
+    }).catch(() => ({ _sum: { sessions: 0, addToCart: 0, checkoutsInitiated: 0, ordersGenerated: 0 } })),
+    // Fallback: parse Facebook rawData for add-to-cart when store doesn't provide it
     prisma.adMetric.findMany({
-      where: { organizationId: orgId, date: dateFilter, addToCart: 0 },
-      select: { rawData: true },
+      where: { organizationId: orgId, date: dateFilter },
+      select: { rawData: true, clicks: true },
     }),
   ]);
 
-  // Extract add_to_cart from rawData for legacy records (before schema field existed)
-  let rawAddToCart = 0;
-  let rawInitiateCheckout = 0;
+  // Store platform data (primary source)
+  const storeSessions = storeFunnelAgg._sum.sessions || 0;
+  const storeAddToCart = storeFunnelAgg._sum.addToCart || 0;
+  const storeCheckouts = storeFunnelAgg._sum.checkoutsInitiated || 0;
+
+  // Fallback: extract from Facebook Ads rawData for add-to-cart
+  let fbAddToCart = 0;
+  let fbClicks = 0;
   for (const m of adMetricsRaw) {
+    fbClicks += m.clicks || 0;
     if (m.rawData && typeof m.rawData === "object") {
       const raw = m.rawData as Record<string, unknown>;
       const actions = raw.actions as Array<{ action_type: string; value: string }> | undefined;
@@ -260,18 +258,15 @@ export async function getFunnelData(days: number = 30, from?: string, to?: strin
         const atc = actions.find((a) =>
           a.action_type === "add_to_cart" || a.action_type === "offsite_conversion.fb_pixel_add_to_cart"
         );
-        const ic = actions.find((a) =>
-          a.action_type === "initiate_checkout" || a.action_type === "offsite_conversion.fb_pixel_initiate_checkout"
-        );
-        if (atc) rawAddToCart += parseInt(atc.value || "0");
-        if (ic) rawInitiateCheckout += parseInt(ic.value || "0");
+        if (atc) fbAddToCart += parseInt(atc.value || "0");
       }
     }
   }
 
-  const sessoes = adAggregates._sum.clicks || 0;
-  const adicoesCarrinho = (adAggregates._sum.addToCart || 0) + rawAddToCart + addToCartReportana;
-  const checkoutsIniciados = abandonedCarts + totalOrders;
+  // Use store data when available, fallback to Facebook/ad data
+  const sessoes = storeSessions > 0 ? storeSessions : fbClicks;
+  const adicoesCarrinho = storeAddToCart > 0 ? storeAddToCart : fbAddToCart;
+  const checkoutsIniciados = storeCheckouts > 0 ? storeCheckouts : totalOrders;
 
   return {
     sessoes,
