@@ -298,6 +298,14 @@ export async function getCreativePerformance(params?: FilterParams) {
     }
   }
 
-  // Sort by spend desc (highest spend first)
-  return Object.values(byAd).sort((a, b) => b.spend - a.spend);
+  // Sort by spend desc and compute derived metrics
+  return Object.values(byAd)
+    .map((c) => ({
+      ...c,
+      ctr: c.impressions > 0 ? (c.clicks / c.impressions) * 100 : 0,
+      roas: c.spend > 0 ? c.revenue / c.spend : 0,
+      cpc: c.clicks > 0 ? c.spend / c.clicks : 0,
+      cpm: c.impressions > 0 ? (c.spend / c.impressions) * 1000 : 0,
+    }))
+    .sort((a, b) => b.spend - a.spend);
 }

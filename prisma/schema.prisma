@@ -116,6 +116,8 @@ model Organization {
   syncLogs        SyncLog[]
   reportanaEvents ReportanaEvent[]
   storeFunnels    StoreFunnel[]
+  reportClients   ReportClient[]
+  whatsAppSession WhatsAppSession?
 
   @@map("organizations")
 }
@@ -287,4 +289,98 @@ model StoreFunnel {
   @@unique([organizationId, platform, date])
   @@index([organizationId, date])
   @@map("store_funnels")
+}
+
+// ─── REPORTS & WHATSAPP ────────────────────────────
+
+enum PlanType {
+  FORMULA_BASE
+  FORMULA_AVANCADA
+  FORMULA_TOTAL
+  PERSONALIZADO
+}
+
+enum ClientStatus {
+  ACTIVE
+  PAUSED
+  CANCELLED
+}
+
+enum ReportFrequency {
+  DAILY
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+}
+
+model ReportClient {
+  id             String       @id @default(cuid())
+  organizationId String
+  name           String
+  responsible    String
+  phone          String
+  plan           PlanType
+  status         ClientStatus @default(ACTIVE)
+  startDate      DateTime
+  groupName      String?
+  groupId        String?
+  notes          String?      @db.Text
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  reports        ReportLog[]
+  schedules      ReportSchedule[]
+
+  @@map("report_clients")
+}
+
+model WhatsAppSession {
+  id             String   @id @default(cuid())
+  organizationId String   @unique
+  sessionId      String   // Internal session identifier
+  creds          String   @db.Text
+  status         String   @default("DISCONNECTED") // CONNECTED, DISCONNECTED
+  qr             String?  @db.Text
+  me             String?  // The connected phone number
+  pushName       String?  // The WhatsApp Name
+  updatedAt      DateTime @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("whatsapp_sessions")
+}
+
+model ReportSchedule {
+  id             String          @id @default(cuid())
+  clientId       String
+  frequency      ReportFrequency
+  cronExpression String?         // Optional if we use strict frequency enums
+  time           String          // HH:mm
+  dayOfWeek      Int?            // 0-6 for Weekly
+  dayOfMonth     Int?            // 1-31 for Monthly
+  config         Json
+  isActive       Boolean         @default(true)
+  lastRun        DateTime?
+  nextRun        DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  client         ReportClient    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@map("report_schedules")
+}
+
+model ReportLog {
+  id        String   @id @default(cuid())
+  clientId  String
+  type      String   // MANUAL, SCHEDULED
+  status    String   // SUCCESS, FAILED, PENDING
+  metrics   Json
+  sentAt    DateTime @default(now())
+  error     String?
+
+  client    ReportClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@map("report_logs")
 }

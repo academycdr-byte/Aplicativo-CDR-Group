@@ -101,6 +101,10 @@ type Creative = {
   revenue: number;
   addToCart: number;
   initiateCheckout: number;
+  ctr: number;
+  roas: number;
+  cpc: number;
+  cpm: number;
 };
 
 type AdMetric = {
@@ -465,13 +469,14 @@ export default function AdsPage() {
                         <Tooltip
                           contentStyle={{ backgroundColor: "var(--card)", borderColor: "var(--border)", borderRadius: "8px" }}
                           labelFormatter={(d) => new Date(d + "T00:00:00").toLocaleDateString("pt-BR")}
-                          formatter={(val: number, name: string) => {
-                            if (name === "Gasto") return [fmt(val), name];
-                            if (name === "Receita") return [fmt(val), name];
-                            if (name === "ROAS") return [`${val.toFixed(2)}x`, name];
-                            if (name === "CPA") return [fmt(val), name];
-                            if (name === "CTR") return [`${val.toFixed(2)}%`, name];
-                            return [val, name];
+                          formatter={(val, name) => {
+                            const v = Number(val) || 0;
+                            if (name === "Gasto") return [fmt(v), name];
+                            if (name === "Receita") return [fmt(v), name];
+                            if (name === "ROAS") return [`${v.toFixed(2)}x`, name];
+                            if (name === "CPA") return [fmt(v), name];
+                            if (name === "CTR") return [`${v.toFixed(2)}%`, name];
+                            return [v, name];
                           }}
                         />
                         <Legend />
