@@ -28,8 +28,23 @@ export default function BestSellersPage() {
             setError(null);
             try {
                 const params = periodToParams(period);
-                const fromDate = params.from ? new Date(params.from) : undefined;
-                const toDate = params.to ? new Date(params.to) : undefined;
+                let fromDate: Date | undefined;
+                let toDate: Date | undefined;
+
+                if (period.type === "custom" && params.from && params.to) {
+                    fromDate = new Date(params.from);
+                    toDate = new Date(params.to);
+                } else if (period.type === "preset") {
+                    // Calculate dates for preset periods
+                    toDate = new Date();
+                    fromDate = new Date();
+                    fromDate.setDate(toDate.getDate() - period.days);
+
+                    // Specific adjustment for "Today" (0 days) to be start of day
+                    if (period.days === 0) {
+                        fromDate.setHours(0, 0, 0, 0);
+                    }
+                }
 
                 const [productsData, collectionsData] = await Promise.all([
                     getBestSellersAction(selectedCollection === "all" ? undefined : selectedCollection, fromDate, toDate),
