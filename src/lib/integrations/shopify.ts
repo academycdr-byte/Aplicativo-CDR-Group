@@ -3,6 +3,7 @@ import { decrypt } from "@/lib/encryption";
 import crypto from "crypto";
 
 const SHOPIFY_API_VERSION = "2025-01";
+const SHOPIFY_GRAPHQL_VERSION = "2025-10"; // Required for ShopifyQL sessions dataset
 const SHOPIFY_SCOPES = "read_orders,read_products,read_customers,read_reports";
 
 /**
@@ -296,8 +297,12 @@ function mapShopifyStatus(status: string): string {
 }
 
 /**
- * Sync funnel metrics from Shopify using ShopifyQL (sessions, orders by day).
- * Also fetches abandoned checkouts count for the funnel.
+ * Sync funnel metrics from Shopify using ShopifyQL `sessions` dataset.
+ * This queries the same data shown in Shopify Admin → Analytics → Conversion funnel:
+ *   - sessions: total online store sessions
+ *   - sessions_with_cart_additions: sessions that added to cart
+ *   - sessions_that_reached_checkout: sessions that started checkout
+ *   - sessions_that_completed_checkout: sessions that completed purchase
  * Requires read_reports scope.
  */
 export async function syncShopifyFunnel(organizationId: string) {
@@ -313,15 +318,17 @@ export async function syncShopifyFunnel(organizationId: string) {
     const accessToken = decrypt(integration.accessToken);
     const shop = integration.externalStoreId || "";
 
-    // 1. Fetch sessions via ShopifyQL GraphQL
-    const sessionsData = await fetchShopifyQLSessions(shop, accessToken);
+    // Fetch funnel data from ShopifyQL sessions dataset
+    const funnelData = await fetchShopifyFunnelData(shop, accessToken);
 
-    // 2. Fetch abandoned checkouts via REST API
+    if (!funnelData || Object.keys(funnelData).length === 0) {
+      console.warn("[Shopify Funnel] No data from ShopifyQL sessions dataset");
+      return { error: "No funnel data available from Shopify analytics" };
+    }
+
+    // Get orders by date from our database as additional reference
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const abandonedByDate = await fetchShopifyAbandonedCheckouts(shop, accessToken, thirtyDaysAgo);
-
-    // 3. Get orders by date from our database
     const orders = await prisma.order.findMany({
       where: {
         organizationId,
@@ -337,18 +344,13 @@ export async function syncShopifyFunnel(organizationId: string) {
       ordersByDate[key] = (ordersByDate[key] || 0) + 1;
     }
 
-    // 4. Merge all data and upsert into StoreFunnel
-    const allDates = new Set([
-      ...Object.keys(sessionsData),
-      ...Object.keys(abandonedByDate),
-      ...Object.keys(ordersByDate),
-    ]);
-
+    // Upsert all funnel data into StoreFunnel
     let synced = 0;
-    for (const dateKey of allDates) {
-      const sessions = sessionsData[dateKey] || 0;
-      const abandoned = abandonedByDate[dateKey] || 0;
-      const dayOrders = ordersByDate[dateKey] || 0;
+    for (const [dateKey, metrics] of Object.entries(funnelData)) {
+      // Use ShopifyQL ordersCompleted, or our DB order count if ShopifyQL didn't return it
+      const dayOrders = metrics.ordersCompleted > 0
+        ? metrics.ordersCompleted
+        : (ordersByDate[dateKey] || 0);
 
       await prisma.storeFunnel.upsert({
         where: {
@@ -362,14 +364,15 @@ export async function syncShopifyFunnel(organizationId: string) {
           organizationId,
           platform: "SHOPIFY",
           date: new Date(dateKey),
-          sessions,
-          addToCart: 0,
-          checkoutsInitiated: abandoned + dayOrders,
+          sessions: metrics.sessions,
+          addToCart: metrics.addToCart,
+          checkoutsInitiated: metrics.checkoutsStarted,
           ordersGenerated: dayOrders,
         },
         update: {
-          sessions,
-          checkoutsInitiated: abandoned + dayOrders,
+          sessions: metrics.sessions,
+          addToCart: metrics.addToCart,
+          checkoutsInitiated: metrics.checkoutsStarted,
           ordersGenerated: dayOrders,
         },
       });
@@ -384,99 +387,136 @@ export async function syncShopifyFunnel(organizationId: string) {
   }
 }
 
-async function fetchShopifyQLSessions(
-  shop: string,
-  accessToken: string
-): Promise<Record<string, number>> {
-  const result: Record<string, number> = {};
+type DailyFunnelMetrics = {
+  sessions: number;
+  addToCart: number;
+  checkoutsStarted: number;
+  ordersCompleted: number;
+};
 
-  try {
-    const query = `FROM sales SHOW sessions GROUP BY day SINCE -30d UNTIL today`;
-    const graphqlBody = JSON.stringify({
-      query: `{
-        shopifyqlQuery(query: "${query}") {
-          tableData {
-            columns { name dataType }
-            rows
-          }
-          parseErrors
-        }
-      }`,
-    });
-
-    const response = await fetch(
-      `https://${shop}/admin/api/${SHOPIFY_API_VERSION}/graphql.json`,
-      {
-        method: "POST",
-        headers: {
-          "X-Shopify-Access-Token": accessToken,
-          "Content-Type": "application/json",
-        },
-        body: graphqlBody,
-      }
-    );
-
-    if (!response.ok) {
-      console.warn("[Shopify ShopifyQL] Failed:", response.status);
-      return result;
-    }
-
-    const data = await response.json();
-    const table = data?.data?.shopifyqlQuery?.tableData;
-
-    if (!table?.columns || !table?.rows) return result;
-
-    const dayIdx = table.columns.findIndex((c: { name: string }) => c.name === "day");
-    const sessionsIdx = table.columns.findIndex((c: { name: string }) => c.name === "sessions");
-
-    if (dayIdx === -1 || sessionsIdx === -1) return result;
-
-    for (const row of table.rows) {
-      const dateKey = String(row[dayIdx]);
-      const sessions = parseInt(String(row[sessionsIdx])) || 0;
-      if (dateKey && sessions > 0) {
-        result[dateKey] = sessions;
-      }
-    }
-  } catch (error) {
-    console.warn("[Shopify ShopifyQL] Sessions query failed:", error);
-  }
-
-  return result;
-}
-
-async function fetchShopifyAbandonedCheckouts(
+/**
+ * Fetch conversion funnel data from Shopify using ShopifyQL `sessions` dataset.
+ * Tries multiple query strategies:
+ * 1. Full funnel with all metrics (sessions, cart additions, checkout, completed)
+ * 2. Sessions only (if full query fails)
+ */
+async function fetchShopifyFunnelData(
   shop: string,
   accessToken: string,
-  since: Date
-): Promise<Record<string, number>> {
-  const result: Record<string, number> = {};
+  sinceDays: number = 30
+): Promise<Record<string, DailyFunnelMetrics> | null> {
+  const queries = [
+    // Full funnel data from sessions dataset
+    `FROM sessions SHOW sessions, sessions_with_cart_additions, sessions_that_reached_checkout, sessions_that_completed_checkout TIMESERIES day SINCE -${sinceDays}d UNTIL today ORDER BY day ASC`,
+    // Fallback: sessions only
+    `FROM sessions SHOW sessions TIMESERIES day SINCE -${sinceDays}d UNTIL today ORDER BY day ASC`,
+  ];
 
-  try {
-    const sinceISO = since.toISOString();
-    const url = `https://${shop}/admin/api/${SHOPIFY_API_VERSION}/checkouts.json?created_at_min=${sinceISO}&limit=250`;
+  for (const query of queries) {
+    try {
+      const table = await executeShopifyQLQuery(shop, accessToken, query);
+      if (!table) continue;
 
-    const response = await fetch(url, {
+      const result = parseShopifyFunnelTable(table);
+      if (Object.keys(result).length > 0) {
+        console.log(`[Shopify Funnel] Got ${Object.keys(result).length} days of data`);
+        return result;
+      }
+    } catch (error) {
+      console.warn("[Shopify Funnel] Query failed:", error);
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Execute a ShopifyQL query via GraphQL Admin API.
+ * Uses API version 2025-10 which supports the sessions dataset.
+ */
+async function executeShopifyQLQuery(
+  shop: string,
+  accessToken: string,
+  query: string
+): Promise<{ columns: Array<{ name: string; dataType: string }>; rows: Array<unknown[]> } | null> {
+  const escapedQuery = query.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  const graphqlBody = JSON.stringify({
+    query: `{
+      shopifyqlQuery(query: "${escapedQuery}") {
+        tableData {
+          columns { name dataType }
+          rows
+        }
+        parseErrors
+      }
+    }`,
+  });
+
+  const response = await fetch(
+    `https://${shop}/admin/api/${SHOPIFY_GRAPHQL_VERSION}/graphql.json`,
+    {
+      method: "POST",
       headers: {
         "X-Shopify-Access-Token": accessToken,
         "Content-Type": "application/json",
       },
-    });
-
-    if (!response.ok) {
-      console.warn("[Shopify] Abandoned checkouts fetch failed:", response.status);
-      return result;
+      body: graphqlBody,
     }
+  );
 
-    const data = await response.json();
-    const checkouts = data.checkouts || [];
+  if (!response.ok) {
+    console.warn(`[Shopify ShopifyQL] Request failed: ${response.status}`);
+    return null;
+  }
 
-    for (const checkout of checkouts) {
-      const dateKey = new Date(checkout.created_at).toISOString().split("T")[0];
-      result[dateKey] = (result[dateKey] || 0) + 1;
-    }
-  } catch (error) {
-    console.warn("[Shopify] Abandoned checkouts failed:", error);
+  const data = await response.json();
+  const queryResult = data?.data?.shopifyqlQuery;
+
+  if (queryResult?.parseErrors?.length > 0) {
+    console.warn("[Shopify ShopifyQL] Parse errors:", queryResult.parseErrors);
+    return null;
+  }
+
+  const table = queryResult?.tableData;
+  if (!table?.columns || !table?.rows || table.rows.length === 0) {
+    return null;
+  }
+
+  return table;
+}
+
+/**
+ * Parse ShopifyQL table data into daily funnel metrics.
+ * Dynamically finds columns by name to handle different query formats.
+ */
+function parseShopifyFunnelTable(
+  table: { columns: Array<{ name: string; dataType: string }>; rows: Array<unknown[]> }
+): Record<string, DailyFunnelMetrics> {
+  const result: Record<string, DailyFunnelMetrics> = {};
+
+  const dayIdx = table.columns.findIndex((c) =>
+    c.name === "day" || c.name === "date" || c.dataType === "date"
+  );
+  const sessionsIdx = table.columns.findIndex((c) => c.name === "sessions");
+  const cartIdx = table.columns.findIndex((c) => c.name === "sessions_with_cart_additions");
+  const checkoutIdx = table.columns.findIndex((c) => c.name === "sessions_that_reached_checkout");
+  const completedIdx = table.columns.findIndex((c) => c.name === "sessions_that_completed_checkout");
+
+  if (dayIdx === -1 || sessionsIdx === -1) {
+    console.warn("[Shopify Funnel] Missing required columns: day or sessions");
+    return result;
+  }
+
+  for (const row of table.rows) {
+    const dateStr = String(row[dayIdx]).split("T")[0];
+    if (!dateStr || dateStr === "undefined" || dateStr === "null") continue;
+
+    result[dateStr] = {
+      sessions: parseInt(String(row[sessionsIdx])) || 0,
+      addToCart: cartIdx !== -1 ? (parseInt(String(row[cartIdx])) || 0) : 0,
+      checkoutsStarted: checkoutIdx !== -1 ? (parseInt(String(row[checkoutIdx])) || 0) : 0,
+      ordersCompleted: completedIdx !== -1 ? (parseInt(String(row[completedIdx])) || 0) : 0,
+    };
   }
 
   return result;
