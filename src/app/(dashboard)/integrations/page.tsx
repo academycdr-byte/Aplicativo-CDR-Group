@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,11 +13,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Link2, Unlink, RefreshCw } from "lucide-react";
+import { Link2, Unlink, RefreshCw, AlertCircle, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
-import { getIntegrations, connectApiKeyIntegration, connectShopifyIntegration, disconnectIntegration } from "@/actions/integrations";
+import { getIntegrations, connectApiKeyIntegration, disconnectIntegration } from "@/actions/integrations";
 import { syncPlatform } from "@/actions/sync";
 import { Platform } from "@prisma/client";
+import { useSearchParams } from "next/navigation";
 
 type PlatformConfig = {
   name: string;
@@ -33,11 +34,9 @@ const platforms: PlatformConfig[] = [
     name: "Shopify",
     platform: "SHOPIFY",
     description: "Conecte sua loja Shopify para sincronizar pedidos e produtos.",
-    authType: "apikey",
+    authType: "oauth",
     color: "#96BF48",
-    fields: [
-      { key: "shopDomain", label: "Dominio da loja", placeholder: "minha-loja.myshopify.com" },
-    ],
+    fields: [],
   },
   {
     name: "Nuvemshop",
@@ -107,16 +106,44 @@ type IntegrationData = {
 };
 
 export default function IntegrationsPage() {
+  return (
+    <Suspense fallback={<div className="text-muted-foreground text-sm p-4">Carregando...</div>}>
+      <IntegrationsContent />
+    </Suspense>
+  );
+}
+
+function IntegrationsContent() {
   const [integrations, setIntegrations] = useState<IntegrationData[]>([]);
   const [connectDialog, setConnectDialog] = useState<PlatformConfig | null>(null);
+  const [shopifyDialog, setShopifyDialog] = useState(false);
+  const [shopDomain, setShopDomain] = useState("");
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     loadIntegrations();
-  }, []);
+
+    // Mostrar mensagens de sucesso/erro do OAuth callback
+    const success = searchParams.get("success");
+    const error = searchParams.get("error");
+    const detail = searchParams.get("detail");
+
+    if (success === "shopify") {
+      toast.success("Shopify conectada com sucesso!");
+    } else if (error === "shopify_oauth_failed") {
+      toast.error(`Erro ao conectar Shopify${detail ? `: ${detail}` : ""}`);
+    } else if (error === "shopify_denied") {
+      toast.error(`Shopify negou acesso${detail ? `: ${detail}` : ""}`);
+    } else if (error === "missing_params") {
+      toast.error("Erro no fluxo OAuth: parametros ausentes");
+    } else if (error === "unauthorized") {
+      toast.error("Voce nao tem permissao para esta integracao");
+    }
+  }, [searchParams]);
 
   async function loadIntegrations() {
     const data = await getIntegrations();
@@ -129,29 +156,41 @@ export default function IntegrationsPage() {
   }
 
   function openConnect(platform: PlatformConfig) {
+    if (platform.platform === "SHOPIFY") {
+      setShopDomain("");
+      setShopifyDialog(true);
+      return;
+    }
+
     if (platform.authType === "oauth") {
       const oauthRoutes: Record<string, string> = {
-        SHOPIFY: "/api/integrations/shopify",
         NUVEMSHOP: "/api/integrations/nuvemshop",
         FACEBOOK_ADS: "/api/integrations/facebook",
         GOOGLE_ADS: "/api/integrations/google",
       };
       const route = oauthRoutes[platform.platform];
       if (route) {
-        if (platform.platform === "SHOPIFY") {
-          const shop = prompt("Digite o dominio da sua loja Shopify (ex: minha-loja.myshopify.com):");
-          if (shop) {
-            window.location.href = `${route}?shop=${encodeURIComponent(shop)}`;
-          }
-        } else {
-          window.location.href = route;
-        }
+        window.location.href = route;
       }
       return;
     }
     setFormData({});
     setMsg("");
     setConnectDialog(platform);
+  }
+
+  function handleShopifyConnect(e: React.FormEvent) {
+    e.preventDefault();
+    let domain = shopDomain.trim().toLowerCase();
+    if (!domain) return;
+
+    // Normalizar dominio
+    if (!domain.includes(".myshopify.com")) {
+      domain = `${domain}.myshopify.com`;
+    }
+
+    // Redirecionar para o OAuth flow
+    window.location.href = `/api/integrations/shopify?shop=${encodeURIComponent(domain)}`;
   }
 
   async function handleSync(platform: Platform) {
@@ -172,18 +211,12 @@ export default function IntegrationsPage() {
     setLoading(true);
     setMsg("");
 
-    let result: { error?: string; success?: boolean };
-
-    if (connectDialog.platform === "SHOPIFY") {
-      result = await connectShopifyIntegration(formData.shopDomain || "");
-    } else {
-      result = await connectApiKeyIntegration({
-        platform: connectDialog.platform,
-        apiKey: formData.apiKey || "",
-        apiSecret: formData.apiSecret,
-        externalStoreId: formData.externalStoreId,
-      });
-    }
+    const result = await connectApiKeyIntegration({
+      platform: connectDialog.platform,
+      apiKey: formData.apiKey || "",
+      apiSecret: formData.apiSecret,
+      externalStoreId: formData.externalStoreId,
+    });
 
     if (result.error) {
       setMsg(result.error);
@@ -283,6 +316,53 @@ export default function IntegrationsPage() {
           );
         })}
       </div>
+
+      {/* Shopify Connect Dialog - pede o dominio antes de redirecionar para OAuth */}
+      <Dialog open={shopifyDialog} onOpenChange={setShopifyDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Conectar Shopify</DialogTitle>
+            <DialogDescription>
+              Digite o dominio da sua loja Shopify. Voce sera redirecionado para autorizar o acesso.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-200 text-sm rounded-lg p-3 flex gap-2">
+            <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+            <span>
+              O app CDR Group precisa estar instalado na sua loja Shopify antes de conectar.
+              Use o link de instalacao fornecido pelo administrador.
+            </span>
+          </div>
+
+          <form onSubmit={handleShopifyConnect} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Dominio da loja</Label>
+              <Input
+                value={shopDomain}
+                onChange={(e) => setShopDomain(e.target.value)}
+                placeholder="minha-loja.myshopify.com"
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                Ex: minha-loja.myshopify.com ou apenas minha-loja
+              </p>
+            </div>
+            <div className="flex justify-end gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShopifyDialog(false)}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit">
+                Conectar via OAuth
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Connect Dialog for API Key platforms */}
       <Dialog open={!!connectDialog} onOpenChange={() => setConnectDialog(null)}>

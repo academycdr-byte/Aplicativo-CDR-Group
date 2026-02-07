@@ -113,60 +113,6 @@ export async function disconnectIntegration(platform: Platform) {
   return { success: true };
 }
 
-export async function connectShopifyIntegration(shop: string) {
-  const ctx = await getSessionWithOrg();
-  if (!ctx) return { error: "Nao autenticado." };
-
-  if (ctx.role !== "OWNER" && ctx.role !== "ADMIN") {
-    return { error: "Voce nao tem permissao para gerenciar integracoes." };
-  }
-
-  // Normalizar dominio
-  let shopDomain = shop.trim().toLowerCase();
-  if (!shopDomain.includes(".myshopify.com")) {
-    shopDomain = `${shopDomain}.myshopify.com`;
-  }
-
-  try {
-    const { getShopifyAccessToken } = await import("@/lib/integrations/shopify");
-    const tokenData = await getShopifyAccessToken(shopDomain);
-
-    const expiresAt = new Date(Date.now() + tokenData.expires_in * 1000);
-
-    await prisma.integration.upsert({
-      where: {
-        organizationId_platform: {
-          organizationId: ctx.organization.id,
-          platform: "SHOPIFY",
-        },
-      },
-      create: {
-        organizationId: ctx.organization.id,
-        platform: "SHOPIFY",
-        status: "CONNECTED",
-        accessToken: encrypt(tokenData.access_token),
-        externalStoreId: shopDomain,
-        scopes: tokenData.scope || "",
-        tokenExpiresAt: expiresAt,
-      },
-      update: {
-        status: "CONNECTED",
-        accessToken: encrypt(tokenData.access_token),
-        externalStoreId: shopDomain,
-        scopes: tokenData.scope || "",
-        tokenExpiresAt: expiresAt,
-        errorMessage: null,
-      },
-    });
-
-    return { success: true };
-  } catch (error) {
-    console.error("[Shopify Connect] Error:", error);
-    const msg = error instanceof Error ? error.message : "Erro desconhecido";
-    return { error: `Falha ao conectar Shopify: ${msg}. Verifique se o app CDR Group esta instalado na loja.` };
-  }
-}
-
 export async function getIntegrationCredentials(platform: Platform) {
   const ctx = await getSessionWithOrg();
   if (!ctx) return null;
