@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { encrypt, decrypt } from "@/lib/encryption";
 
-const FB_GRAPH_VERSION = "v19.0";
+const FB_GRAPH_VERSION = "v21.0";
+const FB_REDIRECT_URI = "https://aplicativo-cdr-group.vercel.app/api/integrations/facebook/callback";
 
 async function refreshFacebookToken(integrationId: string): Promise<string> {
   const integration = await prisma.integration.findUnique({
@@ -167,29 +168,37 @@ export async function syncFacebookAdsMetrics(organizationId: string) {
 }
 
 export function getFacebookAuthUrl(state: string) {
-  const clientId = process.env.FACEBOOK_APP_ID;
-  const redirectUri = `${process.env.AUTH_URL}/api/integrations/facebook/callback`;
+  const clientId = process.env.FACEBOOK_APP_ID?.trim();
+  if (!clientId) throw new Error("FACEBOOK_APP_ID nao configurado");
+
   const scopes = "ads_read,ads_management,read_insights";
 
-  return `https://www.facebook.com/${FB_GRAPH_VERSION}/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&state=${state}`;
+  return `https://www.facebook.com/${FB_GRAPH_VERSION}/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(FB_REDIRECT_URI)}&scope=${scopes}&state=${state}`;
 }
 
 export async function exchangeFacebookToken(code: string) {
-  const redirectUri = `${process.env.AUTH_URL}/api/integrations/facebook/callback`;
+  const clientId = process.env.FACEBOOK_APP_ID?.trim();
+  const clientSecret = process.env.FACEBOOK_APP_SECRET?.trim();
+
+  if (!clientId || !clientSecret) {
+    throw new Error("FACEBOOK_APP_ID ou FACEBOOK_APP_SECRET nao configurado");
+  }
 
   const response = await fetch(
-    `https://graph.facebook.com/${FB_GRAPH_VERSION}/oauth/access_token?client_id=${process.env.FACEBOOK_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&client_secret=${process.env.FACEBOOK_APP_SECRET}&code=${code}`
+    `https://graph.facebook.com/${FB_GRAPH_VERSION}/oauth/access_token?client_id=${clientId}&redirect_uri=${encodeURIComponent(FB_REDIRECT_URI)}&client_secret=${clientSecret}&code=${code}`
   );
 
   if (!response.ok) {
+    const errorBody = await response.text();
+    console.error("[Facebook OAuth] Token exchange failed:", response.status, errorBody);
     throw new Error(`Failed to exchange Facebook token: ${response.status}`);
   }
 
   const data = await response.json();
 
-  // Exchange for long-lived token
+  // Exchange for long-lived token (60 days)
   const longLivedResponse = await fetch(
-    `https://graph.facebook.com/${FB_GRAPH_VERSION}/oauth/access_token?grant_type=fb_exchange_token&client_id=${process.env.FACEBOOK_APP_ID}&client_secret=${process.env.FACEBOOK_APP_SECRET}&fb_exchange_token=${data.access_token}`
+    `https://graph.facebook.com/${FB_GRAPH_VERSION}/oauth/access_token?grant_type=fb_exchange_token&client_id=${clientId}&client_secret=${clientSecret}&fb_exchange_token=${data.access_token}`
   );
 
   if (!longLivedResponse.ok) {

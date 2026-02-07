@@ -149,6 +149,18 @@ function IntegrationsContent() {
       toast.error(`Erro ao conectar Shopify${detail ? `: ${detail}` : ""}`, { duration: 10000 });
     } else if (error === "shopify_config_error") {
       toast.error(`Configuracao Shopify incorreta${detail ? `: ${detail}` : ""}`, { duration: 10000 });
+    } else if (success === "facebook") {
+      toast.success("Facebook Ads conectado com sucesso! Sincronizando metricas...");
+      syncPlatform("FACEBOOK_ADS").then((result) => {
+        if ("error" in result && result.error) {
+          toast.error(`Erro ao sincronizar Facebook Ads: ${result.error}`);
+        } else {
+          toast.success("Metricas do Facebook Ads sincronizadas!");
+          loadIntegrations();
+        }
+      });
+    } else if (error === "facebook_oauth_failed") {
+      toast.error(`Erro ao conectar Facebook Ads${detail ? `: ${detail}` : ""}`, { duration: 10000 });
     } else if (error === "missing_params") {
       toast.error("Erro no fluxo OAuth: parametros ausentes");
     } else if (error === "missing_shop") {
