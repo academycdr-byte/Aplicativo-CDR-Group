@@ -176,60 +176,72 @@ export default function AdsPage() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-        <Card>
+        <Card className="transition-shadow hover:shadow-md">
           <CardContent className="pt-5">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-muted-foreground">Gasto</p>
-              <DollarSign className="w-4 h-4 text-muted-foreground" />
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm text-muted-foreground font-medium">Gasto</p>
+              <div className="w-7 h-7 rounded-lg bg-destructive/10 flex items-center justify-center">
+                <DollarSign className="w-3.5 h-3.5 text-destructive" />
+              </div>
             </div>
-            <p className="text-2xl font-bold">{fmt(totals?.spend || 0)}</p>
+            <p className="text-xl font-bold tracking-tight">{fmt(totals?.spend || 0)}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="transition-shadow hover:shadow-md">
           <CardContent className="pt-5">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-muted-foreground">Impressoes</p>
-              <Eye className="w-4 h-4 text-muted-foreground" />
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm text-muted-foreground font-medium">Impressoes</p>
+              <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Eye className="w-3.5 h-3.5 text-primary" />
+              </div>
             </div>
-            <p className="text-2xl font-bold">{fmtNum(totals?.impressions || 0)}</p>
+            <p className="text-xl font-bold tracking-tight">{fmtNum(totals?.impressions || 0)}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="transition-shadow hover:shadow-md">
           <CardContent className="pt-5">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-muted-foreground">Alcance</p>
-              <Users className="w-4 h-4 text-muted-foreground" />
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm text-muted-foreground font-medium">Alcance</p>
+              <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Users className="w-3.5 h-3.5 text-primary" />
+              </div>
             </div>
-            <p className="text-2xl font-bold">{fmtNum(totals?.reach || 0)}</p>
+            <p className="text-xl font-bold tracking-tight">{fmtNum(totals?.reach || 0)}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="transition-shadow hover:shadow-md">
           <CardContent className="pt-5">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-muted-foreground">Cliques</p>
-              <MousePointer className="w-4 h-4 text-muted-foreground" />
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm text-muted-foreground font-medium">Cliques</p>
+              <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
+                <MousePointer className="w-3.5 h-3.5 text-primary" />
+              </div>
             </div>
-            <p className="text-2xl font-bold">{fmtNum(totals?.clicks || 0)}</p>
+            <p className="text-xl font-bold tracking-tight">{fmtNum(totals?.clicks || 0)}</p>
             <p className="text-xs text-muted-foreground mt-1">CTR: {ctr.toFixed(2)}%</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="transition-shadow hover:shadow-md">
           <CardContent className="pt-5">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-muted-foreground">Conversoes</p>
-              <TrendingUp className="w-4 h-4 text-muted-foreground" />
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm text-muted-foreground font-medium">Conversoes</p>
+              <div className="w-7 h-7 rounded-lg bg-success/10 flex items-center justify-center">
+                <TrendingUp className="w-3.5 h-3.5 text-success" />
+              </div>
             </div>
-            <p className="text-2xl font-bold">{fmtNum(totals?.conversions || 0)}</p>
+            <p className="text-xl font-bold tracking-tight">{fmtNum(totals?.conversions || 0)}</p>
             <p className="text-xs text-muted-foreground mt-1">Receita: {fmt(totals?.revenue || 0)}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="transition-shadow hover:shadow-md">
           <CardContent className="pt-5">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-muted-foreground">ROAS</p>
-              <TrendingUp className="w-4 h-4 text-muted-foreground" />
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm text-muted-foreground font-medium">ROAS</p>
+              <div className="w-7 h-7 rounded-lg bg-success/10 flex items-center justify-center">
+                <TrendingUp className="w-3.5 h-3.5 text-success" />
+              </div>
             </div>
-            <p className="text-2xl font-bold">{roas.toFixed(2)}x</p>
+            <p className="text-xl font-bold tracking-tight">{roas.toFixed(2)}x</p>
             <p className="text-xs text-muted-foreground mt-1">
               CPA: {totals && totals.conversions > 0 ? fmt(totals.spend / totals.conversions) : "-"}
             </p>
@@ -268,16 +280,23 @@ export default function AdsPage() {
               {dayData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={300}>
                   <LineChart data={dayData}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                     <XAxis
                       dataKey="date"
-                      tick={{ fontSize: 12 }}
+                      tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
+                      tickLine={{ stroke: "var(--border)" }}
+                      axisLine={{ stroke: "var(--border)" }}
                       tickFormatter={(v) => {
                         const d = new Date(v + "T00:00:00");
                         return `${d.getDate()}/${d.getMonth() + 1}`;
                       }}
                     />
-                    <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `R$${v}`} />
+                    <YAxis
+                      tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
+                      tickLine={{ stroke: "var(--border)" }}
+                      axisLine={{ stroke: "var(--border)" }}
+                      tickFormatter={(v) => `R$${v}`}
+                    />
                     <Tooltip
                       formatter={(value, name) => {
                         const v = Number(value);
@@ -289,9 +308,10 @@ export default function AdsPage() {
                         const d = new Date(label + "T00:00:00");
                         return d.toLocaleDateString("pt-BR");
                       }}
+                      cursor={{ stroke: "var(--muted-foreground)", strokeOpacity: 0.3 }}
                     />
-                    <Line type="monotone" dataKey="spend" stroke="#ef4444" strokeWidth={2} dot={false} />
-                    <Line type="monotone" dataKey="revenue" stroke="#22c55e" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="spend" stroke="var(--destructive)" strokeWidth={2.5} dot={false} />
+                    <Line type="monotone" dataKey="revenue" stroke="var(--primary)" strokeWidth={2.5} dot={false} />
                   </LineChart>
                 </ResponsiveContainer>
               ) : (
@@ -481,7 +501,7 @@ export default function AdsPage() {
                             </div>
                             <div>
                               <p className="text-muted-foreground text-xs">ROAS</p>
-                              <p className={`font-semibold ${cRoas >= 1 ? "text-green-600" : cRoas > 0 ? "text-amber-600" : ""}`}>
+                              <p className={`font-semibold ${cRoas >= 1 ? "text-success" : cRoas > 0 ? "text-warning" : ""}`}>
                                 {cRoas > 0 ? cRoas.toFixed(2) + "x" : "-"}
                               </p>
                             </div>
@@ -611,7 +631,7 @@ export default function AdsPage() {
                             <TableCell className="text-right">{cCpm > 0 ? fmt(cCpm) : "-"}</TableCell>
                             <TableCell className="text-right">{c.conversions}</TableCell>
                             <TableCell className="text-right">
-                              <span className={cRoas >= 1 ? "text-green-600 font-medium" : cRoas > 0 ? "text-amber-600" : ""}>
+                              <span className={cRoas >= 1 ? "text-success font-medium" : cRoas > 0 ? "text-warning" : ""}>
                                 {cRoas > 0 ? cRoas.toFixed(2) + "x" : "-"}
                               </span>
                             </TableCell>
