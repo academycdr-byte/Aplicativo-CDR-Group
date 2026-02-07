@@ -1,7 +1,7 @@
-import { syncShopifyOrders } from "./shopify";
+import { syncShopifyOrders, syncShopifyFunnel } from "./shopify";
 import { syncCartpandaOrders } from "./cartpanda";
 import { syncYampiOrders } from "./yampi";
-import { syncNuvemshopOrders } from "./nuvemshop";
+import { syncNuvemshopOrders, syncNuvemshopFunnel } from "./nuvemshop";
 import { syncFacebookAdsMetrics } from "./facebook-ads";
 import { syncGoogleAdsMetrics } from "./google-ads";
 import { syncReportanaMetrics } from "./reportana";
@@ -44,6 +44,8 @@ export async function syncAllPlatforms(organizationId: string): Promise<SyncResu
     { platform: "FACEBOOK_ADS", fn: () => syncFacebookAdsMetrics(organizationId) },
     { platform: "GOOGLE_ADS", fn: () => syncGoogleAdsMetrics(organizationId) },
     { platform: "REPORTANA", fn: () => syncReportanaMetrics(organizationId) },
+    { platform: "SHOPIFY_FUNNEL", fn: () => syncShopifyFunnel(organizationId) },
+    { platform: "NUVEMSHOP_FUNNEL", fn: () => syncNuvemshopFunnel(organizationId) },
   ];
 
   const settled = await Promise.allSettled(

@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "ad_metrics" ADD COLUMN "addToCart" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "ad_metrics" ADD COLUMN "initiateCheckout" INTEGER NOT NULL DEFAULT 0;
