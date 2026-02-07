@@ -561,7 +561,7 @@ function IntegrationsContent() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3">
+          <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
             {fbAccounts.map((account) => {
               const isActive = account.account_status === 1;
               return (
