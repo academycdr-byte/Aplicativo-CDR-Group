@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -110,14 +111,35 @@ export default function IntegrationsPage() {
   const [shopifyDialog, setShopifyDialog] = useState(false);
   const [shopDomain, setShopDomain] = useState("");
   const [shopifyToken, setShopifyToken] = useState("");
+  const [shopifyMode, setShopifyMode] = useState<"oauth" | "token">("oauth");
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     loadIntegrations();
-  }, []);
+
+    // Mostrar mensagens de sucesso/erro do OAuth callback
+    const success = searchParams.get("success");
+    const error = searchParams.get("error");
+    const detail = searchParams.get("detail");
+
+    if (success === "shopify") {
+      toast.success("Shopify conectada com sucesso!");
+    } else if (error === "shopify_oauth_failed") {
+      toast.error(`Erro ao conectar Shopify${detail ? `: ${detail}` : ""}`, { duration: 10000 });
+    } else if (error === "shopify_config_error") {
+      toast.error(`Configuracao Shopify incorreta${detail ? `: ${detail}` : ""}`, { duration: 10000 });
+    } else if (error === "missing_params") {
+      toast.error("Erro no fluxo OAuth: parametros ausentes");
+    } else if (error === "missing_shop") {
+      toast.error("Dominio da loja nao informado");
+    } else if (error === "unauthorized") {
+      toast.error("Voce nao tem permissao para esta integracao");
+    }
+  }, [searchParams]);
 
   async function loadIntegrations() {
     const data = await getIntegrations();
@@ -133,6 +155,7 @@ export default function IntegrationsPage() {
     if (platform.platform === "SHOPIFY") {
       setShopDomain("");
       setShopifyToken("");
+      setShopifyMode("oauth");
       setMsg("");
       setShopifyDialog(true);
       return;
@@ -155,7 +178,17 @@ export default function IntegrationsPage() {
     setConnectDialog(platform);
   }
 
-  async function handleShopifyConnect(e: React.FormEvent) {
+  function handleShopifyOAuth(e: React.FormEvent) {
+    e.preventDefault();
+    const domain = shopDomain.trim().toLowerCase();
+    if (!domain) return;
+
+    setLoading(true);
+    // Redirecionar para a rota OAuth que inicia o fluxo com Shopify
+    window.location.href = `/api/integrations/shopify?shop=${encodeURIComponent(domain)}`;
+  }
+
+  async function handleShopifyToken(e: React.FormEvent) {
     e.preventDefault();
     const domain = shopDomain.trim().toLowerCase();
     const token = shopifyToken.trim();
@@ -300,30 +333,38 @@ export default function IntegrationsPage() {
         })}
       </div>
 
-      {/* Shopify Connect Dialog - conexao via Custom App Access Token */}
+      {/* Shopify Connect Dialog */}
       <Dialog open={shopifyDialog} onOpenChange={setShopifyDialog}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Conectar Shopify</DialogTitle>
             <DialogDescription>
-              Conecte usando um Custom App criado no admin da sua loja Shopify.
+              Conecte sua loja Shopify via OAuth ou colando um Access Token.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-200 text-sm rounded-lg p-3 space-y-2">
-            <div className="flex gap-2">
-              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-              <span className="text-xs font-semibold">Como obter o Access Token:</span>
-            </div>
-            <ol className="text-xs space-y-1 ml-6 list-decimal">
-              <li>No admin da Shopify, va em <strong>Configuracoes &gt; Apps e canais de vendas</strong></li>
-              <li>Clique em <strong>Desenvolver apps</strong> (no topo)</li>
-              <li>Clique <strong>Criar um app</strong> e de um nome (ex: CDR Group)</li>
-              <li>Em <strong>Configuracao</strong>, clique em <strong>Configurar escopos da Admin API</strong></li>
-              <li>Selecione: <strong>read_orders</strong>, <strong>read_products</strong>, <strong>read_customers</strong></li>
-              <li>Clique <strong>Salvar</strong> e depois <strong>Instalar app</strong></li>
-              <li>Copie o <strong>Admin API access token</strong> (comeca com <code>shpat_</code>)</li>
-            </ol>
+          {/* Toggle between OAuth and Token mode */}
+          <div className="flex gap-2 border rounded-lg p-1">
+            <button
+              className={`flex-1 text-sm py-1.5 px-3 rounded-md transition-colors ${
+                shopifyMode === "oauth"
+                  ? "bg-primary text-primary-foreground"
+                  : "hover:bg-muted"
+              }`}
+              onClick={() => { setShopifyMode("oauth"); setMsg(""); }}
+            >
+              OAuth (Dev Dashboard)
+            </button>
+            <button
+              className={`flex-1 text-sm py-1.5 px-3 rounded-md transition-colors ${
+                shopifyMode === "token"
+                  ? "bg-primary text-primary-foreground"
+                  : "hover:bg-muted"
+              }`}
+              onClick={() => { setShopifyMode("token"); setMsg(""); }}
+            >
+              Access Token (Manual)
+            </button>
           </div>
 
           {msg && (
@@ -332,45 +373,89 @@ export default function IntegrationsPage() {
             </div>
           )}
 
-          <form onSubmit={handleShopifyConnect} className="space-y-4">
-            <div className="space-y-2">
-              <Label>Dominio da loja</Label>
-              <Input
-                value={shopDomain}
-                onChange={(e) => setShopDomain(e.target.value)}
-                placeholder="minha-loja.myshopify.com"
-                required
-              />
-              <p className="text-xs text-muted-foreground">
-                Ex: minha-loja.myshopify.com ou apenas minha-loja
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label>Admin API Access Token</Label>
-              <Input
-                value={shopifyToken}
-                onChange={(e) => setShopifyToken(e.target.value)}
-                placeholder="shpat_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                required
-                type="password"
-              />
-              <p className="text-xs text-muted-foreground">
-                Token do Custom App (comeca com shpat_). Este token nao expira.
-              </p>
-            </div>
-            <div className="flex justify-end gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setShopifyDialog(false)}
-              >
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={loading}>
-                {loading ? "Validando e conectando..." : "Conectar"}
-              </Button>
-            </div>
-          </form>
+          {shopifyMode === "oauth" ? (
+            <>
+              <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-200 text-sm rounded-lg p-3 space-y-1">
+                <div className="flex gap-2">
+                  <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                  <span className="text-xs">
+                    Voce sera redirecionado para a Shopify para autorizar o acesso.
+                    O app deve estar configurado no Dev Dashboard com a URL de callback correta.
+                  </span>
+                </div>
+              </div>
+              <form onSubmit={handleShopifyOAuth} className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Dominio da loja</Label>
+                  <Input
+                    value={shopDomain}
+                    onChange={(e) => setShopDomain(e.target.value)}
+                    placeholder="minha-loja.myshopify.com"
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Ex: minha-loja.myshopify.com ou apenas minha-loja
+                  </p>
+                </div>
+                <div className="flex justify-end gap-3">
+                  <Button type="button" variant="outline" onClick={() => setShopifyDialog(false)}>
+                    Cancelar
+                  </Button>
+                  <Button type="submit" disabled={loading}>
+                    {loading ? "Redirecionando..." : "Autorizar via Shopify"}
+                  </Button>
+                </div>
+              </form>
+            </>
+          ) : (
+            <>
+              <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-200 text-sm rounded-lg p-3 space-y-2">
+                <div className="flex gap-2">
+                  <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                  <span className="text-xs font-semibold">Como obter o Access Token:</span>
+                </div>
+                <ol className="text-xs space-y-1 ml-6 list-decimal">
+                  <li>No admin da Shopify, va em <strong>Configuracoes &gt; Apps</strong></li>
+                  <li>Clique em <strong>Desenvolver apps</strong></li>
+                  <li>Selecione um app existente ou crie um novo</li>
+                  <li>Configure os escopos: <strong>read_orders</strong>, <strong>read_products</strong>, <strong>read_customers</strong></li>
+                  <li>Instale o app e copie o <strong>Admin API access token</strong></li>
+                </ol>
+              </div>
+              <form onSubmit={handleShopifyToken} className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Dominio da loja</Label>
+                  <Input
+                    value={shopDomain}
+                    onChange={(e) => setShopDomain(e.target.value)}
+                    placeholder="minha-loja.myshopify.com"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Admin API Access Token</Label>
+                  <Input
+                    value={shopifyToken}
+                    onChange={(e) => setShopifyToken(e.target.value)}
+                    placeholder="shpat_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                    required
+                    type="password"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Token comeca com shpat_. Funciona com apps legados e novos.
+                  </p>
+                </div>
+                <div className="flex justify-end gap-3">
+                  <Button type="button" variant="outline" onClick={() => setShopifyDialog(false)}>
+                    Cancelar
+                  </Button>
+                  <Button type="submit" disabled={loading}>
+                    {loading ? "Validando..." : "Conectar com Token"}
+                  </Button>
+                </div>
+              </form>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 
