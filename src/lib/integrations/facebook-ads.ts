@@ -289,25 +289,71 @@ export async function exchangeFacebookToken(code: string) {
   return longLivedResponse.json();
 }
 
-export async function getFacebookAdAccounts(accessToken: string) {
-  const allAccounts: { id: string; name: string; account_status: number }[] = [];
-  let url: string | null = `https://graph.facebook.com/${FB_GRAPH_VERSION}/me/adaccounts?fields=id,name,account_status&limit=100&access_token=${accessToken}`;
+type FbAdAccount = { id: string; name: string; account_status: number };
+type FbPaginatedResponse = { data?: FbAdAccount[]; paging?: { next?: string } };
+
+async function fetchAllPages(startUrl: string): Promise<FbAdAccount[]> {
+  const results: FbAdAccount[] = [];
+  let url: string | null = startUrl;
 
   while (url) {
     const response: Response = await fetch(url);
+    if (!response.ok) break; // Skip on error (e.g. permission denied for a specific BM)
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch ad accounts: ${response.status}`);
-    }
-
-    const data: { data?: { id: string; name: string; account_status: number }[]; paging?: { next?: string } } = await response.json();
+    const data: FbPaginatedResponse = await response.json();
     if (data.data) {
-      allAccounts.push(...data.data);
+      results.push(...data.data);
     }
-
-    // Follow pagination
     url = data.paging?.next || null;
   }
 
-  return allAccounts;
+  return results;
+}
+
+export async function getFacebookAdAccounts(accessToken: string) {
+  const accountMap = new Map<string, FbAdAccount>();
+
+  // 1. Fetch ad accounts directly on the user profile
+  const directAccounts = await fetchAllPages(
+    `https://graph.facebook.com/${FB_GRAPH_VERSION}/me/adaccounts?fields=id,name,account_status&limit=100&access_token=${accessToken}`
+  );
+  for (const acc of directAccounts) {
+    accountMap.set(acc.id, acc);
+  }
+
+  // 2. Fetch all Business Managers the user has access to
+  try {
+    const bizResponse: Response = await fetch(
+      `https://graph.facebook.com/${FB_GRAPH_VERSION}/me/businesses?fields=id,name&limit=100&access_token=${accessToken}`
+    );
+
+    if (bizResponse.ok) {
+      const bizData: { data?: { id: string; name: string }[]; paging?: { next?: string } } = await bizResponse.json();
+      const businesses = bizData.data || [];
+
+      // 3. For each BM, fetch owned + client ad accounts
+      for (const biz of businesses) {
+        const owned = await fetchAllPages(
+          `https://graph.facebook.com/${FB_GRAPH_VERSION}/${biz.id}/owned_ad_accounts?fields=id,name,account_status&limit=100&access_token=${accessToken}`
+        );
+        for (const acc of owned) {
+          accountMap.set(acc.id, acc);
+        }
+
+        const client = await fetchAllPages(
+          `https://graph.facebook.com/${FB_GRAPH_VERSION}/${biz.id}/client_ad_accounts?fields=id,name,account_status&limit=100&access_token=${accessToken}`
+        );
+        for (const acc of client) {
+          accountMap.set(acc.id, acc);
+        }
+      }
+    }
+  } catch {
+    // If business fetching fails, we still have direct accounts
+  }
+
+  // Sort by name
+  return Array.from(accountMap.values()).sort((a, b) =>
+    (a.name || "").localeCompare(b.name || "")
+  );
 }
