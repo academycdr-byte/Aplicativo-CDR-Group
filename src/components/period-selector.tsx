@@ -39,10 +39,20 @@ export function PeriodSelector({ value, onChange, onRefresh, refreshing }: Perio
 
   const isCustom = value.type === "custom";
 
-  function handleRangeSelect(selected: DateRange | undefined) {
-    setRange(selected);
-    if (selected?.from && selected?.to) {
-      onChange({ type: "custom", from: selected.from, to: selected.to });
+  function handleOpenChange(open: boolean) {
+    if (open) {
+      // Reset range to current value when opening
+      setRange(value.type === "custom" ? { from: value.from, to: value.to } : undefined);
+    }
+    setCalendarOpen(open);
+  }
+
+  function handleApply() {
+    if (range?.from && range?.to) {
+      // Set "to" to end of day so the entire last day is included
+      const toEnd = new Date(range.to);
+      toEnd.setHours(23, 59, 59, 999);
+      onChange({ type: "custom", from: range.from, to: toEnd });
       setCalendarOpen(false);
     }
   }
@@ -51,6 +61,8 @@ export function PeriodSelector({ value, onChange, onRefresh, refreshing }: Perio
     if (value.type !== "custom") return "";
     return `${format(value.from, "dd/MM", { locale: ptBR })} - ${format(value.to, "dd/MM", { locale: ptBR })}`;
   }
+
+  const rangeComplete = range?.from && range?.to;
 
   return (
     <div className="flex items-center gap-2">
@@ -74,7 +86,7 @@ export function PeriodSelector({ value, onChange, onRefresh, refreshing }: Perio
         ))}
 
         {/* Calendar icon button */}
-        <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+        <Popover open={calendarOpen} onOpenChange={handleOpenChange}>
           <PopoverTrigger asChild>
             <button
               className={`px-2 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1 ${
@@ -89,16 +101,47 @@ export function PeriodSelector({ value, onChange, onRefresh, refreshing }: Perio
               )}
             </button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="end">
+          <PopoverContent className="w-auto p-0" align="end" sideOffset={8}>
+            <div className="p-3 pb-0">
+              <p className="text-sm font-medium mb-1">Selecione o periodo</p>
+              <p className="text-xs text-muted-foreground">
+                {!range?.from && "Clique na data de inicio"}
+                {range?.from && !range?.to && (
+                  <>Inicio: <strong>{format(range.from, "dd/MM/yyyy", { locale: ptBR })}</strong> — agora clique na data final</>
+                )}
+                {range?.from && range?.to && (
+                  <><strong>{format(range.from, "dd/MM/yyyy", { locale: ptBR })}</strong> ate <strong>{format(range.to, "dd/MM/yyyy", { locale: ptBR })}</strong></>
+                )}
+              </p>
+            </div>
             <Calendar
               mode="range"
               selected={range}
-              onSelect={handleRangeSelect}
+              onSelect={setRange}
               numberOfMonths={2}
               disabled={{ after: new Date() }}
               locale={ptBR}
               className="rounded-md"
             />
+            <div className="flex items-center justify-end gap-2 p-3 pt-0 border-t">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setRange(undefined);
+                  setCalendarOpen(false);
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleApply}
+                disabled={!rangeComplete}
+              >
+                Aplicar
+              </Button>
+            </div>
           </PopoverContent>
         </Popover>
       </div>
@@ -125,7 +168,6 @@ export function periodToParams(value: PeriodValue): { days: number; from?: strin
   if (value.type === "custom") {
     const fromStr = value.from.toISOString();
     const toStr = value.to.toISOString();
-    // Calculate approximate days for comparison period
     const diffMs = value.to.getTime() - value.from.getTime();
     const days = Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
     return { days, from: fromStr, to: toStr };
