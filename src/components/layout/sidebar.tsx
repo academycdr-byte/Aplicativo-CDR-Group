@@ -17,22 +17,13 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-type NavItem = { name: string; href: string; icon: LucideIcon; adminOnly?: boolean };
-
-const mainNav: NavItem[] = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Pedidos", href: "/orders", icon: ShoppingBag },
-  { name: "Vendas", href: "/sales", icon: TrendingUp },
-  { name: "Mais Vendidos", href: "/best-sellers", icon: ShoppingBag },
-  { name: "Anuncios", href: "/ads", icon: Megaphone },
-  { name: "Relatorios", href: "/reports", icon: FileText, adminOnly: true },
-];
-
-const settingsNav: NavItem[] = [
-  { name: "Integracoes", href: "/integrations", icon: Link2 },
-  { name: "Configuracoes", href: "/settings", icon: Settings },
-  { name: "Admin", href: "/admin", icon: Shield, adminOnly: true },
-];
+type NavItem = {
+  name: string;
+  href: string;
+  icon: LucideIcon;
+  adminOnly?: boolean;
+  internalOnly?: boolean;
+};
 
 function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
   const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
@@ -59,11 +50,42 @@ export function Sidebar() {
   const { data: session } = useSession();
 
   const userRole = session?.user?.role;
+  // Internal team includes OWNER, ADMIN, and MEMBER
+  const isInternal = userRole === "OWNER" || userRole === "ADMIN" || userRole === "MEMBER";
+  // Admin access remains restricted to OWNER and ADMIN
   const isAdmin = userRole === "OWNER" || userRole === "ADMIN";
 
-  // Filter nav items based on admin status
-  const filteredMainNav = mainNav.filter(item => !item.adminOnly || isAdmin);
-  const filteredSettingsNav = settingsNav.filter(item => !item.adminOnly || isAdmin);
+  // Navigation items with role-based visibility
+  // If 'roles' is undefined, it's visible to everyone (including CLIENT)
+  // If 'hideForClients' is true, it's hidden for CLIENT role but visible to others
+  const mainNavItems = [
+    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+    { name: "Pedidos", href: "/orders", icon: ShoppingBag },
+    { name: "Vendas", href: "/sales", icon: TrendingUp },
+    { name: "Mais Vendidos", href: "/best-sellers", icon: ShoppingBag },
+    { name: "Anuncios", href: "/ads", icon: Megaphone },
+    // Relatórios restricted to internal team
+    { name: "Relatorios", href: "/reports", icon: FileText, internalOnly: true },
+  ];
+
+  const settingsNavItems = [
+    // Integrations usually for internal team/admins to configure
+    { name: "Integracoes", href: "/integrations", icon: Link2, internalOnly: true },
+    { name: "Configuracoes", href: "/settings", icon: Settings },
+    { name: "Admin", href: "/admin", icon: Shield, adminOnly: true },
+  ];
+
+  // Helper to filter items
+  const filterNav = (items: any[]) => {
+    return items.filter(item => {
+      if (item.adminOnly) return isAdmin;
+      if (item.internalOnly) return isInternal;
+      return true;
+    });
+  };
+
+  const filteredMainNav = filterNav(mainNavItems);
+  const filteredSettingsNav = filterNav(settingsNavItems);
 
   return (
     <aside className="hidden md:flex md:w-60 md:flex-col bg-sidebar-bg text-sidebar-text min-h-screen border-r border-white/5">
@@ -107,7 +129,14 @@ export function Sidebar() {
 
       {/* Footer */}
       <div className="px-4 py-4 border-t border-white/5">
-        <p className="text-[10px] text-sidebar-text/30 text-center">CDR Group &copy; 2025</p>
+        <div className="flex flex-col gap-1">
+          <p className="text-[10px] text-sidebar-text/30 text-center">CDR Group &copy; 2025</p>
+          {userRole && (
+            <p className="text-[9px] text-sidebar-text/20 text-center uppercase tracking-wider">
+              {userRole}
+            </p>
+          )}
+        </div>
       </div>
     </aside>
   );
