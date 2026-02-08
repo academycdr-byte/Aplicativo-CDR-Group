@@ -1,7 +1,6 @@
 "use client";
 
 import { Eye, ShoppingCart, MousePointerClick, Package, ArrowDown } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 type FunnelData = {
@@ -18,9 +17,9 @@ interface FunnelVisualProps {
 export function FunnelVisual({ data }: FunnelVisualProps) {
     if (!data) {
         return (
-            <Card className="h-full flex items-center justify-center p-6 text-muted-foreground text-sm">
+            <div className="h-full flex items-center justify-center p-6 text-muted-foreground text-sm">
                 Sem dados do funil
-            </Card>
+            </div>
         );
     }
 
@@ -67,56 +66,56 @@ export function FunnelVisual({ data }: FunnelVisualProps) {
     }
 
     return (
-        <Card className="h-full">
-            <CardHeader className="pb-4">
-                <CardTitle className="text-base font-semibold">Funil de Conversão</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-                {steps.map((step, i) => {
-                    const widthPct = Math.max((step.value / maxVal) * 100, 5); // min 5% width
-                    const prevStep = steps[i - 1];
-                    const conversionRate = prevStep && prevStep.value > 0
-                        ? ((step.value / prevStep.value) * 100).toFixed(1)
-                        : null;
+        <div className="space-y-6">
+            {steps.map((step, i) => {
+                const widthPct = Math.max((step.value / maxVal) * 100, 2); // min 2% width
+                const prevStep = steps[i - 1];
+                const conversionRate = prevStep && prevStep.value > 0
+                    ? ((step.value / prevStep.value) * 100).toFixed(1)
+                    : null;
 
-                    const Icon = step.icon;
+                const Icon = step.icon;
 
-                    return (
-                        <div key={step.id} className="relative group">
-                            {/* Conversion Indicator connecting steps */}
-                            {conversionRate && (
-                                <div className="absolute -top-4 left-8 text-[10px] text-muted-foreground flex items-center gap-1 font-medium bg-background px-1 z-10">
-                                    <ArrowDown className="w-3 h-3 text-muted-foreground/50" />
-                                    {conversionRate}%
-                                </div>
-                            )}
+                return (
+                    <div key={step.id} className="relative group">
+                        {/* Conversion Indicator */}
+                        {conversionRate && (
+                            <div className="absolute -top-4 left-[1.15rem] h-4 w-px bg-border/50 z-0"></div>
+                        )}
 
-                            <div className="flex items-center gap-4">
-                                {/* Icon Box */}
-                                <div className={cn("w-9 h-9 rounded-lg flex items-center justify-center border shrink-0", step.color)}>
-                                    <Icon className="w-4 h-4" />
-                                </div>
+                        <div className="flex items-center gap-4 relative z-10">
+                            {/* Icon Box */}
+                            <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center border shrink-0 transition-all duration-300", step.color)}>
+                                <Icon className="w-5 h-5" />
+                            </div>
 
-                                {/* Bar Area */}
-                                <div className="flex-1">
-                                    <div className="flex justify-between items-end mb-1.5">
-                                        <span className="text-sm font-medium leading-none">{step.label}</span>
-                                        <span className="text-sm font-bold leading-none">{fmtNum(step.value)}</span>
+                            {/* Bar Area */}
+                            <div className="flex-1">
+                                <div className="flex justify-between items-end mb-2">
+                                    <span className="text-sm font-medium leading-none text-muted-foreground">{step.label}</span>
+                                    <div className="flex items-center gap-2">
+                                        {conversionRate && (
+                                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-secondary text-muted-foreground/80">
+                                                {conversionRate}%
+                                            </span>
+                                        )}
+                                        <span className="text-sm font-bold leading-none text-foreground">{fmtNum(step.value)}</span>
                                     </div>
 
-                                    {/* Visual Bar Container */}
-                                    <div className="h-2.5 w-full bg-secondary/50 rounded-full overflow-hidden">
-                                        <div
-                                            className={cn("h-full rounded-full transition-all duration-500", step.barColor)}
-                                            style={{ width: `${widthPct}%` }}
-                                        />
-                                    </div>
+                                </div>
+
+                                {/* Visual Bar Container */}
+                                <div className="h-2.5 w-full bg-secondary/50 rounded-full overflow-hidden">
+                                    <div
+                                        className={cn("h-full rounded-full transition-all duration-1000 ease-out", step.barColor)}
+                                        style={{ width: `${widthPct}%` }}
+                                    />
                                 </div>
                             </div>
                         </div>
-                    );
-                })}
-            </CardContent>
-        </Card>
+                    </div>
+                );
+            })}
+        </div>
     );
 }

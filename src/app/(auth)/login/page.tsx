@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { loginUser } from "@/actions/auth";
 import { validateLoginForm } from "@/lib/validation";
+import { cn } from "@/lib/utils";
+import { Loader2, ArrowRight, ShieldCheck, User } from "lucide-react";
 
 export default function LoginPage() {
   const [error, setError] = useState("");
@@ -39,93 +40,124 @@ export default function LoginPage() {
         setError(result.error);
       }
     } catch {
-      // signIn redirects on success, which throws a NEXT_REDIRECT error
+      // signIn redirects on success
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <Card>
-      <CardHeader className="text-center">
-        <div className="flex justify-center mb-4">
+    <Card className="w-full border-white/10 bg-white/5 backdrop-blur-2xl shadow-2xl">
+      <CardHeader className="text-center space-y-2 pb-6">
+        <div className="mx-auto w-12 h-12 rounded-2xl bg-primary/20 flex items-center justify-center mb-2 ring-1 ring-primary/30 shadow-glow">
+          <ShieldCheck className="w-6 h-6 text-primary" />
         </div>
-        <CardTitle className="text-2xl">Entrar</CardTitle>
-        <CardDescription>Acesse o painel da CDR Group</CardDescription>
+        <CardTitle className="text-2xl font-bold tracking-tight">Bem-vindo de volta</CardTitle>
+        <CardDescription className="text-base">
+          Acesse sua conta para continuar
+        </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-6">
         {error && (
-          <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-lg p-3 mb-4">
+          <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm font-medium rounded-xl p-3 text-center animate-in fade-in slide-in-from-top-1">
             {error}
           </div>
         )}
 
-        <div className="flex bg-muted p-1 rounded-lg mb-6">
+        {/* Segmented Control */}
+        <div className="relative p-1 bg-secondary/50 rounded-xl flex">
+          <div
+            className={cn(
+              "absolute top-1 bottom-1 w-[calc(50%-4px)] bg-background rounded-lg shadow-sm transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)]",
+              loginType === "ADMIN" ? "translate-x-[calc(100%+4px)]" : "translate-x-0"
+            )}
+          />
           <button
             type="button"
             onClick={() => setLoginType("CLIENT")}
-            className={`flex-1 text-sm font-medium py-2 rounded-md transition-all ${loginType === "CLIENT"
-              ? "bg-background shadow-sm text-foreground"
-              : "text-muted-foreground hover:text-foreground"
-              }`}
+            className={cn(
+              "flex-1 relative z-10 text-sm font-medium py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2",
+              loginType === "CLIENT" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+            )}
           >
-            Sou Cliente
+            <User className="w-4 h-4" />
+            Cliente
           </button>
           <button
             type="button"
             onClick={() => setLoginType("ADMIN")}
-            className={`flex-1 text-sm font-medium py-2 rounded-md transition-all ${loginType === "ADMIN"
-              ? "bg-background shadow-sm text-foreground"
-              : "text-muted-foreground hover:text-foreground"
-              }`}
+            className={cn(
+              "flex-1 relative z-10 text-sm font-medium py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2",
+              loginType === "ADMIN" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+            )}
           >
-            Sou Administrador
+            <ShieldCheck className="w-4 h-4" />
+            Admin
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              name="email"
-              type="email"
-              required
-              placeholder="seu@email.com"
-              maxLength={255}
-            />
-            {fieldErrors.email && (
-              <p className="text-xs text-destructive">{fieldErrors.email}</p>
-            )}
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email" className="ml-1">Email</Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                required
+                placeholder="seu@email.com"
+                className="h-11 bg-secondary/30 focus:bg-background transition-colors"
+              />
+              {fieldErrors.email && (
+                <p className="text-xs text-destructive font-medium ml-1">{fieldErrors.email}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between ml-1">
+                <Label htmlFor="password">Senha</Label>
+                <Link href="/forgot-password" className="text-xs text-primary hover:text-primary/80 transition-colors">
+                  Esqueceu a senha?
+                </Link>
+              </div>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                required
+                placeholder="••••••••"
+                minLength={6}
+                className="h-11 bg-secondary/30 focus:bg-background transition-colors"
+              />
+              {fieldErrors.password && (
+                <p className="text-xs text-destructive font-medium ml-1">{fieldErrors.password}</p>
+              )}
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="password">Senha</Label>
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              required
-              placeholder="Sua senha"
-              minLength={6}
-              maxLength={128}
-            />
-            {fieldErrors.password && (
-              <p className="text-xs text-destructive">{fieldErrors.password}</p>
+          <Button type="submit" size="lg" className="w-full text-base font-semibold shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all duration-300" disabled={loading}>
+            {loading ? (
+              <>
+                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                Entrando...
+              </>
+            ) : (
+              <>
+                Entrar
+                <ArrowRight className="w-5 h-5 ml-2 opacity-50" />
+              </>
             )}
-          </div>
-
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Entrando..." : "Entrar"}
           </Button>
         </form>
 
-        <p className="text-center text-sm text-muted-foreground mt-6">
-          Nao tem conta?{" "}
-          <Link href="/register" className="text-primary font-medium hover:underline">
-            Criar conta
-          </Link>
-        </p>
+        <div className="text-center">
+          <p className="text-sm text-muted-foreground">
+            Não tem uma conta?{" "}
+            <Link href="/register" className="text-primary font-semibold hover:text-primary/80 transition-colors">
+              Criar conta
+            </Link>
+          </p>
+        </div>
       </CardContent>
     </Card>
   );

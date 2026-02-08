@@ -351,10 +351,10 @@ function IntegrationsContent() {
           const isConnected = status === "CONNECTED";
 
           return (
-            <Card key={platform.platform} className="flex flex-col group hover:shadow-md transition-all duration-200 border-border/60">
+            <Card key={platform.platform} className="flex flex-col group hover-card border-border/60">
               <CardContent className="pt-6 flex flex-col flex-1">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="relative w-12 h-12 rounded-full overflow-hidden flex-shrink-0 bg-white shadow-sm border border-gray-100 flex items-center justify-center group-hover:scale-105 transition-transform duration-200">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="relative w-14 h-14 rounded-2xl overflow-hidden flex-shrink-0 bg-white shadow-sm border border-black/5 flex items-center justify-center transition-transform duration-300">
                     <Image
                       src={`/platforms/${platform.name.toLowerCase().replace(" ", "")}.png`}
                       alt={platform.name}

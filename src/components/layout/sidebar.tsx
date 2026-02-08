@@ -16,7 +16,9 @@ import {
   FileText,
   Wallet,
   type LucideIcon,
+  ChevronRight,
 } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 type NavItem = {
   name: string;
@@ -26,23 +28,25 @@ type NavItem = {
   internalOnly?: boolean;
 };
 
-// NavLink style updated to match Leverads
+// Apple Style NavLink
 function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
   const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
   const Icon = item.icon;
+
   return (
     <Link
       href={item.href}
-      className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-all relative ${isActive
-        ? "bg-primary/8 text-primary"
-        : "text-sidebar-text/70 hover:text-sidebar-text hover:bg-sidebar-hover"
+      className={`group flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-200 relative ${isActive
+          ? "bg-primary/10 text-primary"
+          : "text-sidebar-text/70 hover:text-sidebar-text hover:bg-sidebar-hover"
         }`}
     >
       {isActive && (
-        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 bg-primary rounded-r-full" />
+        <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] bg-primary rounded-r-full" />
       )}
-      <Icon className="w-[18px] h-[18px] shrink-0" />
-      {item.name}
+      <Icon className={`w-[18px] h-[18px] shrink-0 transition-colors ${isActive ? "text-primary" : "text-sidebar-text/60 group-hover:text-sidebar-text"}`} strokeWidth={1.5} />
+      <span>{item.name}</span>
+      {isActive && <ChevronRight className="w-3 h-3 ml-auto text-primary/50" />}
     </Link>
   );
 }
@@ -94,29 +98,29 @@ export function Sidebar() {
   const filteredManagementNav = filterNav(managementNavItems);
 
   return (
-    <aside className="hidden md:flex md:w-56 md:flex-col bg-sidebar-bg text-sidebar-text min-h-screen border-r border-white/5">
-      {/* Logo */}
-      <div className="flex items-center gap-3 px-5 py-5 mb-2">
-        <div className="relative w-8 h-8 flex items-center justify-center">
+    <aside className="hidden md:flex md:w-[260px] md:flex-col bg-sidebar-bg border-r border-sidebar-border h-screen sticky top-0 z-30">
+      {/* Brand */}
+      <div className="flex items-center gap-3 px-6 py-6 mb-2">
+        <div className="relative w-9 h-9 flex items-center justify-center bg-white/5 rounded-xl shadow-inner border border-white/5">
           <Image
             src="/logo.png.png"
             alt="CDR Group"
             fill
-            className="object-contain"
+            className="object-contain p-1.5"
             priority
           />
         </div>
         <div>
-          <p className="font-semibold text-sm leading-tight text-white">CDR Group</p>
-          <p className="text-[10px] text-sidebar-text/50 leading-tight">Performance</p>
+          <p className="font-semibold text-sm leading-tight text-white tracking-wide">CDR Group</p>
+          <p className="text-[11px] text-sidebar-text/50 leading-tight font-medium">Performance</p>
         </div>
       </div>
 
-      {/* Main navigation */}
-      <nav className="flex-1 px-3 space-y-6 overflow-y-auto">
+      {/* Navigation */}
+      <nav className="flex-1 px-4 space-y-8 overflow-y-auto no-scrollbar py-2">
         {filteredAiNav.length > 0 && (
           <div className="space-y-1">
-            <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-sidebar-text/30">
+            <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-sidebar-text/40">
               CDR AI
             </p>
             {filteredAiNav.map((item) => (
@@ -127,7 +131,7 @@ export function Sidebar() {
 
         {filteredPlatformNav.length > 0 && (
           <div className="space-y-1">
-            <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-sidebar-text/30">
+            <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-sidebar-text/40">
               Plataforma
             </p>
             {filteredPlatformNav.map((item) => (
@@ -138,7 +142,7 @@ export function Sidebar() {
 
         {filteredManagementNav.length > 0 && (
           <div className="space-y-1">
-            <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-sidebar-text/30">
+            <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-sidebar-text/40">
               Gestão
             </p>
             {filteredManagementNav.map((item) => (
@@ -148,16 +152,24 @@ export function Sidebar() {
         )}
       </nav>
 
-      {/* Footer */}
-      <div className="px-4 py-4 border-t border-white/5 mt-auto">
-        <div className="flex flex-col gap-1">
-          {/* Org Name PlaceHolder - Assuming org name comes from somewhere else or static for now */}
-          <p className="text-[10px] uppercase font-semibold text-sidebar-text/40">CDR Group</p>
-          {session?.user && (
-            <p className="text-[10px] text-sidebar-text/30 truncate">
-              {session.user.email}
+      {/* User User Profile (Apple Style) */}
+      <div className="px-4 py-4 border-t border-sidebar-border mt-auto bg-black/10">
+        <div className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-white/5 transition-colors cursor-pointer group">
+          <Avatar className="h-9 w-9 border border-white/10 shadow-sm">
+            <AvatarImage src={session?.user?.image || ""} />
+            <AvatarFallback className="bg-primary/20 text-primary text-xs font-bold">
+              {session?.user?.name?.charAt(0) || "U"}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1 overflow-hidden">
+            <p className="text-[13px] font-medium text-sidebar-text truncate group-hover:text-white transition-colors">
+              {session?.user?.name || "Usuário"}
             </p>
-          )}
+            <p className="text-[11px] text-sidebar-text/50 truncate">
+              {session?.user?.email}
+            </p>
+          </div>
+          <Settings className="w-4 h-4 text-sidebar-text/30 group-hover:text-sidebar-text/70 transition-colors" />
         </div>
       </div>
     </aside>

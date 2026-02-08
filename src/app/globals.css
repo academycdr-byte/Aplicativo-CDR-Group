@@ -6,96 +6,160 @@
 
 :root {
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --radius: 0.5rem; /* Mudar de 0.625rem para 0.5rem — mais reto como Leverads */
-  /* Light mode — clean white base with CDR green brand */
+
+  /* Apple HIG Radius - 16px default for cards */
+  --radius: 1rem;
+
+  /* Light Mode - Clean, Airy, Apple-like */
   --background: oklch(0.985 0.002 150);
+  /* Branco com toque verde ultra sutil */
   --foreground: oklch(0.16 0.03 150);
+  /* Verde quase preto */
+
   --card: oklch(1 0 0);
+  /* Branco puro */
   --card-foreground: oklch(0.16 0.03 150);
+
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.16 0.03 150);
+
   --primary: oklch(0.53 0.2 142);
+  /* Verde CDR */
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.94 0.015 150);
+
+  --secondary: oklch(0.96 0.01 150);
+  /* Cinza muito claro */
   --secondary-foreground: oklch(0.2 0.03 150);
-  --muted: oklch(0.94 0.015 150);
-  --muted-foreground: oklch(0.45 0.03 150);
-  --accent: oklch(0.94 0.02 140);
+
+  --muted: oklch(0.96 0.01 150);
+  --muted-foreground: oklch(0.55 0.02 150);
+  /* Cinza médio */
+
+  --accent: oklch(0.96 0.01 150);
   --accent-foreground: oklch(0.2 0.03 150);
-  --destructive: oklch(0.577 0.245 27.325);
-  --success: oklch(0.648 0.2 145);
-  --warning: oklch(0.75 0.183 80);
-  --border: oklch(0.88 0.02 150);
-  --input: oklch(0.88 0.02 150);
+
+  --destructive: oklch(0.65 0.22 25);
+  /* Vermelho Apple */
+  --destructive-foreground: oklch(0.985 0 0);
+
+  --success: oklch(0.7 0.18 145);
+  /* Verde Sucesso */
+  --warning: oklch(0.85 0.16 85);
+  /* Amarelo Alerta */
+
+  --border: oklch(0.92 0.01 150);
+  /* Borda sutil */
+  --input: oklch(0.92 0.01 150);
   --ring: oklch(0.53 0.2 142);
+
+  /* Charts - Light Mode */
   --chart-1: oklch(0.53 0.2 142);
-  --chart-2: oklch(0.5 0.15 170);
-  --chart-3: oklch(0.4 0.1 155);
-  --chart-4: oklch(0.7 0.18 115);
-  --chart-5: oklch(0.6 0.12 185);
-  /* Sidebar in light mode — dark green (matches website nav) */
+  /* CDR Green */
+  --chart-2: oklch(0.6 0.16 160);
+  /* Green varies */
+  --chart-3: oklch(0.45 0.12 180);
+  /* Teal/Cyan */
+  --chart-4: oklch(0.7 0.18 120);
+  /* Lime */
+  --chart-5: oklch(0.4 0.1 150);
+  /* Deep Green */
+
+  /* Sidebar Light - Dark Green Contrast (Website match) */
   --sidebar-bg: oklch(0.16 0.03 150);
   --sidebar-text: oklch(0.85 0.01 150);
   --sidebar-hover: oklch(0.22 0.03 150);
-  --sidebar: oklch(0.97 0.005 150);
+  --sidebar-active: oklch(0.22 0.03 150);
+  --sidebar-border: oklch(1 0 0 / 0.1);
+
+  --sidebar: oklch(0.985 0.002 150);
   --sidebar-foreground: oklch(0.16 0.03 150);
   --sidebar-primary: oklch(0.53 0.2 142);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.94 0.015 150);
+  --sidebar-accent: oklch(0.96 0.01 150);
   --sidebar-accent-foreground: oklch(0.2 0.03 150);
-  --sidebar-border: oklch(0.88 0.02 150);
   --sidebar-ring: oklch(0.53 0.2 142);
 }
 
 .dark {
-  /* Dark mode — matches CDR Group website directly */
+  /* Dark Mode - Deep Green & Neon Accents */
   --background: oklch(0.145 0.015 150);
+  /* #0D1A14 */
   --foreground: oklch(0.985 0 0);
+  /* White */
+
   --card: oklch(0.185 0.02 150);
+  /* #142820 */
   --card-foreground: oklch(0.985 0 0);
+
   --popover: oklch(0.185 0.02 150);
   --popover-foreground: oklch(0.985 0 0);
+
   --primary: oklch(0.89 0.24 128);
-  --primary-foreground: oklch(0.16 0.03 150);
+  /* Neon Lime #B8FF1A */
+  --primary-foreground: oklch(0.145 0.015 150);
+  /* Dark Text on Neon */
+
   --secondary: oklch(0.23 0.02 150);
+  /* Lighter Green */
   --secondary-foreground: oklch(0.985 0 0);
+
   --muted: oklch(0.23 0.02 150);
-  --muted-foreground: oklch(0.65 0.02 150);
+  --muted-foreground: oklch(0.7 0.02 150);
+  /* Gray-Green text */
+
   --accent: oklch(0.23 0.02 150);
   --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
+
+  --destructive: oklch(0.65 0.22 25);
+  --destructive-foreground: oklch(0.985 0 0);
+
   --success: oklch(0.75 0.2 145);
-  --warning: oklch(0.75 0.183 80);
-  --border: oklch(0.89 0.24 128 / 15%);
-  --input: oklch(0.89 0.24 128 / 15%);
+  --warning: oklch(0.85 0.183 80);
+
+  --border: oklch(0.89 0.24 128 / 0.15);
+  /* Neon Lime 15% opacity */
+  --input: oklch(0.89 0.24 128 / 0.15);
   --ring: oklch(0.89 0.24 128);
+  /* Neon Lime Ring */
+
+  /* Charts - Dark Mode */
   --chart-1: oklch(0.89 0.24 128);
-  --chart-2: oklch(0.6 0.18 150);
-  --chart-3: oklch(0.65 0.15 175);
+  /* Neon Lime */
+  --chart-2: oklch(0.65 0.18 150);
+  /* Bright Green */
+  --chart-3: oklch(0.6 0.15 170);
+  /* Cyan/Teal */
   --chart-4: oklch(0.8 0.2 110);
-  --chart-5: oklch(0.45 0.12 160);
-  /* Sidebar dark mode — deep dark green */
+  /* Yellow-Green */
+  --chart-5: oklch(0.5 0.12 160);
+  /* Muted Teal */
+
+  /* Sidebar Dark */
   --sidebar-bg: oklch(0.13 0.02 150);
+  /* Slightly darker than main bg */
   --sidebar-text: oklch(0.85 0.01 150);
-  --sidebar-hover: oklch(0.2 0.03 150);
+  --sidebar-hover: oklch(0.22 0.03 150);
+  --sidebar-active: oklch(0.22 0.03 150);
+  --sidebar-border: oklch(0.89 0.24 128 / 0.1);
+
   --sidebar: oklch(0.16 0.02 150);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.89 0.24 128);
   --sidebar-primary-foreground: oklch(0.16 0.03 150);
   --sidebar-accent: oklch(0.23 0.02 150);
   --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(0.89 0.24 128 / 15%);
   --sidebar-ring: oklch(0.89 0.24 128);
 }
 
 @theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 6px);
+  --radius-md: calc(var(--radius) - 4px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
-  --radius-4xl: calc(var(--radius) + 16px);
+  --radius-full: 9999px;
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -121,60 +185,81 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+
+  --color-sidebar-bg: var(--sidebar-bg);
+  --color-sidebar-text: var(--sidebar-text);
+  --color-sidebar-hover: var(--sidebar-hover);
+  --color-sidebar-active: var(--sidebar-active);
+  --color-sidebar-border: var(--sidebar-border);
+
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
   --color-sidebar-accent: var(--sidebar-accent);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-bg: var(--sidebar-bg);
-  --color-sidebar-text: var(--sidebar-text);
-  --color-sidebar-hover: var(--sidebar-hover);
+
+  /* Shadows - Apple Style */
+  --shadow-subtle: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-card: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -1px rgb(0 0 0 / 0.06);
+  --shadow-floating: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -2px rgb(0 0 0 / 0.05);
+  --shadow-glow: 0 0 20px -5px var(--primary);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased selection:bg-primary/30 selection:text-foreground;
+    font-feature-settings: "ss01", "ss02", "cv01", "cv02";
+    /* Inter advanced typography */
   }
 }
 
-/* Smooth card hover */
-.card-hover {
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
-}
-.card-hover:hover {
-  box-shadow: 0 4px 16px rgb(0 0 0 / 0.06);
+/* Utilities */
+@layer components {
+
+  /* Apple Glassmorphism */
+  .glass {
+    @apply bg-card/70 backdrop-blur-xl border border-white/10 shadow-lg;
+  }
+
+  .glass-dark {
+    @apply bg-zinc-900/70 backdrop-blur-xl border border-white/5 shadow-lg;
+  }
+
+  /* Smooth transitions for everything */
+  .transition-default {
+    @apply transition-all duration-300 ease-[cubic-bezier(0.25, 0.1, 0.25, 1)];
+  }
+
+  /* Card Hover Effect */
+  .hover-card {
+    @apply transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-lg dark:hover:shadow-primary/5 hover:border-primary/30;
+  }
 }
 
-/* Recharts tooltip override — matches theme in both modes */
+/* Recharts Overrides - Apple Style */
 .recharts-default-tooltip {
-  background-color: var(--card) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: 0.5rem !important;
-  box-shadow: 0 4px 12px rgb(0 0 0 / 0.15) !important;
-  padding: 0.625rem 0.875rem !important;
-}
-.recharts-default-tooltip .recharts-tooltip-label {
-  color: var(--foreground) !important;
-  font-weight: 600 !important;
-  margin-bottom: 0.25rem !important;
-}
-.recharts-default-tooltip .recharts-tooltip-item {
-  color: var(--foreground) !important;
-  padding: 1px 0 !important;
-}
-.recharts-default-tooltip .recharts-tooltip-item-name,
-.recharts-default-tooltip .recharts-tooltip-item-separator {
-  color: var(--muted-foreground) !important;
+  @apply !bg-card/90 !backdrop-blur-md !border-border/50 !rounded-xl !shadow-xl !px-4 !py-3;
 }
 
-/* Recharts cursor crosshair */
-.recharts-cursor {
-  stroke: var(--primary) !important;
-  stroke-opacity: 0.3;
+.recharts-tooltip-label {
+  @apply !text-foreground !font-semibold !mb-1 !text-xs !uppercase !tracking-wider;
+}
+
+.recharts-tooltip-item {
+  @apply !text-sm !font-medium !py-0.5;
+}
+
+.recharts-cartesian-grid-horizontal line,
+.recharts-cartesian-grid-vertical line {
+  @apply !stroke-border/30;
+}
+
+.recharts-legend-item-text {
+  @apply !text-muted-foreground !text-xs !font-medium;
 }

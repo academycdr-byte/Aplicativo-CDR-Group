@@ -11,27 +11,14 @@ type MetricPoint = {
 
 interface EstimatedProfitCalendarProps {
     data: MetricPoint[];
-    totalProfit: number; // calculated in parent or here
-    currentMonthLabel: string; // e.g., "Fevereiro 2026"
+    totalProfit: number;
+    currentMonthLabel: string;
 }
 
 export function EstimatedProfitCalendar({ data, totalProfit, currentMonthLabel }: EstimatedProfitCalendarProps) {
-    // Helper to get days for the calendar grid
-    // We will assume we are focusing on the range of data provided or the current month.
-    // For simplicity and robustness, let's map the data to days.
-    // If data covers multiple months, this visual might need adjustment, but the requirement implies a monthly view or "period" view.
-    // We'll generate a grid based on the dates in 'data' if it's less than ~31 days, or just show the last 30 days.
-
     const calendarDays = useMemo(() => {
-        // Sort data by date
         const sorted = [...data].sort((a, b) => a.date.localeCompare(b.date));
 
-        // Create a map for quick lookup
-        const dataMap = new Map(sorted.map(d => [d.date, d]));
-
-        // Generate days (simple approach: use the data points as days if they are consecutive enough)
-        // Or better: just render the squares for the dates available in the data, 
-        // assuming the parent filters 'data' to the relevant view.
         return sorted.map(day => {
             const profit = day.faturamento - day.investimento;
             const dateObj = new Date(day.date + "T00:00:00");
@@ -46,24 +33,28 @@ export function EstimatedProfitCalendar({ data, totalProfit, currentMonthLabel }
         });
     }, [data]);
 
-    const weekDays = ["DO", "SE", "TE", "QU", "QU", "SE", "SA"];
+    const weekDays = ["D", "S", "T", "Q", "Q", "S", "S"];
 
     return (
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-full w-full">
             {/* Header */}
-            <div className="mb-6">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Lucro Estimado</p>
-                <p className="text-2xl font-bold tracking-tight text-foreground">
-                    {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalProfit)}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">{currentMonthLabel}</p>
+            <div className="mb-6 flex items-end justify-between">
+                <div>
+                    <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-semibold">Lucro Estimado</p>
+                    <p className="text-2xl font-bold tracking-tight text-foreground">
+                        {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalProfit)}
+                    </p>
+                </div>
+                <div className="text-right">
+                    <p className="text-xs font-medium text-foreground bg-secondary/50 px-2 py-1 rounded-md">{currentMonthLabel}</p>
+                </div>
             </div>
 
             {/* Grid */}
-            <div className="grid grid-cols-7 gap-1.5 w-full max-w-[280px]">
+            <div className="grid grid-cols-7 gap-2 w-full">
                 {/* Weekday Headers */}
                 {weekDays.map((d, i) => (
-                    <div key={i} className="text-[9px] text-muted-foreground text-center font-medium py-1">
+                    <div key={i} className="text-[10px] text-muted-foreground/50 text-center font-bold py-1">
                         {d}
                     </div>
                 ))}
@@ -77,34 +68,30 @@ export function EstimatedProfitCalendar({ data, totalProfit, currentMonthLabel }
                     <div
                         key={day.date}
                         className={cn(
-                            "w-full aspect-square rounded-md flex items-center justify-center text-[10px] font-medium transition-colors border relative group cursor-default",
+                            "w-full aspect-square rounded-xl flex items-center justify-center text-[10px] font-semibold transition-all duration-300 relative group cursor-default border",
                             day.profit >= 0
-                                ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
-                                : "bg-red-500/10 text-red-600 border-red-500/20",
-                            // Highlight today (optional, need real today check)
-                            // isToday && "ring-2 ring-primary ring-offset-2"
+                                ? "bg-emerald-500/5 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20"
+                                : "bg-red-500/5 text-red-600 border-red-500/20 hover:bg-red-500/20",
                         )}
                     >
                         {day.dayOfMonth}
-                        {/* Tooltip on hover (simple native title for now or custom if needed) */}
-                        <span className="sr-only">
-                            {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(day.profit)}
-                        </span>
 
-                        <div className="absolute opacity-0 group-hover:opacity-100 bottom-full mb-2 left-1/2 -translate-x-1/2 bg-popover text-popover-foreground text-[10px] px-2 py-1 rounded shadow-lg border whitespace-nowrap z-10 pointer-events-none">
+                        {/* Tooltip */}
+                        <div className="absolute opacity-0 group-hover:opacity-100 bottom-full mb-2 left-1/2 -translate-x-1/2 bg-popover/95 backdrop-blur-md text-popover-foreground text-xs px-3 py-1.5 rounded-lg shadow-floating border border-border/50 whitespace-nowrap z-50 pointer-events-none transition-opacity duration-200">
+                            <div className="font-semibold text-center mb-0.5">{day.dayOfMonth}</div>
                             {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(day.profit)}
                         </div>
                     </div>
                 ))}
             </div>
 
-            <div className="mt-4 flex items-center gap-3 text-[10px] text-muted-foreground">
-                <div className="flex items-center gap-1.5">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500/20 border border-emerald-500/50" />
+            <div className="mt-8 flex items-center justify-center gap-6 text-[11px] font-medium text-muted-foreground">
+                <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
                     <span>Lucro</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                    <div className="w-2 h-2 rounded-full bg-red-500/20 border border-red-500/50" />
+                <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
                     <span>Prejuízo</span>
                 </div>
             </div>

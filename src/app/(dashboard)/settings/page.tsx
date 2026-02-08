@@ -30,14 +30,14 @@ export default function SettingsPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {settingsItems.map((item) => (
           <Link key={item.href} href={item.href}>
-            <Card className="hover:border-primary transition-colors h-full">
+            <Card className="hover-card h-full border-border/60">
               <CardContent className="pt-6">
                 <div className="flex items-start gap-4">
-                  <div className="p-2 bg-primary/10 rounded-lg">
+                  <div className="p-3 bg-secondary/80 rounded-xl">
                     <item.icon className="w-5 h-5 text-primary" />
                   </div>
                   <div>
-                    <h3 className="font-semibold mb-1">{item.title}</h3>
+                    <h3 className="font-semibold mb-1 text-base">{item.title}</h3>
                     <p className="text-sm text-muted-foreground">
                       {item.description}
                     </p>

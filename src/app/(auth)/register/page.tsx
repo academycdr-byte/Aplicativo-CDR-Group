@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { registerUser } from "@/actions/auth";
 import { validateRegisterForm } from "@/lib/validation";
+import { Loader2, ArrowRight, UserPlus } from "lucide-react";
 
 export default function RegisterPage() {
   const [error, setError] = useState("");
@@ -24,6 +25,10 @@ export default function RegisterPage() {
     const email = (formData.get("email") as string).trim();
     const password = formData.get("password") as string;
 
+    // Note: The previous validation function name in the file was validateRegisterForm
+    // but in login it was validateLoginForm. I'll stick to what was there or updated.
+    // The previous file content showed validateRegisterForm.
+
     const validation = validateRegisterForm({ name, email, password });
     if (!validation.valid) {
       setFieldErrors(validation.errors);
@@ -38,84 +43,105 @@ export default function RegisterPage() {
         setError(result.error);
       }
     } catch {
-      // signIn redirects on success, which throws a NEXT_REDIRECT error
+      // Automatic redirect on success in server action
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-2xl">Criar conta</CardTitle>
-        <CardDescription>Crie sua conta no painel CDR Group</CardDescription>
+    <Card className="w-full border-white/10 bg-white/5 backdrop-blur-2xl shadow-2xl">
+      <CardHeader className="text-center space-y-2 pb-6">
+        <div className="mx-auto w-12 h-12 rounded-2xl bg-secondary/30 flex items-center justify-center mb-2 ring-1 ring-white/10 shadow-glow">
+          <UserPlus className="w-6 h-6 text-foreground" />
+        </div>
+        <CardTitle className="text-2xl font-bold tracking-tight">Crie sua conta</CardTitle>
+        <CardDescription className="text-base">
+          Comece agora mesmo a monitorar suas campanhas
+        </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-6">
         {error && (
-          <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-lg p-3 mb-4">
+          <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm font-medium rounded-xl p-3 text-center animate-in fade-in slide-in-from-top-1">
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Nome</Label>
-            <Input
-              id="name"
-              name="name"
-              type="text"
-              required
-              placeholder="Seu nome"
-              minLength={2}
-              maxLength={100}
-            />
-            {fieldErrors.name && (
-              <p className="text-xs text-destructive">{fieldErrors.name}</p>
-            )}
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name" className="ml-1">Nome completo</Label>
+              <Input
+                id="name"
+                name="name"
+                type="text"
+                required
+                placeholder="Seu nome"
+                maxLength={255}
+                className="h-11 bg-secondary/30 focus:bg-background transition-colors"
+              />
+              {fieldErrors.name && (
+                <p className="text-xs text-destructive font-medium ml-1">{fieldErrors.name}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="email" className="ml-1">Email</Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                required
+                placeholder="seu@email.com"
+                maxLength={255}
+                className="h-11 bg-secondary/30 focus:bg-background transition-colors"
+              />
+              {fieldErrors.email && (
+                <p className="text-xs text-destructive font-medium ml-1">{fieldErrors.email}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password" className="ml-1">Senha</Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                required
+                placeholder="••••••••"
+                minLength={6}
+                maxLength={128}
+                className="h-11 bg-secondary/30 focus:bg-background transition-colors"
+              />
+              {fieldErrors.password && (
+                <p className="text-xs text-destructive font-medium ml-1">{fieldErrors.password}</p>
+              )}
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              name="email"
-              type="email"
-              required
-              placeholder="seu@email.com"
-              maxLength={255}
-            />
-            {fieldErrors.email && (
-              <p className="text-xs text-destructive">{fieldErrors.email}</p>
+          <Button type="submit" size="lg" className="w-full text-base font-semibold shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all duration-300" disabled={loading}>
+            {loading ? (
+              <>
+                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                Criando conta...
+              </>
+            ) : (
+              <>
+                Criar conta
+                <ArrowRight className="w-5 h-5 ml-2 opacity-50" />
+              </>
             )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="password">Senha</Label>
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              required
-              minLength={6}
-              maxLength={128}
-              placeholder="Minimo 6 caracteres"
-            />
-            {fieldErrors.password && (
-              <p className="text-xs text-destructive">{fieldErrors.password}</p>
-            )}
-          </div>
-
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Criando conta..." : "Criar conta"}
           </Button>
         </form>
 
-        <p className="text-center text-sm text-muted-foreground mt-6">
-          Ja tem conta?{" "}
-          <Link href="/login" className="text-primary font-medium hover:underline">
-            Entrar
-          </Link>
-        </p>
+        <div className="text-center">
+          <p className="text-sm text-muted-foreground">
+            Já tem uma conta?{" "}
+            <Link href="/login" className="text-primary font-semibold hover:text-primary/80 transition-colors">
+              Entrar
+            </Link>
+          </p>
+        </div>
       </CardContent>
     </Card>
   );
