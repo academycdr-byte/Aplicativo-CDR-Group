@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Settings2 } from "lucide-react";
 import { saveFinancialConfig } from "@/actions/finance";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 
 type FinancialConfig = {
     defaultTaxRate: number;
@@ -25,7 +25,7 @@ type FinancialConfig = {
 export function FinancialConfigDialog({ config }: { config: FinancialConfig }) {
     const [isOpen, setIsOpen] = useState(false);
     const [formData, setFormData] = useState(config);
-    const { toast } = useToast();
+
 
     const handleSave = async () => {
         try {
@@ -33,10 +33,10 @@ export function FinancialConfigDialog({ config }: { config: FinancialConfig }) {
                 defaultTaxRate: Number(formData.defaultTaxRate),
                 fixedTransactionFee: Number(formData.fixedTransactionFee),
             });
-            toast({ title: "Configurações salvas com sucesso!" });
+            toast.success("Configurações salvas com sucesso!");
             setIsOpen(false);
         } catch (error) {
-            toast({ title: "Erro ao salvar configurações", variant: "destructive" });
+            toast.error("Erro ao salvar configurações");
         }
     };
 

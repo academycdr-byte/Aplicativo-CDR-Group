@@ -23,7 +23,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Plus, Pencil, Save, X } from "lucide-react";
 import { saveProductCost } from "@/actions/finance";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 
 type ProductCost = {
     id: string;
@@ -38,7 +38,7 @@ export function ProductCostTable({ costs }: { costs: ProductCost[] }) {
     const [editForm, setEditForm] = useState<Partial<ProductCost>>({});
     const [isNewDialogOpen, setIsNewDialogOpen] = useState(false);
     const [newProduct, setNewProduct] = useState({ sku: "", name: "", costPrice: 0 });
-    const { toast } = useToast();
+
 
     const handleEdit = (cost: ProductCost) => {
         setEditingId(cost.id);
@@ -60,10 +60,10 @@ export function ProductCostTable({ costs }: { costs: ProductCost[] }) {
                 costPrice: Number(editForm.costPrice),
                 imageUrl: editForm.imageUrl || undefined,
             });
-            toast({ title: "Custo atualizado com sucesso!" });
+            toast.success("Custo atualizado com sucesso!");
             setEditingId(null);
         } catch (error) {
-            toast({ title: "Erro ao atualizar custo", variant: "destructive" });
+            toast.error("Erro ao atualizar custo");
         }
     };
 
@@ -76,11 +76,11 @@ export function ProductCostTable({ costs }: { costs: ProductCost[] }) {
                 name: newProduct.name,
                 costPrice: Number(newProduct.costPrice),
             });
-            toast({ title: "Produto adicionado com sucesso!" });
+            toast.success("Produto adicionado com sucesso!");
             setIsNewDialogOpen(false);
             setNewProduct({ sku: "", name: "", costPrice: 0 });
         } catch (error) {
-            toast({ title: "Erro ao criar produto", variant: "destructive" });
+            toast.error("Erro ao criar produto");
         }
     };
 
