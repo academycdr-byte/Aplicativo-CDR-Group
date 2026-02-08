@@ -24,8 +24,9 @@ export async function GET(request: NextRequest) {
 
   try {
     const state = generateOAuthState();
-    // URL fixa de producao - deve bater exatamente com a configurada no Dev Dashboard
-    const redirectUri = "https://aplicativo-cdr-group.vercel.app/api/integrations/shopify/callback";
+    const baseUrl = process.env.AUTH_URL || process.env.NEXTAUTH_URL;
+    if (!baseUrl) throw new Error("AUTH_URL nao configurado");
+    const redirectUri = `${baseUrl}/api/integrations/shopify/callback`;
 
     // Salvar state e shop em cookies para validar no callback
     const cookieStore = await cookies();

@@ -143,6 +143,82 @@ export async function validateShopifyAccessToken(
 }
 
 /**
+ * Registra webhooks na loja Shopify apos conexao OAuth.
+ * Sem isso, a Shopify nunca envia webhooks para o app.
+ */
+export async function registerShopifyWebhooks(
+  shop: string,
+  accessToken: string
+): Promise<void> {
+  const baseUrl = process.env.AUTH_URL || process.env.NEXTAUTH_URL;
+  if (!baseUrl) {
+    console.error("[Shopify Webhooks] AUTH_URL nao configurado, pulando registro de webhooks");
+    return;
+  }
+
+  const webhookAddress = `${baseUrl}/api/webhooks/shopify`;
+  const topics = ["orders/create", "orders/updated", "app/uninstalled"];
+
+  // Buscar webhooks ja registrados para evitar duplicatas
+  let existingTopics: string[] = [];
+  try {
+    const listRes = await fetch(
+      `https://${shop}/admin/api/${SHOPIFY_API_VERSION}/webhooks.json`,
+      {
+        headers: {
+          "X-Shopify-Access-Token": accessToken,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    if (listRes.ok) {
+      const listData = await listRes.json();
+      existingTopics = (listData.webhooks || [])
+        .filter((w: { address: string }) => w.address === webhookAddress)
+        .map((w: { topic: string }) => w.topic);
+    }
+  } catch (err) {
+    console.warn("[Shopify Webhooks] Erro ao listar webhooks existentes:", err);
+  }
+
+  for (const topic of topics) {
+    if (existingTopics.includes(topic)) {
+      console.log(`[Shopify Webhooks] ${topic} ja registrado para ${shop}`);
+      continue;
+    }
+
+    try {
+      const res = await fetch(
+        `https://${shop}/admin/api/${SHOPIFY_API_VERSION}/webhooks.json`,
+        {
+          method: "POST",
+          headers: {
+            "X-Shopify-Access-Token": accessToken,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            webhook: {
+              topic,
+              address: webhookAddress,
+              format: "json",
+            },
+          }),
+        }
+      );
+
+      if (res.ok) {
+        console.log(`[Shopify Webhooks] Registrado ${topic} para ${shop}`);
+      } else {
+        const errText = await res.text();
+        console.error(`[Shopify Webhooks] Falha ao registrar ${topic} (${res.status}):`, errText);
+      }
+    } catch (err) {
+      console.error(`[Shopify Webhooks] Erro ao registrar ${topic}:`, err);
+    }
+  }
+}
+
+/**
  * Busca pedidos da Shopify usando o access token armazenado.
  */
 export async function fetchShopifyOrders(integrationId: string) {

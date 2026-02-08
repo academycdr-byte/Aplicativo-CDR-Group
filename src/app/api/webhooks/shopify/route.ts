@@ -30,7 +30,6 @@ export async function POST(req: NextRequest) {
     }
 
     const data = JSON.parse(body);
-    const domain = shop.replace(".myshopify.com", "");
 
     // Handle GDPR Mandatory Webhooks (Return 200 OK)
     if (
@@ -39,7 +38,6 @@ export async function POST(req: NextRequest) {
       topic === "shop/redact"
     ) {
       console.log(`[Shopify GDPR] Received ${topic} for shop ${shop}`);
-      // In a real app, queue a job to process this request asynchronously
       return NextResponse.json({ ok: true });
     }
 
@@ -50,7 +48,7 @@ export async function POST(req: NextRequest) {
       const integration = await prisma.integration.findFirst({
         where: {
           platform: "SHOPIFY",
-          externalStoreId: { contains: domain }, // loose match to be safe
+          externalStoreId: shop,
           status: "CONNECTED",
         },
       });
@@ -72,7 +70,7 @@ export async function POST(req: NextRequest) {
     const integration = await prisma.integration.findFirst({
       where: {
         platform: "SHOPIFY",
-        externalStoreId: domain,
+        externalStoreId: shop,
         status: "CONNECTED",
       },
     });

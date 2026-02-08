@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { encrypt } from "@/lib/encryption";
-import { exchangeShopifyCode, validateShopifyHmac, syncShopifyOrders } from "@/lib/integrations/shopify";
+import { exchangeShopifyCode, validateShopifyHmac, syncShopifyOrders, registerShopifyWebhooks } from "@/lib/integrations/shopify";
 import { cookies } from "next/headers";
 
 // GET /api/integrations/shopify/callback?code=xxx&hmac=xxx&shop=xxx&state=xxx
@@ -96,6 +96,11 @@ export async function GET(request: NextRequest) {
     });
 
     console.log("[Shopify OAuth] Integration saved for shop:", shop);
+
+    // Register webhooks in the background (don't wait for it)
+    registerShopifyWebhooks(shop, tokenData.access_token).catch((err) => {
+      console.error("[Shopify OAuth] Webhook registration failed:", err);
+    });
 
     // Trigger initial sync in the background (don't wait for it)
     syncShopifyOrders(membership.organizationId).catch((err) => {
