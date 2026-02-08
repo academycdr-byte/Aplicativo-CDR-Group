@@ -64,9 +64,12 @@ export function Sidebar() {
     { name: "Vendas", href: "/sales", icon: TrendingUp },
     { name: "Mais Vendidos", href: "/best-sellers", icon: ShoppingBag },
     { name: "Anuncios", href: "/ads", icon: Megaphone },
-    // Relatórios restricted to internal team
-    { name: "Relatórios", href: "/reports", icon: FileText, internalOnly: true },
   ];
+
+  // STRICT: Only push Relatórios if isSuperAdmin is TRUE
+  if (session?.user?.email?.toLowerCase() === "academy.cdr@gmail.com") {
+    mainNavItems.push({ name: "Relatórios", href: "/reports", icon: FileText, internalOnly: true } as any);
+  }
 
   const settingsNavItems = [
     // Integrations usually for internal team/admins to configure
@@ -74,14 +77,11 @@ export function Sidebar() {
     { name: "Configuracoes", href: "/settings", icon: Settings },
   ];
 
-  const userEmail = session?.user?.email;
-  const isSuperAdmin = userEmail?.toLowerCase() === "academy.cdr@gmail.com";
+  // const isSuperAdmin = userEmail?.toLowerCase() === "academy.cdr@gmail.com";
 
   // Helper to filter items
   const filterNav = (items: any[]) => {
     return items.filter(item => {
-      // "Relatórios" restricted strictly to academy.cdr@gmail.com
-      if (item.href === "/reports") return isSuperAdmin;
 
       if (item.adminOnly) return isAdmin;
       if (item.internalOnly) return isInternal;
