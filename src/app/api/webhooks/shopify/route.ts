@@ -5,9 +5,9 @@ import crypto from "crypto";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.text();
-    const hmac = req.headers.get("x-shopify-hmac-sha256");
-    const shop = req.headers.get("x-shopify-shop-domain");
     const topic = req.headers.get("x-shopify-topic");
+    const shop = req.headers.get("x-shopify-shop-domain");
+    const hmac = req.headers.get("x-shopify-hmac-sha256");
 
     if (!hmac || !shop || !topic) {
       return NextResponse.json({ error: "Missing headers" }, { status: 400 });
@@ -30,18 +30,57 @@ export async function POST(req: NextRequest) {
     }
 
     const data = JSON.parse(body);
+    const domain = shop.replace(".myshopify.com", "");
 
-    // Find the integration for this shop
+    // Handle GDPR Mandatory Webhooks (Return 200 OK)
+    if (
+      topic === "customers/data_request" ||
+      topic === "customers/redact" ||
+      topic === "shop/redact"
+    ) {
+      console.log(`[Shopify GDPR] Received ${topic} for shop ${shop}`);
+      // In a real app, queue a job to process this request asynchronously
+      return NextResponse.json({ ok: true });
+    }
+
+    // Handle App Uninstalled
+    if (topic === "app/uninstalled") {
+      console.log(`[Shopify Webhook] App uninstalled for ${shop}`);
+
+      const integration = await prisma.integration.findFirst({
+        where: {
+          platform: "SHOPIFY",
+          externalStoreId: { contains: domain }, // loose match to be safe
+          status: "CONNECTED",
+        },
+      });
+
+      if (integration) {
+        await prisma.integration.update({
+          where: { id: integration.id },
+          data: {
+            status: "DISCONNECTED",
+            errorMessage: "App uninstalled by user",
+          },
+        });
+        console.log(`[Shopify Webhook] Integration ${integration.id} marked as disconnected`);
+      }
+      return NextResponse.json({ ok: true });
+    }
+
+    // Handle Orders (Only if app is installed/connected)
     const integration = await prisma.integration.findFirst({
       where: {
         platform: "SHOPIFY",
-        externalStoreId: shop.replace(".myshopify.com", ""),
+        externalStoreId: domain,
         status: "CONNECTED",
       },
     });
 
     if (!integration) {
-      return NextResponse.json({ error: "Integration not found" }, { status: 404 });
+      // If we receive an order webhook but have no active integration, it might be a race condition or stale hook
+      console.warn(`[Shopify Webhook] Received ${topic} but no active integration found for ${shop}`);
+      return NextResponse.json({ ok: true }); // Return 200 to ACK
     }
 
     if (topic === "orders/create" || topic === "orders/updated") {
