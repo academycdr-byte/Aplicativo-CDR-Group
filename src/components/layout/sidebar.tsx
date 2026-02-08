@@ -136,13 +136,6 @@ export function Sidebar() {
       <div className="px-4 py-4 border-t border-white/5">
         <div className="flex flex-col gap-1">
           <p className="text-[10px] text-sidebar-text/30 text-center">CDR Group &copy; 2025</p>
-          {session?.user && (
-            <div className="text-[9px] text-sidebar-text/20 text-center flex flex-col items-center">
-              <span className="uppercase tracking-wider">{userRole}</span>
-              <span className="truncate max-w-[150px]">{userEmail}</span>
-              {isSuperAdmin ? <span className="text-green-500">ROOT</span> : <span className="text-red-500">USER</span>}
-            </div>
-          )}
         </div>
       </div>
     </aside>
