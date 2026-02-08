@@ -14,6 +14,7 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  const [loginType, setLoginType] = useState<"CLIENT" | "ADMIN">("CLIENT");
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -58,6 +59,29 @@ export default function LoginPage() {
             {error}
           </div>
         )}
+
+        <div className="flex bg-muted p-1 rounded-lg mb-6">
+          <button
+            type="button"
+            onClick={() => setLoginType("CLIENT")}
+            className={`flex-1 text-sm font-medium py-2 rounded-md transition-all ${loginType === "CLIENT"
+              ? "bg-background shadow-sm text-foreground"
+              : "text-muted-foreground hover:text-foreground"
+              }`}
+          >
+            Sou Cliente
+          </button>
+          <button
+            type="button"
+            onClick={() => setLoginType("ADMIN")}
+            className={`flex-1 text-sm font-medium py-2 rounded-md transition-all ${loginType === "ADMIN"
+              ? "bg-background shadow-sm text-foreground"
+              : "text-muted-foreground hover:text-foreground"
+              }`}
+          >
+            Sou Administrador
+          </button>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
