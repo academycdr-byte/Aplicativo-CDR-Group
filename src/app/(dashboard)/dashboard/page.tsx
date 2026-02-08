@@ -131,7 +131,8 @@ export default function DashboardPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     const { days, from, to } = periodToParams(period);
-    const [s, m, p, o, f, r, ct] = await Promise.all([
+
+    const results = await Promise.allSettled([
       getDashboardData(days, from, to),
       getMetricsAnalysis(days, from, to),
       getOrdersByPlatform(),
@@ -140,13 +141,22 @@ export default function DashboardPage() {
       getPaidAndRepurchaseRates(days, from, to),
       getCustomerTrends(days, from, to),
     ]);
-    if (s) setStats(s);
-    setMetricsData(m);
-    setPlatformData(p);
-    setRecentOrders(o);
-    setFunnel(f);
-    setRates(r);
-    setCustomerTrends(ct);
+
+    const [s, m, p, o, f, r, ct] = results;
+
+    if (s.status === "fulfilled" && s.value) setStats(s.value);
+    if (m.status === "fulfilled") setMetricsData(m.value);
+    if (p.status === "fulfilled") setPlatformData(p.value);
+    if (o.status === "fulfilled") setRecentOrders(o.value);
+    if (f.status === "fulfilled") setFunnel(f.value);
+    if (r.status === "fulfilled") setRates(r.value);
+    if (ct.status === "fulfilled") setCustomerTrends(ct.value);
+
+    const failures = results.filter((r) => r.status === "rejected");
+    if (failures.length > 0) {
+      toast.error(`Erro ao carregar ${failures.length} seção(ões) do dashboard`);
+    }
+
     setLoading(false);
   }, [period]);
 

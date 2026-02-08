@@ -73,10 +73,12 @@ export async function loginUser(formData: {
   loginType?: "ADMIN" | "CLIENT";
 }) {
   try {
-    // STRICT ENFORCEMENT: If trying to login as ADMIN, email MUST be academy.cdr@gmail.com
+    // STRICT ENFORCEMENT: If trying to login as ADMIN, email MUST be in allowed list
     if (formData.loginType === "ADMIN") {
-      const adminEmail = "academy.cdr@gmail.com";
-      if (formData.email.trim().toLowerCase() !== adminEmail) {
+      const adminEmails = (process.env.ADMIN_EMAILS || "academy.cdr@gmail.com")
+        .split(",")
+        .map((e) => e.trim().toLowerCase());
+      if (!adminEmails.includes(formData.email.trim().toLowerCase())) {
         return { error: "Acesso administrativo negado para este e-mail." };
       }
     }

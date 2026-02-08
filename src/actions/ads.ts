@@ -2,44 +2,8 @@
 
 import { prisma } from "@/lib/prisma";
 import { getSessionWithOrg } from "@/lib/session";
+import { getDateRange, getPreviousDateRange, buildDateFilter } from "@/lib/date-utils";
 import { Prisma } from "@prisma/client";
-
-function getDateRange(days: number, from?: string, to?: string): { since: Date; until?: Date } {
-  if (from && to) {
-    return { since: new Date(from), until: new Date(to) };
-  }
-  const since = new Date();
-  if (days === 0) {
-    since.setHours(0, 0, 0, 0);
-  } else {
-    since.setDate(since.getDate() - days);
-  }
-  return { since };
-}
-
-function getPreviousDateRange(days: number, from?: string, to?: string): { since: Date; until: Date } {
-  let currentSince: Date;
-  let currentUntil: Date;
-
-  if (from && to) {
-    currentSince = new Date(from);
-    currentUntil = new Date(to);
-  } else {
-    currentUntil = new Date();
-    currentSince = new Date();
-    if (days === 0) {
-      currentSince.setHours(0, 0, 0, 0);
-    } else {
-      currentSince.setDate(currentSince.getDate() - days);
-    }
-  }
-
-  const duration = currentUntil.getTime() - currentSince.getTime();
-  const previousUntil = new Date(currentSince.getTime() - 1); // 1ms before current start
-  const previousSince = new Date(previousUntil.getTime() - duration);
-
-  return { since: previousSince, until: previousUntil };
-}
 
 type FilterParams = {
   platform?: string;
@@ -52,7 +16,7 @@ type FilterParams = {
 
 function buildWhereClause(
   orgId: string,
-  dateFilter: { gte: Date; lte?: Date },
+  dateFilter: { gte: Date; lte: Date },
   params?: FilterParams
 ): Prisma.AdMetricWhereInput {
   const where: Prisma.AdMetricWhereInput = {
@@ -97,9 +61,7 @@ export async function getAdMetrics(params?: FilterParams) {
 
   // Current Period
   const currentRange = getDateRange(days, params?.from, params?.to);
-  const currentDateFilter = currentRange.until
-    ? { gte: currentRange.since, lte: currentRange.until }
-    : { gte: currentRange.since };
+  const currentDateFilter = buildDateFilter(currentRange);
 
   const currentWhere = buildWhereClause(ctx.organization.id, currentDateFilter, params);
 
@@ -188,8 +150,7 @@ export async function getAdMetricsByDay(days: number = 30, from?: string, to?: s
   const ctx = await getSessionWithOrg();
   if (!ctx) return [];
 
-  const { since, until } = getDateRange(days, from, to);
-  const dateFilter = until ? { gte: since, lte: until } : { gte: since };
+  const dateFilter = buildDateFilter(getDateRange(days, from, to));
 
   // Reuse logic by constructing params object
   const params: FilterParams = { search, exclude, platform };
@@ -226,8 +187,7 @@ export async function getCreativePerformance(params?: FilterParams) {
   if (!ctx) return [];
 
   const days = params?.days || 30;
-  const { since, until } = getDateRange(days, params?.from, params?.to);
-  const dateFilter = until ? { gte: since, lte: until } : { gte: since };
+  const dateFilter = buildDateFilter(getDateRange(days, params?.from, params?.to));
 
   const where = buildWhereClause(ctx.organization.id, dateFilter, params);
 

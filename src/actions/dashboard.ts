@@ -2,33 +2,20 @@
 
 import { prisma } from "@/lib/prisma";
 import { getSessionWithOrg } from "@/lib/session";
-
-function getDateRange(days: number, from?: string, to?: string): { since: Date; until?: Date } {
-  if (from && to) {
-    return { since: new Date(from), until: new Date(to) };
-  }
-  const since = new Date();
-  if (days === 0) {
-    since.setHours(0, 0, 0, 0);
-  } else {
-    since.setDate(since.getDate() - days);
-  }
-  return { since };
-}
+import { getDateRange, buildDateFilter } from "@/lib/date-utils";
 
 export async function getDashboardData(days: number = 30, from?: string, to?: string) {
   const ctx = await getSessionWithOrg();
   if (!ctx) return null;
 
   const orgId = ctx.organization.id;
-  const { since, until } = getDateRange(days, from, to);
+  const range = getDateRange(days, from, to);
+  const dateFilter = buildDateFilter(range);
+  const adDateFilter = dateFilter;
 
   const compareDays = days === 0 ? 1 : days;
   const prevSince = new Date();
   prevSince.setDate(prevSince.getDate() - compareDays * 2);
-
-  const dateFilter = until ? { gte: since, lte: until } : { gte: since };
-  const adDateFilter = until ? { gte: since, lte: until } : { gte: since };
 
   const [
     totalOrders,
@@ -43,14 +30,14 @@ export async function getDashboardData(days: number = 30, from?: string, to?: st
       where: { organizationId: orgId, orderDate: dateFilter },
     }),
     prisma.order.count({
-      where: { organizationId: orgId, orderDate: { gte: prevSince, lt: since } },
+      where: { organizationId: orgId, orderDate: { gte: prevSince, lt: range.since } },
     }),
     prisma.order.aggregate({
       where: { organizationId: orgId, orderDate: dateFilter, status: "paid" },
       _sum: { totalAmount: true },
     }),
     prisma.order.aggregate({
-      where: { organizationId: orgId, orderDate: { gte: prevSince, lt: since }, status: "paid" },
+      where: { organizationId: orgId, orderDate: { gte: prevSince, lt: range.since }, status: "paid" },
       _sum: { totalAmount: true },
     }),
     prisma.adMetric.aggregate({
@@ -58,7 +45,7 @@ export async function getDashboardData(days: number = 30, from?: string, to?: st
       _sum: { spend: true },
     }),
     prisma.adMetric.aggregate({
-      where: { organizationId: orgId, date: { gte: prevSince, lt: since } },
+      where: { organizationId: orgId, date: { gte: prevSince, lt: range.since } },
       _sum: { spend: true },
     }),
     prisma.adMetric.aggregate({
@@ -94,8 +81,7 @@ export async function getRevenueByDay(days: number = 30, from?: string, to?: str
   const ctx = await getSessionWithOrg();
   if (!ctx) return [];
 
-  const { since, until } = getDateRange(days, from, to);
-  const dateFilter = until ? { gte: since, lte: until } : { gte: since };
+  const dateFilter = buildDateFilter(getDateRange(days, from, to));
 
   const orders = await prisma.order.findMany({
     where: {
@@ -152,8 +138,7 @@ export async function getMetricsAnalysis(days: number = 30, from?: string, to?: 
   if (!ctx) return [];
 
   const orgId = ctx.organization.id;
-  const { since, until } = getDateRange(days, from, to);
-  const dateFilter = until ? { gte: since, lte: until } : { gte: since };
+  const dateFilter = buildDateFilter(getDateRange(days, from, to));
 
   const [orders, adMetrics] = await Promise.all([
     prisma.order.findMany({
@@ -218,8 +203,7 @@ export async function getFunnelData(days: number = 30, from?: string, to?: strin
   if (!ctx) return null;
 
   const orgId = ctx.organization.id;
-  const { since, until } = getDateRange(days, from, to);
-  const dateFilter = until ? { gte: since, lte: until } : { gte: since };
+  const dateFilter = buildDateFilter(getDateRange(days, from, to));
 
   const [
     totalOrders,
@@ -304,8 +288,7 @@ export async function getPaidAndRepurchaseRates(days: number = 30, from?: string
   if (!ctx) return null;
 
   const orgId = ctx.organization.id;
-  const { since, until } = getDateRange(days, from, to);
-  const dateFilter = until ? { gte: since, lte: until } : { gte: since };
+  const dateFilter = buildDateFilter(getDateRange(days, from, to));
 
   const [totalOrders, paidOrders, allCustomers] = await Promise.all([
     prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter } }),
@@ -345,8 +328,8 @@ export async function getCustomerTrends(days: number = 30, from?: string, to?: s
   if (!ctx) return [];
 
   const orgId = ctx.organization.id;
-  const { since, until } = getDateRange(days, from, to);
-  const dateFilter = until ? { gte: since, lte: until } : { gte: since };
+  const range = getDateRange(days, from, to);
+  const dateFilter = buildDateFilter(range);
 
   // Get orders in period with customer emails
   const orders = await prisma.order.findMany({
@@ -357,7 +340,7 @@ export async function getCustomerTrends(days: number = 30, from?: string, to?: s
 
   // Get all customer emails that ordered BEFORE the period (returning customers)
   const priorCustomers = await prisma.order.findMany({
-    where: { organizationId: orgId, orderDate: { lt: since }, customerEmail: { not: null } },
+    where: { organizationId: orgId, orderDate: { lt: range.since }, customerEmail: { not: null } },
     select: { customerEmail: true },
     distinct: ["customerEmail"],
   });
@@ -412,6 +395,16 @@ export async function getRecentOrders(limit: number = 5) {
     where: { organizationId: ctx.organization.id },
     orderBy: { orderDate: "desc" },
     take: limit,
+    select: {
+      id: true,
+      externalOrderId: true,
+      platform: true,
+      status: true,
+      customerName: true,
+      totalAmount: true,
+      currency: true,
+      orderDate: true,
+    },
   });
 
   return orders.map((o) => ({

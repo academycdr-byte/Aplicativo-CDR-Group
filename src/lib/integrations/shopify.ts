@@ -237,35 +237,59 @@ export async function fetchShopifyOrders(integrationId: string) {
   const accessToken = decrypt(integration.accessToken);
   const shop = integration.externalStoreId;
 
-  const url = `https://${shop}/admin/api/${SHOPIFY_API_VERSION}/orders.json?status=any&limit=250`;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let allOrders: any[] = [];
+  let url: string | null = `https://${shop}/admin/api/${SHOPIFY_API_VERSION}/orders.json?status=any&limit=250`;
+  const MAX_ORDERS = 10000;
 
-  const response = await fetch(url, {
-    headers: {
-      "X-Shopify-Access-Token": accessToken,
-      "Content-Type": "application/json",
-    },
-  });
+  while (url && allOrders.length < MAX_ORDERS) {
+    const response: Response = await fetch(url, {
+      headers: {
+        "X-Shopify-Access-Token": accessToken,
+        "Content-Type": "application/json",
+      },
+    });
 
-  if (!response.ok) {
-    const errorBody = await response.text();
-    console.error("[Shopify API] Orders fetch failed:", response.status, errorBody);
+    if (!response.ok) {
+      const errorBody = await response.text();
+      console.error("[Shopify API] Orders fetch failed:", response.status, errorBody);
 
-    if (response.status === 401) {
-      await prisma.integration.update({
-        where: { id: integrationId },
-        data: {
-          status: "DISCONNECTED",
-          errorMessage: "Token expirado ou invalido. Reconecte a Shopify.",
-        },
-      });
-      throw new Error("Token Shopify expirado. Reconecte a integracao.");
+      if (response.status === 401) {
+        await prisma.integration.update({
+          where: { id: integrationId },
+          data: {
+            status: "DISCONNECTED",
+            errorMessage: "Token expirado ou invalido. Reconecte a Shopify.",
+          },
+        });
+        throw new Error("Token Shopify expirado. Reconecte a integracao.");
+      }
+
+      throw new Error(`Shopify API error: ${response.status}`);
     }
 
-    throw new Error(`Shopify API error: ${response.status}`);
+    const data = await response.json();
+    const orders = data.orders || [];
+    allOrders = allOrders.concat(orders);
+
+    // Follow Link header pagination
+    const linkHeader: string | null = response.headers.get("Link");
+    url = null;
+    if (linkHeader) {
+      const nextMatch: RegExpMatchArray | null = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
+      if (nextMatch) {
+        url = nextMatch[1];
+      }
+    }
+
+    console.log(`[Shopify API] Fetched ${orders.length} orders (total: ${allOrders.length})`);
   }
 
-  const data = await response.json();
-  return data.orders || [];
+  if (allOrders.length >= MAX_ORDERS) {
+    console.warn(`[Shopify API] Hit max order limit (${MAX_ORDERS})`);
+  }
+
+  return allOrders;
 }
 
 export async function syncShopifyOrders(organizationId: string) {

@@ -65,24 +65,29 @@ export default function AnalyticsPage() {
         // Filter params for ads
         const adParams = { days, from, to };
 
-        const [adMetrics, dailyAnalysis, creativePerf, platformPerf] = await Promise.all([
-            getAdMetrics(adParams),
-            getMetricsAnalysis(days, from, to),
-            getCreativePerformance(adParams),
-            getOrdersByPlatform(),
-        ]);
+        try {
+            const results = await Promise.allSettled([
+                getAdMetrics(adParams),
+                getMetricsAnalysis(days, from, to),
+                getCreativePerformance(adParams),
+                getOrdersByPlatform(),
+            ]);
 
-        // Calculate KPIs
-        const totals = adMetrics.totals || { spend: 0, clicks: 0, impressions: 0, conversions: 0 };
-        const cpa = totals.conversions > 0 ? totals.spend / totals.conversions : 0;
-        const cpc = totals.clicks > 0 ? totals.spend / totals.clicks : 0;
-        const ctr = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0;
-        const cpm = totals.impressions > 0 ? (totals.spend / totals.impressions) * 1000 : 0;
-
-        setKpis({ cpa, cpc, ctr, cpm });
-        setDailyData(dailyAnalysis);
-        setCreatives(creativePerf.slice(0, 5)); // Top 5
-        setPlatformData(platformPerf);
+            if (results[0].status === "fulfilled") {
+                const adMetrics = results[0].value;
+                const totals = adMetrics.totals || { spend: 0, clicks: 0, impressions: 0, conversions: 0 };
+                const cpa = totals.conversions > 0 ? totals.spend / totals.conversions : 0;
+                const cpc = totals.clicks > 0 ? totals.spend / totals.clicks : 0;
+                const ctr = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0;
+                const cpm = totals.impressions > 0 ? (totals.spend / totals.impressions) * 1000 : 0;
+                setKpis({ cpa, cpc, ctr, cpm });
+            }
+            if (results[1].status === "fulfilled") setDailyData(results[1].value);
+            if (results[2].status === "fulfilled") setCreatives(results[2].value.slice(0, 5));
+            if (results[3].status === "fulfilled") setPlatformData(results[3].value);
+        } catch (error) {
+            console.error("Failed to load analytics data", error);
+        }
 
         setLoading(false);
     }, [period]);

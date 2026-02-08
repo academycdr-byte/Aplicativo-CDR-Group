@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma as db } from "@/lib/prisma";
+import { getSessionWithOrg } from "@/lib/session";
 import { revalidatePath } from "next/cache";
 
 // Types
@@ -38,22 +39,9 @@ export async function getFinancialMetrics({
     from: Date;
     to: Date;
 }) {
-    // 1. Get Organization (assuming single tenant context or passed context)
-    // For now, we'll fetch the first organization or handle correctly if auth is passed.
-    // In a real app, use auth() to get orgId.
-    // We'll mock getting the first organization for simplicity if auth not available in this scope,
-    // but ideally you should pass organizationId.
-    // Let's assume we can get it from the user session or fixed seed.
-    // For this action, we'll use a helper to get current org or pass it.
-
-    // Actually, let's fetch orders and expenses for the *current* user's organization.
-    // We will assume the session is handled by the caller or we use a fixed org for now.
-    // We'll use the first organization found if no auth (dev mode) or implement auth.
-
-    // TODO: Replace with actual session org ID
-    const org = await db.organization.findFirst();
-    if (!org) throw new Error("Organization not found");
-    const organizationId = org.id;
+    const ctx = await getSessionWithOrg();
+    if (!ctx) throw new Error("Nao autenticado");
+    const organizationId = ctx.organization.id;
 
     // 2. Fetch Financial Config
     const config = await db.financialConfig.findUnique({
@@ -169,11 +157,11 @@ export async function getFinancialMetrics({
  * Get all product costs for management table
  */
 export async function getProductCosts() {
-    const org = await db.organization.findFirst();
-    if (!org) return [];
+    const ctx = await getSessionWithOrg();
+    if (!ctx) return [];
 
     return db.productCost.findMany({
-        where: { organizationId: org.id },
+        where: { organizationId: ctx.organization.id },
         orderBy: { name: 'asc' }
     });
 }
@@ -182,18 +170,19 @@ export async function getProductCosts() {
  * Update or Create a Product Cost
  */
 export async function saveProductCost(input: ProductCostInput) {
-    const org = await db.organization.findFirst();
-    if (!org) throw new Error("No organization");
+    const ctx = await getSessionWithOrg();
+    if (!ctx) throw new Error("Nao autenticado");
+    const orgId = ctx.organization.id;
 
     await db.productCost.upsert({
         where: {
             organizationId_sku: {
-                organizationId: org.id,
+                organizationId: orgId,
                 sku: input.sku
             }
         },
         create: {
-            organizationId: org.id,
+            organizationId: orgId,
             sku: input.sku,
             name: input.name,
             costPrice: input.costPrice,
@@ -214,11 +203,11 @@ export async function saveProductCost(input: ProductCostInput) {
  * Get current financial config
  */
 export async function getFinancialConfig() {
-    const org = await db.organization.findFirst();
-    if (!org) return null;
+    const ctx = await getSessionWithOrg();
+    if (!ctx) return null;
 
     return db.financialConfig.findUnique({
-        where: { organizationId: org.id }
+        where: { organizationId: ctx.organization.id }
     });
 }
 
@@ -226,13 +215,22 @@ export async function getFinancialConfig() {
  * Save financial config
  */
 export async function saveFinancialConfig(input: FinancialConfigInput) {
-    const org = await db.organization.findFirst();
-    if (!org) throw new Error("No organization");
+    const ctx = await getSessionWithOrg();
+    if (!ctx) throw new Error("Nao autenticado");
+    const orgId = ctx.organization.id;
+
+    // Validate inputs
+    if (isNaN(input.defaultTaxRate) || input.defaultTaxRate < 0 || input.defaultTaxRate > 100) {
+        throw new Error("Taxa padrao deve ser entre 0 e 100");
+    }
+    if (isNaN(input.fixedTransactionFee) || input.fixedTransactionFee < 0) {
+        throw new Error("Taxa fixa de transacao deve ser >= 0");
+    }
 
     await db.financialConfig.upsert({
-        where: { organizationId: org.id },
+        where: { organizationId: orgId },
         create: {
-            organizationId: org.id,
+            organizationId: orgId,
             defaultTaxRate: input.defaultTaxRate,
             fixedTransactionFee: input.fixedTransactionFee
         },

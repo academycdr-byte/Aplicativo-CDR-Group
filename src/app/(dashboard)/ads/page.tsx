@@ -188,17 +188,20 @@ export default function AdsPage() {
       exclude: excludedTerms
     };
 
-    const [metricsData, dayMetrics, creativeData] = await Promise.all([
+    const results = await Promise.allSettled([
       getAdMetrics(params),
       getAdMetricsByDay(days, from, to, searchQuery || undefined, excludedTerms, platform),
       getCreativePerformance(params),
     ]);
 
-    setTotals(metricsData.totals);
-    setPrevTotals(metricsData.previousTotals);
-    setMetrics(metricsData.metrics);
-    setDayData(dayMetrics);
-    setCreatives(creativeData);
+    if (results[0].status === "fulfilled") {
+      const metricsData = results[0].value;
+      setTotals(metricsData.totals);
+      setPrevTotals(metricsData.previousTotals);
+      setMetrics(metricsData.metrics);
+    }
+    if (results[1].status === "fulfilled") setDayData(results[1].value);
+    if (results[2].status === "fulfilled") setCreatives(results[2].value);
     setMetricsPage(1);
     setCreativesPage(1);
   }, [period, platformFilter, searchQuery, excludedTerms]);
@@ -598,7 +601,7 @@ export default function AdsPage() {
                       <span className="w-6 text-center text-muted-foreground text-sm font-medium mr-2">{idx + 1}</span>
                       <div className="w-10 h-10 bg-muted rounded relative overflow-hidden shrink-0 mr-3 border border-border">
                         {c.thumbnailUrl ? (
-                          <Image src={c.thumbnailUrl} alt="" fill className="object-cover" unoptimized />
+                          <Image src={c.thumbnailUrl} alt="" fill className="object-cover" />
                         ) : <ImageIcon className="w-5 h-5 absolute inset-0 m-auto text-muted-foreground/50" />}
                       </div>
                       <div className="flex-1 min-w-0 mr-2">
@@ -654,7 +657,7 @@ export default function AdsPage() {
                       <TableRow key={m.id} className={`hover:bg-muted/30 border-b border-border/50 ${m.roas >= 3 ? "bg-emerald-500/5 hover:bg-emerald-500/10" : ""}`}>
                         <TableCell>
                           <div className="flex items-center gap-3">
-                            {m.thumbnailUrl && <Image src={m.thumbnailUrl} alt="" width={32} height={32} className="rounded object-cover" unoptimized />}
+                            {m.thumbnailUrl && <Image src={m.thumbnailUrl} alt="" width={32} height={32} className="rounded object-cover" />}
                             <div className="min-w-0 max-w-[250px]">
                               <p className="text-sm font-medium truncate" title={m.adName || ""}>{m.adName || "Anúncio"}</p>
                               <p className="text-xs text-muted-foreground truncate">{m.campaignName}</p>
@@ -745,7 +748,7 @@ export default function AdsPage() {
                   {/* Thumbnail */}
                   <div className="relative aspect-video bg-muted flex items-center justify-center overflow-hidden">
                     {c.thumbnailUrl ? (
-                      <Image src={c.thumbnailUrl} alt="" fill className="object-cover transition-transform" unoptimized />
+                      <Image src={c.thumbnailUrl} alt="" fill className="object-cover transition-transform" />
                     ) : <ImageIcon className="w-8 h-8 opacity-20" />}
 
                     {/* Overlay Play Icon if we assume it's a video or just generally for "Detail View" affordance */}

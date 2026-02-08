@@ -73,9 +73,9 @@ export function Sidebar() {
     { name: "Analytics", href: "/analytics", icon: BarChart3 },
   ];
 
-  // Logic for Reports tab (restrict to specific email)
-  if (session?.user?.email?.toLowerCase() === "academy.cdr@gmail.com") {
-    platformNavItems.push({ name: "Relatórios", href: "/reports", icon: FileText } as any);
+  // Logic for Reports tab (restrict to admin roles)
+  if (isAdmin) {
+    platformNavItems.push({ name: "Relatórios", href: "/reports", icon: FileText } as NavItem);
   }
 
   // GESTÃO Group
@@ -102,7 +102,7 @@ export function Sidebar() {
       <div className="flex items-center gap-3 px-6 py-6 mb-2">
         <div className="relative w-12 h-12 flex items-center justify-center bg-white/5 rounded-xl shadow-inner border border-white/5">
           <Image
-            src="/logo.png.png"
+            src="/logo.png"
             alt="CDR Group"
             fill
             className="object-contain p-1.5"

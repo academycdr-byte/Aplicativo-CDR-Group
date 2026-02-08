@@ -230,6 +230,7 @@ model Order {
   @@unique([organizationId, platform, externalOrderId])
   @@index([organizationId, orderDate])
   @@index([organizationId, platform])
+  @@index([organizationId, status, orderDate])
   @@map("orders")
 }
 
@@ -263,6 +264,7 @@ model AdMetric {
   @@unique([organizationId, platform, campaignId, adId, date])
   @@index([organizationId, date])
   @@index([organizationId, platform])
+  @@index([organizationId, platform, date])
   @@map("ad_metrics")
 }
 

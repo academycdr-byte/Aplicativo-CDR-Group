@@ -166,8 +166,10 @@ export function PeriodSelector({ value, onChange, onRefresh, refreshing }: Perio
 /** Helper to convert PeriodValue to { days, from?, to? } for server actions */
 export function periodToParams(value: PeriodValue): { days: number; from?: string; to?: string } {
   if (value.type === "custom") {
-    const fromStr = value.from.toISOString();
-    const toStr = value.to.toISOString();
+    // Send YYYY-MM-DD strings to avoid timezone conversion issues
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const fromStr = `${value.from.getFullYear()}-${pad(value.from.getMonth() + 1)}-${pad(value.from.getDate())}`;
+    const toStr = `${value.to.getFullYear()}-${pad(value.to.getMonth() + 1)}-${pad(value.to.getDate())}`;
     const diffMs = value.to.getTime() - value.from.getTime();
     const days = Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
     return { days, from: fromStr, to: toStr };

@@ -2,27 +2,14 @@
 
 import { prisma } from "@/lib/prisma";
 import { getSessionWithOrg } from "@/lib/session";
-
-function getDateRange(days: number, from?: string, to?: string): { since: Date; until?: Date } {
-  if (from && to) {
-    return { since: new Date(from), until: new Date(to) };
-  }
-  const since = new Date();
-  if (days === 0) {
-    since.setHours(0, 0, 0, 0);
-  } else {
-    since.setDate(since.getDate() - days);
-  }
-  return { since };
-}
+import { getDateRange, buildDateFilter } from "@/lib/date-utils";
 
 export async function getSalesData(days: number = 30, from?: string, to?: string) {
   const ctx = await getSessionWithOrg();
   if (!ctx) return null;
 
   const orgId = ctx.organization.id;
-  const { since, until } = getDateRange(days, from, to);
-  const dateFilter = until ? { gte: since, lte: until } : { gte: since };
+  const dateFilter = buildDateFilter(getDateRange(days, from, to));
 
   const [totalRevenue, totalOrders, avgTicket, topProducts] = await Promise.all([
     prisma.order.aggregate({
@@ -67,8 +54,7 @@ export async function getSalesByDay(days: number = 30, from?: string, to?: strin
   const ctx = await getSessionWithOrg();
   if (!ctx) return [];
 
-  const { since, until } = getDateRange(days, from, to);
-  const dateFilter = until ? { gte: since, lte: until } : { gte: since };
+  const dateFilter = buildDateFilter(getDateRange(days, from, to));
 
   const orders = await prisma.order.findMany({
     where: {

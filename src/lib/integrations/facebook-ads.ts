@@ -191,6 +191,7 @@ export async function syncFacebookAdsMetrics(organizationId: string) {
     const until = new Date().toISOString().split("T")[0];
 
     const fields = [
+      "date_start",
       "campaign_id", "campaign_name",
       "adset_id", "adset_name",
       "ad_id", "ad_name",
@@ -211,14 +212,28 @@ export async function syncFacebookAdsMetrics(organizationId: string) {
     }
 
     const data = await response.json();
+
+    // Validate API response
+    if (data.error) {
+      console.error("[Facebook Ads] API error in response:", JSON.stringify(data.error));
+      throw new Error(`Facebook API error: ${data.error.message || "Unknown"}`);
+    }
+
     let allInsights = data.data || [];
 
     // Handle pagination
     let nextUrl = data.paging?.next;
     while (nextUrl) {
       const nextResponse = await fetch(nextUrl);
-      if (!nextResponse.ok) break;
+      if (!nextResponse.ok) {
+        console.error("[Facebook Ads] Pagination failed:", nextResponse.status);
+        break;
+      }
       const nextData = await nextResponse.json();
+      if (nextData.error) {
+        console.error("[Facebook Ads] Pagination API error:", JSON.stringify(nextData.error));
+        break;
+      }
       allInsights = allInsights.concat(nextData.data || []);
       nextUrl = nextData.paging?.next;
     }
