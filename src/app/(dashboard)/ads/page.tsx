@@ -827,10 +827,7 @@ export default function AdsPage() {
         <VideoModal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
-          videoUrl={selectedCreative.videoUrl}
-          thumbnailUrl={selectedCreative.thumbnailUrl}
-          adName={selectedCreative.adName}
-          platform={selectedCreative.platform}
+          creative={selectedCreative}
         />
       )}
     </div>
