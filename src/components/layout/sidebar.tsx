@@ -72,16 +72,16 @@ export function Sidebar() {
     // Integrations usually for internal team/admins to configure
     { name: "Integracoes", href: "/integrations", icon: Link2, internalOnly: true },
     { name: "Configuracoes", href: "/settings", icon: Settings },
-    { name: "Admin", href: "/admin", icon: Shield, adminOnly: true },
   ];
 
-  const isSuperAdmin = session?.user?.email === "academy.cdr@gmail.com";
+  const userEmail = session?.user?.email;
+  const isSuperAdmin = userEmail?.toLowerCase() === "academy.cdr@gmail.com";
 
   // Helper to filter items
   const filterNav = (items: any[]) => {
     return items.filter(item => {
       // "Relatórios" restricted strictly to academy.cdr@gmail.com
-      if (item.name === "Relatórios") return isSuperAdmin;
+      if (item.href === "/reports") return isSuperAdmin;
 
       if (item.adminOnly) return isAdmin;
       if (item.internalOnly) return isInternal;
@@ -136,10 +136,12 @@ export function Sidebar() {
       <div className="px-4 py-4 border-t border-white/5">
         <div className="flex flex-col gap-1">
           <p className="text-[10px] text-sidebar-text/30 text-center">CDR Group &copy; 2025</p>
-          {userRole && (
-            <p className="text-[9px] text-sidebar-text/20 text-center uppercase tracking-wider">
-              {userRole}
-            </p>
+          {session?.user && (
+            <div className="text-[9px] text-sidebar-text/20 text-center flex flex-col items-center">
+              <span className="uppercase tracking-wider">{userRole}</span>
+              <span className="truncate max-w-[150px]">{userEmail}</span>
+              {isSuperAdmin ? <span className="text-green-500">ROOT</span> : <span className="text-red-500">USER</span>}
+            </div>
           )}
         </div>
       </div>
