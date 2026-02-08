@@ -75,9 +75,14 @@ export function Sidebar() {
     { name: "Admin", href: "/admin", icon: Shield, adminOnly: true },
   ];
 
+  const isSuperAdmin = session?.user?.email === "academy.cdr@gmail.com";
+
   // Helper to filter items
   const filterNav = (items: any[]) => {
     return items.filter(item => {
+      // "Relatórios" restricted strictly to academy.cdr@gmail.com
+      if (item.name === "Relatórios") return isSuperAdmin;
+
       if (item.adminOnly) return isAdmin;
       if (item.internalOnly) return isInternal;
       return true;
