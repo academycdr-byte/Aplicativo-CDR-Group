@@ -5,7 +5,8 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --radius: 0.625rem;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --radius: 0.5rem; /* Mudar de 0.625rem para 0.5rem — mais reto como Leverads */
   /* Light mode — clean white base with CDR green brand */
   --background: oklch(0.985 0.002 150);
   --foreground: oklch(0.16 0.03 150);

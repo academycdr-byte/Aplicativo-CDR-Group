@@ -40,8 +40,8 @@ import {
   Users,
   ImageIcon,
   ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
+  ArrowUpRight,
+  ArrowDownRight,
   Play,
   ShoppingCart,
   CreditCard,
@@ -325,36 +325,44 @@ export default function AdsPage() {
     prefix = "",
     suffix = "",
     subText,
-    invertTrend = false
+    variant = "default"
   }: any) {
     const variation = prevTotals ? getVariation(value, prevValue) : 0;
     const isPositive = variation > 0;
-    const isGood = invertTrend ? !isPositive : isPositive; // For CPI/Spend, down is good
+    const isNegative = variation < 0; // Explicitly check negative
+
+    // Style determination
+    let iconClass = "bg-primary/10 text-primary";
+    if (variant === "destructive") iconClass = "bg-red-500/10 text-red-500";
+    if (variant === "success") iconClass = "bg-emerald-500/10 text-emerald-500";
+    if (variant === "blue") iconClass = "bg-blue-500/10 text-blue-500";
+    if (variant === "purple") iconClass = "bg-purple-500/10 text-purple-500";
+    if (variant === "amber") iconClass = "bg-amber-500/10 text-amber-500";
 
     return (
-      <Card className="transition-shadow hover:shadow-md">
-        <CardContent className="pt-5">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-sm text-muted-foreground font-medium">{title}</p>
-            <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${title === "Gasto" || title === "CPA" ? "bg-destructive/10" : "bg-primary/10"
-              }`}>
-              <Icon className={`w-3.5 h-3.5 ${title === "Gasto" || title === "CPA" ? "text-destructive" : "text-primary"
-                }`} />
-            </div>
+      <Card className="border border-border shadow-none rounded-lg p-5 hover:border-primary/30 transition-colors">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[11px] uppercase tracking-wider font-medium text-muted-foreground">{title}</span>
+          <div className={`w-9 h-9 rounded-full flex items-center justify-center ${iconClass}`}>
+            <Icon className="w-4 h-4" />
           </div>
-          <p className="text-xl font-bold tracking-tight">
+        </div>
+        <div>
+          <div className="text-2xl font-bold tracking-tight text-foreground">
             {prefix}{typeof value === "number" ? (prefix === "R$" ? fmt(value).replace("R$", "").trim() : fmtNum(value)) : value}{suffix}
-          </p>
-          <div className="flex items-center gap-2 mt-1">
-            {prevTotals && (
-              <div className={`flex items-center text-xs ${isGood ? "text-success" : "text-destructive"}`}>
-                {isPositive ? <ArrowUp className="w-3 h-3 mr-0.5" /> : <ArrowDown className="w-3 h-3 mr-0.5" />}
-                <span>{Math.abs(variation).toFixed(1)}%</span>
-              </div>
-            )}
-            {subText && <p className="text-xs text-muted-foreground">{subText}</p>}
           </div>
-        </CardContent>
+          {prevTotals && (
+            <div className="flex items-center gap-1.5 mt-1">
+              {isPositive && <ArrowUpRight className="w-3.5 h-3.5 text-emerald-500" />}
+              {isNegative && <ArrowDownRight className="w-3.5 h-3.5 text-red-500" />}
+              <span className={`text-xs font-medium ${isPositive ? 'text-emerald-500' : isNegative ? 'text-red-500' : 'text-muted-foreground'}`}>
+                {Math.abs(variation).toFixed(1)}%
+              </span>
+              <span className="text-[10px] text-muted-foreground">vs anterior</span>
+            </div>
+          )}
+          {subText && !prevTotals && <p className="text-xs text-muted-foreground mt-1">{subText}</p>}
+        </div>
       </Card>
     );
   }
@@ -379,9 +387,9 @@ export default function AdsPage() {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-bold">Anuncios</h2>
-          <p className="text-muted-foreground text-sm mt-1">
-            Gestao de performance de midia paga.
+          <h2 className="text-xl font-semibold tracking-tight">Anúncios</h2>
+          <p className="text-muted-foreground text-sm mt-0.5">
+            Gestão de performance Mídia Paga.
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-3">
@@ -407,14 +415,14 @@ export default function AdsPage() {
 
       {/* KPI Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 xl:grid-cols-8 gap-4">
-        <KPICard title="Gasto" value={t.spend} prevValue={p.spend} icon={DollarSign} prefix="R$ " invertTrend />
-        <KPICard title="Impressoes" value={t.impressions} prevValue={p.impressions} icon={Eye} />
-        <KPICard title="Alcance" value={t.reach} prevValue={p.reach} icon={Users} />
-        <KPICard title="Cliques" value={t.clicks} prevValue={p.clicks} icon={MousePointer} subText={`CTR: ${ctr.toFixed(2)}%`} />
-        <KPICard title="Conversoes" value={t.conversions} prevValue={p.conversions} icon={TrendingUp} />
-        <KPICard title="ROAS" value={roas.toFixed(2)} prevValue={prevRoas} icon={BarChart2} suffix="x" />
-        <KPICard title="CPA" value={cpa} prevValue={prevCpa} icon={CreditCard} prefix="R$ " invertTrend />
-        <KPICard title="Ticket Medio" value={ticket} prevValue={prevTicket} icon={ShoppingCart} prefix="R$ " />
+        <KPICard title="Gasto" value={t.spend} prevValue={p.spend} icon={DollarSign} prefix="R$" variant="destructive" />
+        <KPICard title="Impressões" value={t.impressions} prevValue={p.impressions} icon={Eye} variant="blue" />
+        <KPICard title="Alcance" value={t.reach} prevValue={p.reach} icon={Users} variant="purple" />
+        <KPICard title="Cliques" value={t.clicks} prevValue={p.clicks} icon={MousePointer} variant="amber" />
+        <KPICard title="Conversões" value={t.conversions} prevValue={p.conversions} icon={TrendingUp} variant="success" />
+        <KPICard title="ROAS" value={roas.toFixed(2)} prevValue={prevRoas} icon={BarChart2} suffix="x" variant="default" />
+        <KPICard title="CPA" value={cpa} prevValue={prevCpa} icon={CreditCard} prefix="R$" variant="destructive" />
+        <KPICard title="Ticket Médio" value={ticket} prevValue={prevTicket} icon={ShoppingCart} prefix="R$" variant="success" />
       </div>
 
       {/* View Toggle */}
@@ -427,7 +435,7 @@ export default function AdsPage() {
           data-state={view === "overview" ? "active" : ""}
         >
           <BarChart2 className="w-4 h-4 mr-2" />
-          Visao Geral
+          Visão Geral
         </Button>
         <Button
           variant={view === "creatives" ? "default" : "ghost"}
@@ -447,24 +455,31 @@ export default function AdsPage() {
           {/* Section: Funnel & Chart */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Funnel - Left Side (or Top on mobile) */}
-            <div className="lg:col-span-4">
-              <FunnelChart
-                data={{
-                  impressions: t.impressions,
-                  clicks: t.clicks,
-                  addToCart: t.addToCart,
-                  initiateCheckout: t.initiateCheckout,
-                  purchases: t.conversions
-                }}
-                className="h-full"
-              />
+            <div className="lg:col-span-4 max-h-[400px]">
+              <Card className="h-full border border-border shadow-none rounded-lg">
+                <CardHeader className="border-b border-border/50 px-5 py-4">
+                  <CardTitle className="text-base font-semibold">Funil de Vendas</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <FunnelChart
+                    data={{
+                      impressions: t.impressions,
+                      clicks: t.clicks,
+                      addToCart: t.addToCart,
+                      initiateCheckout: t.initiateCheckout,
+                      purchases: t.conversions
+                    }}
+                    className="h-full"
+                  />
+                </CardContent>
+              </Card>
             </div>
 
             {/* Main Chart - Right Side */}
             <div className="lg:col-span-8">
-              <Card className="h-full flex flex-col">
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-base">Evolucao Temporal</CardTitle>
+              <Card className="h-full flex flex-col border border-border shadow-none rounded-lg">
+                <CardHeader className="flex flex-row items-center justify-between border-b border-border/50 px-5 py-4">
+                  <CardTitle className="text-base font-semibold">Evolução Temporal</CardTitle>
                   <Select value={chartMetric} onValueChange={(v: any) => setChartMetric(v)}>
                     <SelectTrigger className="w-[180px] h-8 text-xs">
                       <SelectValue />
@@ -477,14 +492,14 @@ export default function AdsPage() {
                     </SelectContent>
                   </Select>
                 </CardHeader>
-                <CardContent className="flex-1 min-h-[300px]">
+                <CardContent className="flex-1 min-h-[300px] p-5">
                   {dayData.length > 0 ? (
                     <ResponsiveContainer width="100%" height={300}>
                       <LineChart data={dayData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} opacity={0.5} />
                         <XAxis
                           dataKey="date"
-                          tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                          tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
                           tickLine={false}
                           axisLine={false}
                           tickFormatter={(v) => {
@@ -494,7 +509,7 @@ export default function AdsPage() {
                           minTickGap={30}
                         />
                         <YAxis
-                          tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                          tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
                           tickLine={false}
                           axisLine={false}
                           tickFormatter={(v) => {
@@ -521,7 +536,7 @@ export default function AdsPage() {
                         {chartMetric === "spend_revenue" && (
                           <>
                             <Line type="monotone" dataKey="spend" name="Gasto" stroke="var(--destructive)" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
-                            <Line type="monotone" dataKey="revenue" name="Receita" stroke="#aaff00" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                            <Line type="monotone" dataKey="revenue" name="Receita" stroke="var(--primary)" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
                           </>
                         )}
                         {chartMetric === "roas" && (
@@ -529,7 +544,7 @@ export default function AdsPage() {
                             type="monotone"
                             dataKey={(d) => d.spend > 0 ? d.revenue / d.spend : 0}
                             name="ROAS"
-                            stroke="#aaff00"
+                            stroke="var(--primary)"
                             strokeWidth={2}
                             dot={false}
                           />
@@ -539,7 +554,7 @@ export default function AdsPage() {
                             type="monotone"
                             dataKey={(d) => d.conversions > 0 ? d.spend / d.conversions : 0}
                             name="CPA"
-                            stroke="var(--primary)"
+                            stroke="var(--destructive)"
                             strokeWidth={2}
                             dot={false}
                           />
@@ -558,7 +573,7 @@ export default function AdsPage() {
                     </ResponsiveContainer>
                   ) : (
                     <div className="h-full flex items-center justify-center text-muted-foreground">
-                      Sem dados para o periodo.
+                      Sem dados para o período.
                     </div>
                   )}
                 </CardContent>
@@ -568,16 +583,16 @@ export default function AdsPage() {
 
           {/* Top Performers Section */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-base">Top 5 Anuncios (ROAS)</CardTitle>
+            <Card className="border border-border shadow-none rounded-lg">
+              <CardHeader className="flex flex-row items-center justify-between border-b border-border/50 px-5 py-4">
+                <CardTitle className="text-base font-semibold">Top 5 Anúncios (ROAS)</CardTitle>
                 <div className="flex items-center space-x-2">
                   <Label htmlFor="worst-mode" className="text-xs">Ver Piores</Label>
                   <Switch id="worst-mode" checked={showWorstPerformers} onCheckedChange={setShowWorstPerformers} />
                 </div>
               </CardHeader>
               <CardContent className="p-0">
-                <div className="space-y-0 divide-y">
+                <div className="space-y-0 divide-y divide-border/50">
                   {(showWorstPerformers ? topCreatives.worst : topCreatives.best).map((c, idx) => (
                     <div key={c.adId} className="flex items-center p-3 hover:bg-muted/30 transition-colors">
                       <span className="w-6 text-center text-muted-foreground text-sm font-medium mr-2">{idx + 1}</span>
@@ -595,7 +610,7 @@ export default function AdsPage() {
                         </div>
                       </div>
                       <div className="text-right whitespace-nowrap">
-                        <p className={`text-sm font-bold ${c.roas >= 3 ? "text-success" : c.roas < 1 ? "text-destructive" : "text-warning"}`}>
+                        <p className={`text-sm font-bold ${c.roas >= 3 ? "text-emerald-500" : c.roas < 1 ? "text-red-500" : "text-amber-500"}`}>
                           {c.roas.toFixed(2)}x
                         </p>
                         <p className="text-xs text-muted-foreground">ROAS</p>
@@ -604,37 +619,24 @@ export default function AdsPage() {
                   ))}
                   {(showWorstPerformers ? topCreatives.worst : topCreatives.best).length === 0 && (
                     <div className="p-6 text-center text-muted-foreground text-sm">
-                      Nenhum anuncio com gasto relevante encontrado.
+                      Nenhum anúncio com gasto relevante encontrado.
                     </div>
                   )}
                 </div>
               </CardContent>
             </Card>
-
-            {/* Secondary metric exploration - or simply empty for now, user asked for Top 5 section.
-                    Since we have space, let's keep it clean or maybe expand table width?
-                    The requirements asked for "Section D: Top Performers".
-                    Let's use the other half for a breakdown by Platform maybe? 
-                    Actually, let's just make the Main Table Full Width below.
-                    This grid cell can be used for "Top Products" later if we had that data.
-                    For now, let's just make the Top Performers take full width or be half width? 
-                    Let's stick to the request. We'll leave the chart and funnel above.
-                    Let's make this section just the Top 5 cards, maybe side-by-side: Best vs Worst?
-                    No, toggle was requested. 
-                    Let's keep it simple.
-                */}
           </div>
 
           {/* Detailed Table */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-base">Detalhamento Completo</CardTitle>
+          <Card className="border border-border shadow-none rounded-lg">
+            <CardHeader className="flex flex-row items-center justify-between border-b border-border/50 px-5 py-4">
+              <CardTitle className="text-base font-semibold">Detalhamento Completo</CardTitle>
             </CardHeader>
             <CardContent className="p-0 overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[300px]">Anuncio</TableHead>
+                  <TableRow className="hover:bg-transparent border-b border-border/50">
+                    <TableHead className="w-[300px]">Anúncio</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("spend", metricsSortKey, metricsSortDir, setMetricsSortKey, setMetricsSortDir)}>Gasto <ArrowUpDown className="inline w-3 h-3 ml-1" /></TableHead>
                     <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("impressions", metricsSortKey, metricsSortDir, setMetricsSortKey, setMetricsSortDir)}>Impr.</TableHead>
@@ -649,12 +651,12 @@ export default function AdsPage() {
                   {sortedMetrics
                     .slice((metricsPage - 1) * metricsPerPage, metricsPage * metricsPerPage)
                     .map((m: any) => (
-                      <TableRow key={m.id} className={m.roas >= 3 ? "bg-success/5 hover:bg-success/10" : ""}>
+                      <TableRow key={m.id} className={`hover:bg-muted/30 border-b border-border/50 ${m.roas >= 3 ? "bg-emerald-500/5 hover:bg-emerald-500/10" : ""}`}>
                         <TableCell>
                           <div className="flex items-center gap-3">
                             {m.thumbnailUrl && <Image src={m.thumbnailUrl} alt="" width={32} height={32} className="rounded object-cover" unoptimized />}
                             <div className="min-w-0 max-w-[250px]">
-                              <p className="text-sm font-medium truncate" title={m.adName || ""}>{m.adName || "Anuncio"}</p>
+                              <p className="text-sm font-medium truncate" title={m.adName || ""}>{m.adName || "Anúncio"}</p>
                               <p className="text-xs text-muted-foreground truncate">{m.campaignName}</p>
                             </div>
                           </div>
@@ -674,9 +676,9 @@ export default function AdsPage() {
 
               {/* Pagination */}
               {sortedMetrics.length > metricsPerPage && (
-                <div className="flex items-center justify-between px-4 py-4 border-t">
+                <div className="flex items-center justify-between px-4 py-4 border-t border-border/50">
                   <p className="text-xs text-muted-foreground">
-                    Pagina {metricsPage} de {Math.ceil(sortedMetrics.length / metricsPerPage)}
+                    Página {metricsPage} de {Math.ceil(sortedMetrics.length / metricsPerPage)}
                   </p>
                   <div className="flex gap-2">
                     <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setMetricsPage(p => Math.max(1, p - 1))} disabled={metricsPage === 1}><ChevronLeft className="w-4 h-4" /></Button>
@@ -719,7 +721,7 @@ export default function AdsPage() {
                     <SelectItem value="roas">Maior ROAS</SelectItem>
                     <SelectItem value="revenue">Maior Receita</SelectItem>
                     <SelectItem value="ctr">Maior CTR</SelectItem>
-                    <SelectItem value="conversions">Mais Conversoes</SelectItem>
+                    <SelectItem value="conversions">Mais Conversões</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -733,7 +735,7 @@ export default function AdsPage() {
               .map((c) => (
                 <Card
                   key={c.adId}
-                  className={`group overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-xl hover:scale-[1.02] border-l-4 ${c.roas >= 3 ? "border-l-[#aaff00]" : c.roas >= 1 ? "border-l-yellow-500" : "border-l-red-500"
+                  className={`group overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-xl hover:scale-[1.02] border border-border shadow-none rounded-lg border-l-4 ${c.roas >= 3 ? "border-l-emerald-500" : c.roas >= 1 ? "border-l-amber-500" : "border-l-red-500"
                     }`}
                   onClick={() => {
                     setSelectedCreative(c);
@@ -762,19 +764,19 @@ export default function AdsPage() {
 
                   <CardContent className="p-4 space-y-3">
                     <div className="min-w-0">
-                      <p className="font-semibold text-sm truncate" title={c.adName || ""}>{c.adName || "Sem Titulo"}</p>
+                      <p className="font-semibold text-sm truncate" title={c.adName || ""}>{c.adName || "Sem Título"}</p>
                       <p className="text-xs text-muted-foreground truncate">{c.campaignName}</p>
                     </div>
 
                     {/* Primary Metrics */}
-                    <div className="flex items-end justify-between border-b pb-2 mb-2">
+                    <div className="flex items-end justify-between border-b border-border/50 pb-2 mb-2">
                       <div>
                         <p className="text-[10px] text-muted-foreground uppercase">Gasto</p>
                         <p className="font-semibold">{fmt(c.spend)}</p>
                       </div>
                       <div className="text-right">
                         <p className="text-[10px] text-muted-foreground uppercase">ROAS</p>
-                        <p className={`font-bold text-lg ${c.roas >= 3 ? "text-[#aaff00]" : c.roas > 1 ? "text-yellow-500" : "text-red-500"}`}>
+                        <p className={`font-bold text-lg ${c.roas >= 3 ? "text-emerald-500" : c.roas > 1 ? "text-amber-500" : "text-red-500"}`}>
                           {c.roas.toFixed(2)}x
                         </p>
                       </div>
@@ -795,7 +797,7 @@ export default function AdsPage() {
                         <p className="font-medium">{c.ctr.toFixed(2)}%</p>
                       </div>
 
-                      <div className="col-span-3 pt-1 flex justify-between border-t mt-1">
+                      <div className="col-span-3 pt-1 flex justify-between border-t border-border/50 mt-1">
                         <span className="text-muted-foreground">Receita: <span className="text-foreground">{fmt(c.revenue)}</span></span>
                         <span className="text-muted-foreground">Conv: <span className="text-foreground">{c.conversions}</span></span>
                       </div>
@@ -805,34 +807,32 @@ export default function AdsPage() {
               ))}
           </div>
 
-          {/* Pagination */}
+          {/* Pagination for Creatives Grid */}
           {sortedCreatives.length > creativesPerPage && (
-            <div className="flex justify-center mt-6 gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setCreativesPage(p => Math.max(1, p - 1))}
-                disabled={creativesPage === 1}
-              >
-                Anterior
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => setCreativesPage(p => Math.min(Math.ceil(sortedCreatives.length / creativesPerPage), p + 1))}
-                disabled={creativesPage >= Math.ceil(sortedCreatives.length / creativesPerPage)}
-              >
-                Proxima
-              </Button>
+            <div className="flex items-center justify-between px-0 py-4">
+              <p className="text-xs text-muted-foreground">
+                Página {creativesPage} de {Math.ceil(sortedCreatives.length / creativesPerPage)}
+              </p>
+              <div className="flex gap-2">
+                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCreativesPage(p => Math.max(1, p - 1))} disabled={creativesPage === 1}><ChevronLeft className="w-4 h-4" /></Button>
+                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCreativesPage(p => Math.min(Math.ceil(sortedCreatives.length / creativesPerPage), p + 1))} disabled={creativesPage >= Math.ceil(sortedCreatives.length / creativesPerPage)}><ChevronRight className="w-4 h-4" /></Button>
+              </div>
             </div>
           )}
         </div>
       )}
 
-      {/* Video/Creative Details Modal */}
-      <VideoModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        creative={selectedCreative}
-      />
+      {/* Modals */}
+      {isModalOpen && selectedCreative && (
+        <VideoModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          videoUrl={selectedCreative.videoUrl}
+          thumbnailUrl={selectedCreative.thumbnailUrl}
+          adName={selectedCreative.adName}
+          platform={selectedCreative.platform}
+        />
+      )}
     </div>
   );
 }

@@ -13,6 +13,8 @@ import {
   BarChart3,
   Settings,
   Shield,
+  FileText,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -23,26 +25,60 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { useSession } from "next-auth/react";
 
-type NavItem = { name: string; href: string; icon: LucideIcon };
-
-const mainNav: NavItem[] = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Pedidos", href: "/orders", icon: ShoppingBag },
-  { name: "Vendas", href: "/sales", icon: TrendingUp },
-  { name: "Anuncios", href: "/ads", icon: Megaphone },
-  { name: "Relatorios", href: "/reports", icon: BarChart3 },
-];
-
-const settingsNav: NavItem[] = [
-  { name: "Integracoes", href: "/integrations", icon: Link2 },
-  { name: "Configuracoes", href: "/settings", icon: Settings },
-  { name: "Admin", href: "/admin", icon: Shield },
-];
+type NavItem = {
+  name: string;
+  href: string;
+  icon: LucideIcon;
+  adminOnly?: boolean;
+  internalOnly?: boolean;
+};
 
 export function MobileSidebar() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const { data: session } = useSession();
+
+  const userRole = session?.user?.role;
+  const isInternal = userRole === "OWNER" || userRole === "ADMIN" || userRole === "MEMBER";
+  const isAdmin = userRole === "OWNER" || userRole === "ADMIN";
+
+  // Same structure as Sidebar
+  const aiNavItems = [
+    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  ];
+
+  const platformNavItems = [
+    { name: "Pedidos", href: "/orders", icon: ShoppingBag },
+    { name: "Vendas", href: "/sales", icon: TrendingUp },
+    { name: "Mais Vendidos", href: "/best-sellers", icon: ShoppingBag },
+    { name: "Anuncios", href: "/ads", icon: Megaphone },
+    { name: "Financeiro", href: "/financeiro", icon: Wallet },
+    { name: "Analytics", href: "/analytics", icon: BarChart3 },
+  ];
+
+  if (session?.user?.email?.toLowerCase() === "academy.cdr@gmail.com") {
+    platformNavItems.push({ name: "Relatórios", href: "/reports", icon: FileText } as any);
+  }
+
+  const managementNavItems = [
+    { name: "Integrações", href: "/integrations", icon: Link2, internalOnly: true },
+    { name: "Configurações", href: "/settings", icon: Settings },
+  ];
+
+  const filterNav = (items: any[]) => {
+    return items.filter(item => {
+      if (item.adminOnly) return isAdmin;
+      if (item.internalOnly) return isInternal;
+      return true;
+    });
+  };
+
+  const filteredAiNav = filterNav(aiNavItems);
+  const filteredPlatformNav = filterNav(platformNavItems);
+  const filteredManagementNav = filterNav(managementNavItems);
+
 
   function NavLink({ item }: { item: NavItem }) {
     const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
@@ -51,14 +87,13 @@ export function MobileSidebar() {
       <Link
         href={item.href}
         onClick={() => setOpen(false)}
-        className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all relative ${
-          isActive
-            ? "bg-primary/10 text-primary"
+        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-all relative ${isActive
+            ? "bg-primary/8 text-primary"
             : "text-sidebar-text/70 hover:text-sidebar-text hover:bg-sidebar-hover"
-        }`}
+          }`}
       >
         {isActive && (
-          <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-primary rounded-r-full" />
+          <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 bg-primary rounded-r-full" />
         )}
         <Icon className="w-[18px] h-[18px] shrink-0" />
         {item.name}
@@ -73,10 +108,10 @@ export function MobileSidebar() {
           <Menu className="w-5 h-5" />
         </Button>
       </SheetTrigger>
-      <SheetContent side="left" className="w-60 p-0 bg-sidebar-bg text-sidebar-text">
+      <SheetContent side="left" className="w-64 p-0 bg-sidebar-bg text-sidebar-text overflow-y-auto">
         <SheetHeader className="px-5 py-5 border-b border-white/5">
           <SheetTitle className="flex items-center gap-3 text-sidebar-text">
-            <div className="w-9 h-9 bg-primary rounded-xl flex items-center justify-center text-primary-foreground font-bold text-[10px] tracking-wider">
+            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-primary-foreground font-bold text-[10px] tracking-wider">
               CDR
             </div>
             <div>
@@ -85,20 +120,30 @@ export function MobileSidebar() {
             </div>
           </SheetTitle>
         </SheetHeader>
-        <nav className="px-3 pt-4 pb-4 space-y-5">
+        <nav className="px-3 pt-4 pb-4 space-y-6">
           <div className="space-y-1">
             <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-sidebar-text/30">
-              Painel
+              CDR AI
             </p>
-            {mainNav.map((item) => (
+            {filteredAiNav.map((item) => (
               <NavLink key={item.href} item={item} />
             ))}
           </div>
+
           <div className="space-y-1">
             <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-sidebar-text/30">
-              Gestao
+              Plataforma
             </p>
-            {settingsNav.map((item) => (
+            {filteredPlatformNav.map((item) => (
+              <NavLink key={item.href} item={item} />
+            ))}
+          </div>
+
+          <div className="space-y-1">
+            <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-sidebar-text/30">
+              Gestão
+            </p>
+            {filteredManagementNav.map((item) => (
               <NavLink key={item.href} item={item} />
             ))}
           </div>

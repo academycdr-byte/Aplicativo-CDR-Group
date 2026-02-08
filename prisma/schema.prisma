@@ -118,8 +118,43 @@ model Organization {
   storeFunnels    StoreFunnel[]
   reportClients   ReportClient[]
   whatsAppSession WhatsAppSession?
+  
+  // Financials
+  productCosts    ProductCost[]
+  financialConfig FinancialConfig?
 
   @@map("organizations")
+}
+
+model ProductCost {
+  id             String       @id @default(cuid())
+  organizationId String
+  sku            String
+  name           String?
+  costPrice      Decimal      @db.Decimal(10, 2)
+  imageUrl       String?
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, sku])
+  @@map("product_costs")
+}
+
+model FinancialConfig {
+  id                  String       @id @default(cuid())
+  organizationId      String       @unique
+  
+  defaultTaxRate      Decimal      @db.Decimal(5, 2) @default(0)
+  fixedTransactionFee Decimal      @db.Decimal(10, 2) @default(0)
+
+  updatedAt           DateTime     @updatedAt
+
+  organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  @@map("financial_configs")
 }
 
 model Membership {

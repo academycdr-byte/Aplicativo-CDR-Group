@@ -4,33 +4,29 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   DollarSign,
   ShoppingBag,
   TrendingUp,
   ArrowUpRight,
   ArrowDownRight,
-  ArrowDown,
   CheckCircle,
   Repeat,
   Users,
-  ShoppingCart,
-  Package,
-  Eye,
-  MousePointerClick,
+  BarChart,
   type LucideIcon,
 } from "lucide-react";
 import {
   ResponsiveContainer,
   ComposedChart,
-  BarChart,
+  BarChart as RechartsBarChart,
   Bar,
   Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
 } from "recharts";
 import { toast } from "sonner";
 import {
@@ -44,6 +40,8 @@ import {
 } from "@/actions/dashboard";
 import { syncAll } from "@/actions/sync";
 import { PeriodSelector, periodToParams, type PeriodValue } from "@/components/period-selector";
+import { EstimatedProfitCalendar } from "@/components/estimated-profit-calendar";
+import { FunnelVisual } from "@/components/funnel-visual";
 
 type DashboardStats = {
   totalOrders: number;
@@ -103,30 +101,13 @@ type RecentOrder = {
   orderDate: Date;
 };
 
-const platformLabels: Record<string, string> = {
-  SHOPIFY: "Shopify",
-  CARTPANDA: "Cartpanda",
-  YAMPI: "Yampi",
-  NUVEMSHOP: "Nuvemshop",
-};
-
-const statusLabels: Record<string, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
-  paid: { label: "Pago", variant: "default" },
-  pending: { label: "Pendente", variant: "secondary" },
-  cancelled: { label: "Cancelado", variant: "destructive" },
-  refunded: { label: "Reembolsado", variant: "outline" },
-  shipped: { label: "Enviado", variant: "default" },
-  delivered: { label: "Entregue", variant: "default" },
-};
-
-// Toggle pill options for the metrics chart
 const metricToggles = [
   { key: "faturamento", label: "Faturamento", color: "var(--primary)", type: "bar" },
   { key: "investimento", label: "Investimento", color: "var(--destructive)", type: "bar" },
-  { key: "compras", label: "Compras", color: "var(--chart-2)", type: "bar" },
-  { key: "ticketMedio", label: "Ticket Medio", color: "var(--chart-4)", type: "line" },
-  { key: "cpa", label: "CPA", color: "var(--chart-5)", type: "line" },
-  { key: "roas", label: "ROAS", color: "var(--warning)", type: "line" },
+  { key: "compras", label: "Compras", color: "#3b82f6", type: "bar" },
+  { key: "ticketMedio", label: "Ticket Médio", color: "#8b5cf6", type: "line" },
+  { key: "cpa", label: "CPA", color: "#f59e0b", type: "line" },
+  { key: "roas", label: "ROAS", color: "#10b981", type: "line" },
 ] as const;
 
 export default function DashboardPage() {
@@ -204,67 +185,60 @@ export default function DashboardPage() {
     return new Intl.NumberFormat("pt-BR").format(v);
   }
 
-  function formatDate(date: Date) {
-    return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit" }).format(new Date(date));
-  }
+  const calcProfit = (s: DashboardStats | null) => {
+    if (!s) return 0;
+    return s.revenue - s.adSpend;
+  };
+
+  const getMonthLabel = () => {
+    const date = new Date();
+    return date.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  };
 
   if (loading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 pt-2">
+        {/* Skeleton Header */}
         <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight">Visao Geral</h2>
-            <p className="text-muted-foreground text-sm mt-1">Carregando dados...</p>
+          <div className="space-y-2">
+            <div className="h-6 w-32 bg-muted rounded animate-pulse" />
+            <div className="h-4 w-48 bg-muted rounded animate-pulse" />
           </div>
+          <div className="h-9 w-64 bg-muted rounded animate-pulse" />
         </div>
+
+        {/* Skeleton KPIs */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
-            <Card key={i}>
-              <CardContent className="pt-5 pb-5">
-                <div className="animate-pulse space-y-3">
-                  <div className="flex justify-between">
-                    <div className="h-4 w-24 bg-muted rounded" />
-                    <div className="w-10 h-10 bg-muted rounded-xl" />
-                  </div>
-                  <div className="h-8 w-32 bg-muted rounded" />
-                  <div className="h-3 w-36 bg-muted rounded" />
+            <Card key={i} className="border border-border shadow-none rounded-lg p-5">
+              <div className="animate-pulse space-y-3">
+                <div className="flex justify-between">
+                  <div className="h-3 w-24 bg-muted rounded" />
+                  <div className="w-8 h-8 bg-muted rounded-full" />
                 </div>
-              </CardContent>
+                <div className="h-7 w-32 bg-muted rounded" />
+                <div className="h-3 w-20 bg-muted rounded" />
+              </div>
             </Card>
           ))}
         </div>
-        <Card><CardContent className="pt-6"><div className="animate-pulse h-72 bg-muted rounded" /></CardContent></Card>
+
+        {/* Skeleton Charts */}
+        <Card className="border border-border shadow-none rounded-lg h-96 p-6">
+          <div className="animate-pulse w-full h-full bg-muted/20" />
+        </Card>
       </div>
     );
   }
-
-  // Funnel steps
-  const funnelSteps = funnel ? [
-    { label: "Sessoes", value: funnel.sessoes, icon: Eye, color: "from-violet-500/20 to-violet-500/5 border-violet-500" },
-    { label: "Adicoes ao Carrinho", value: funnel.adicoesCarrinho, icon: ShoppingCart, color: "from-blue-500/20 to-blue-500/5 border-blue-500" },
-    { label: "Checkouts Iniciados", value: funnel.checkoutsIniciados, icon: MousePointerClick, color: "from-amber-500/20 to-amber-500/5 border-amber-500" },
-    { label: "Pedidos Gerados", value: funnel.pedidosGerados, icon: Package, color: "from-emerald-500/20 to-emerald-500/5 border-emerald-500" },
-  ] : [];
-
-  // Key funnel rates
-  const taxaConversaoSessao = funnel && funnel.sessoes > 0
-    ? ((funnel.pedidosGerados / funnel.sessoes) * 100)
-    : 0;
-  const taxaAdicaoCarrinho = funnel && funnel.sessoes > 0
-    ? ((funnel.adicoesCarrinho / funnel.sessoes) * 100)
-    : 0;
-  const taxaConversaoCheckout = funnel && funnel.checkoutsIniciados > 0
-    ? ((funnel.pedidosGerados / funnel.checkoutsIniciados) * 100)
-    : 0;
 
   return (
     <div className="space-y-6">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Visao Geral</h2>
-          <p className="text-muted-foreground text-sm mt-1">
-            Acompanhe o desempenho das suas plataformas.
+          <h2 className="text-xl font-semibold tracking-tight">Visão Geral</h2>
+          <p className="text-muted-foreground text-sm mt-0.5">
+            Acompanhe o desempenho das suas campanhas.
           </p>
         </div>
         <PeriodSelector
@@ -277,294 +251,115 @@ export default function DashboardPage() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPICard icon={ShoppingBag} title="Faturamento" value={fmt(stats?.revenue || 0)} change={stats?.revenueChange || "0%"} iconColor="bg-primary/10 text-primary" />
-        <KPICard icon={DollarSign} title="Investimento" value={fmt(stats?.adSpend || 0)} change={stats?.adSpendChange || "0%"} iconColor="bg-destructive/10 text-destructive" />
-        <KPICard icon={ShoppingBag} title="Pedidos" value={String(stats?.totalOrders || 0)} change={stats?.ordersChange || "0%"} iconColor="bg-success/10 text-success" />
-        <KPICard icon={TrendingUp} title="ROAS" value={`${(stats?.roas || 0).toFixed(2)}x`} change="" iconColor="bg-chart-4/10 text-chart-4" />
+        <KPICard
+          label="FATURAMENTO"
+          value={fmt(stats?.revenue || 0)}
+          change={stats?.revenueChange || "0%"}
+          icon={TrendingUp}
+          iconColor="text-emerald-500 bg-emerald-500/10"
+        />
+        <KPICard
+          label="INVESTIMENTO"
+          value={fmt(stats?.adSpend || 0)}
+          change={stats?.adSpendChange || "0%"}
+          icon={DollarSign}
+          iconColor="text-red-500 bg-red-500/10"
+        />
+        <KPICard
+          label="PEDIDOS"
+          value={String(stats?.totalOrders || 0)}
+          change={stats?.ordersChange || "0%"}
+          icon={ShoppingBag}
+          iconColor="text-blue-500 bg-blue-500/10"
+        />
+        <KPICard
+          label="ROAS"
+          value={`${(stats?.roas || 0).toFixed(2)}x`}
+          change=""
+          icon={BarChart}
+          iconColor="text-amber-500 bg-amber-500/10"
+        />
       </div>
 
-      {/* Analise de Metricas — multi-metric chart */}
-      <Card>
-        <CardHeader className="flex-row items-center justify-between space-y-0 pb-4">
-          <CardTitle className="text-base font-semibold">Analise de Metricas</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {/* Metric toggle pills */}
-          <div className="flex flex-wrap gap-2 mb-4">
-            {metricToggles.map((m) => (
-              <button
-                key={m.key}
-                onClick={() => toggleMetric(m.key)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
-                  activeMetrics.has(m.key)
-                    ? "border-current opacity-100"
-                    : "border-border opacity-40 hover:opacity-70"
-                }`}
-                style={{ color: m.color }}
-              >
-                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: m.color }} />
-                {m.label}
-              </button>
-            ))}
+      {/* Main Chart + Calendar Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Performance Chart - Takes 2/3 */}
+        <Card className="lg:col-span-2 border border-border shadow-none rounded-lg flex flex-col">
+          <div className="border-b border-border/50 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <h3 className="text-base font-semibold">Performance in Period</h3>
+              <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground">
+                <BarChart className="w-4 h-4" />
+              </Button>
+            </div>
+
+            {/* Filters/Toggles */}
+            <div className="flex flex-wrap gap-2">
+              {metricToggles.map((m) => (
+                <button
+                  key={m.key}
+                  onClick={() => toggleMetric(m.key)}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-[10px] uppercase tracking-wider font-semibold border transition-all ${activeMetrics.has(m.key)
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-transparent text-muted-foreground border-border hover:border-primary/50"
+                    }`}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
           </div>
-          {metricsData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={360}>
-              <ComposedChart data={metricsData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                <XAxis
-                  dataKey="date"
-                  tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
-                  tickLine={false}
-                  axisLine={{ stroke: "var(--border)" }}
-                  tickFormatter={(v) => {
-                    const d = new Date(v + "T00:00:00");
-                    return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
-                  }}
-                />
-                <YAxis
-                  yAxisId="left"
-                  tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(v) => fmtShort(v)}
-                  width={65}
-                />
-                <YAxis
-                  yAxisId="right"
-                  orientation="right"
-                  tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
-                  tickLine={false}
-                  axisLine={false}
-                  width={50}
-                />
-                <Tooltip
-                  content={({ active, payload, label }) => {
-                    if (!active || !payload?.length) return null;
-                    const d = new Date(label + "T00:00:00");
-                    return (
-                      <div className="bg-card border border-border rounded-lg shadow-lg p-3 text-sm">
-                        <p className="font-medium mb-2">{d.toLocaleDateString("pt-BR")}</p>
-                        {payload.map((p) => (
-                          <div key={p.dataKey} className="flex items-center justify-between gap-4 py-0.5">
-                            <span className="flex items-center gap-1.5 text-muted-foreground">
-                              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: String(p.color) }} />
-                              {metricToggles.find((m) => m.key === p.dataKey)?.label}:
-                            </span>
-                            <span className="font-semibold">
-                              {p.dataKey === "roas" ? `${Number(p.value).toFixed(2)}x`
-                                : p.dataKey === "compras" ? fmtNum(Number(p.value))
-                                : fmt(Number(p.value))}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    );
-                  }}
-                />
-                {activeMetrics.has("faturamento") && <Bar yAxisId="left" dataKey="faturamento" fill="var(--primary)" radius={[4, 4, 0, 0]} barSize={20} />}
-                {activeMetrics.has("investimento") && <Bar yAxisId="left" dataKey="investimento" fill="var(--destructive)" radius={[4, 4, 0, 0]} barSize={20} />}
-                {activeMetrics.has("compras") && <Bar yAxisId="left" dataKey="compras" fill="var(--chart-2)" radius={[4, 4, 0, 0]} barSize={20} />}
-                {activeMetrics.has("ticketMedio") && <Line yAxisId="right" type="monotone" dataKey="ticketMedio" stroke="var(--chart-4)" strokeWidth={2} dot={false} />}
-                {activeMetrics.has("cpa") && <Line yAxisId="right" type="monotone" dataKey="cpa" stroke="var(--chart-5)" strokeWidth={2} dot={false} />}
-                {activeMetrics.has("roas") && <Line yAxisId="right" type="monotone" dataKey="roas" stroke="var(--warning)" strokeWidth={2} dot={false} />}
-              </ComposedChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="h-80 flex items-center justify-center text-muted-foreground text-sm">
-              Conecte uma plataforma para ver os dados
-            </div>
-          )}
-        </CardContent>
-      </Card>
 
-      {/* Funnel + Rates row */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        {/* Funil de Conversao E-commerce */}
-        <Card className="xl:col-span-2">
-          <CardHeader className="space-y-0 pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base font-semibold">Funil E-commerce</CardTitle>
-            </div>
-            {/* Rate badges */}
-            {funnel && (
-              <div className="flex flex-wrap gap-2 pt-3">
-                <div className="flex items-center gap-2 rounded-lg border border-violet-500/30 bg-violet-500/5 px-3 py-2">
-                  <div className="w-2 h-2 rounded-full bg-violet-500" />
-                  <div>
-                    <p className="text-[10px] text-muted-foreground leading-tight">Conversao / Sessao</p>
-                    <p className="text-sm font-bold text-violet-600 dark:text-violet-400">{taxaConversaoSessao.toFixed(2)}%</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 rounded-lg border border-blue-500/30 bg-blue-500/5 px-3 py-2">
-                  <div className="w-2 h-2 rounded-full bg-blue-500" />
-                  <div>
-                    <p className="text-[10px] text-muted-foreground leading-tight">Adicao ao Carrinho</p>
-                    <p className="text-sm font-bold text-blue-600 dark:text-blue-400">{taxaAdicaoCarrinho.toFixed(2)}%</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2">
-                  <div className="w-2 h-2 rounded-full bg-amber-500" />
-                  <div>
-                    <p className="text-[10px] text-muted-foreground leading-tight">Conversao Checkout</p>
-                    <p className="text-sm font-bold text-amber-600 dark:text-amber-400">{taxaConversaoCheckout.toFixed(2)}%</p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </CardHeader>
-          <CardContent>
-            {funnel ? (
-              <div className="space-y-0 pt-2">
-                {funnelSteps.map((step, i) => {
-                  const pctOfTotal = funnelSteps[0].value > 0
-                    ? ((step.value / funnelSteps[0].value) * 100)
-                    : 0;
-                  const barWidth = Math.max(40, 100 - i * 15);
-                  const prevValue = i > 0 ? funnelSteps[i - 1].value : 0;
-                  const dropPct = prevValue > 0 ? (((prevValue - step.value) / prevValue) * 100).toFixed(1) : null;
-                  const convPct = i > 0 && funnelSteps[i - 1].value > 0
-                    ? ((step.value / funnelSteps[i - 1].value) * 100).toFixed(1)
-                    : null;
-                  const Icon = step.icon;
-
-                  return (
-                    <div key={step.label}>
-                      {/* Drop indicator between steps */}
-                      {i > 0 && (
-                        <div className="flex items-center justify-center py-1">
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <ArrowDown className="w-3 h-3" />
-                            <span>{dropPct ? `${dropPct}% perda` : "—"}</span>
-                          </div>
-                        </div>
-                      )}
-                      {/* Funnel bar */}
-                      <div
-                        className={`relative rounded-xl border-l-4 bg-gradient-to-r px-4 py-3.5 transition-all ${step.color}`}
-                        style={{ width: `${barWidth}%`, marginLeft: `${(100 - barWidth) / 2}%` }}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2.5">
-                            <Icon className="w-4 h-4 opacity-70" />
-                            <div>
-                              <p className="text-sm font-semibold">{step.label}</p>
-                              <p className="text-[11px] text-muted-foreground">
-                                {i === 0 ? "100% do total" : `${pctOfTotal.toFixed(1)}% do total`}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-xl font-bold">{fmtNum(step.value)}</p>
-                            {convPct && <p className="text-[11px] text-primary font-medium">{convPct}% conversao</p>}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">
-                Sem dados para o funil
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Paid % + Repurchase % + Unique Customers */}
-        <div className="space-y-4">
-          <Card>
-            <CardContent className="pt-5 pb-5">
-              <div className="flex items-start justify-between mb-3">
-                <p className="text-sm text-muted-foreground font-medium">Pedidos Pagos</p>
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-primary/10 text-primary">
-                  <CheckCircle className="w-5 h-5" />
-                </div>
-              </div>
-              <p className="text-3xl font-bold tracking-tight">{(rates?.paidRate || 0).toFixed(1)}%</p>
-              <div className="mt-2 w-full bg-muted rounded-full h-2.5">
-                <div className="bg-primary h-2.5 rounded-full transition-all" style={{ width: `${Math.min(rates?.paidRate || 0, 100)}%` }} />
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                {rates?.paidOrders || 0} pagos de {rates?.totalOrders || 0} gerados
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-5 pb-5">
-              <div className="flex items-start justify-between mb-3">
-                <p className="text-sm text-muted-foreground font-medium">Taxa de Recompra</p>
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-chart-2/10 text-chart-2">
-                  <Repeat className="w-5 h-5" />
-                </div>
-              </div>
-              <p className="text-3xl font-bold tracking-tight">{(rates?.repurchaseRate || 0).toFixed(1)}%</p>
-              <div className="mt-2 w-full bg-muted rounded-full h-2.5">
-                <div className="bg-chart-2 h-2.5 rounded-full transition-all" style={{ width: `${Math.min(rates?.repurchaseRate || 0, 100)}%` }} />
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                {rates?.repeatCustomers || 0} recompraram de {rates?.uniqueCustomers || 0} clientes
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-5 pb-5">
-              <div className="flex items-start justify-between mb-3">
-                <p className="text-sm text-muted-foreground font-medium">Clientes Unicos</p>
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-chart-4/10 text-chart-4">
-                  <Users className="w-5 h-5" />
-                </div>
-              </div>
-              <p className="text-3xl font-bold tracking-tight">{fmtNum(rates?.uniqueCustomers || 0)}</p>
-              <p className="text-xs text-muted-foreground mt-2">no periodo selecionado</p>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* Customer Trends + Platform breakdown */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        {/* Tendencias de Clientes */}
-        <Card>
-          <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-base font-semibold">Tendencias de Clientes</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {customerTrends.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <ComposedChart data={customerTrends}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+          <CardContent className="p-5 flex-1 min-h-[350px]">
+            {metricsData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={340}>
+                <ComposedChart data={metricsData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} opacity={0.4} />
                   <XAxis
-                    dataKey="month"
-                    tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                    dataKey="date"
+                    tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
                     tickLine={false}
-                    axisLine={{ stroke: "var(--border)" }}
+                    axisLine={false}
+                    tickMargin={10}
                     tickFormatter={(v) => {
-                      const [y, m] = v.split("-");
-                      const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-                      return months[parseInt(m) - 1] || v;
+                      const d = new Date(v + "T00:00:00");
+                      return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
                     }}
                   />
-                  <YAxis yAxisId="left" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} tickLine={false} axisLine={false} />
-                  <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} tickLine={false} axisLine={false} tickFormatter={(v) => `${v.toFixed(0)}%`} />
+                  <YAxis
+                    yAxisId="left"
+                    tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(v) => fmtShort(v)}
+                    width={45}
+                  />
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                    tickLine={false}
+                    axisLine={false}
+                    width={40}
+                  />
                   <Tooltip
+                    cursor={{ stroke: "var(--primary)", strokeWidth: 1, strokeDasharray: "4 4" }}
                     content={({ active, payload, label }) => {
                       if (!active || !payload?.length) return null;
-                      const [y, m] = (label as string).split("-");
-                      const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+                      const d = new Date(label + "T00:00:00");
                       return (
-                        <div className="bg-card border border-border rounded-lg shadow-lg p-3 text-sm">
-                          <p className="font-medium mb-2">{months[parseInt(m) - 1]} {y}</p>
+                        <div className="bg-card border border-border rounded-lg shadow-xl p-3 text-xs min-w-[180px]">
+                          <p className="font-semibold mb-2 pb-2 border-b border-border">{d.toLocaleDateString("pt-BR")}</p>
                           {payload.map((p) => (
-                            <div key={p.dataKey} className="flex items-center justify-between gap-4 py-0.5">
-                              <span className="flex items-center gap-1.5 text-muted-foreground">
-                                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: String(p.color) }} />
-                                {p.dataKey === "novos" ? "Novos Clientes" : p.dataKey === "recorrentes" ? "Clientes Recorrentes" : "Taxa de Recorrencia"}:
-                              </span>
-                              <span className="font-semibold">
-                                {p.dataKey === "taxaRecorrencia" ? `${Number(p.value).toFixed(1)}%` : fmtNum(Number(p.value))}
+                            <div key={p.dataKey} className="flex items-center justify-between gap-4 py-1">
+                              <div className="flex items-center gap-1.5 text-muted-foreground">
+                                <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: String(p.color) }} />
+                                <span>{metricToggles.find((m) => m.key === p.dataKey)?.label}</span>
+                              </div>
+                              <span className="font-medium">
+                                {p.dataKey === "roas" ? `${Number(p.value).toFixed(2)}x`
+                                  : p.dataKey === "compras" ? fmtNum(Number(p.value))
+                                    : fmt(Number(p.value))}
                               </span>
                             </div>
                           ))}
@@ -572,113 +367,203 @@ export default function DashboardPage() {
                       );
                     }}
                   />
-                  <Bar yAxisId="left" dataKey="novos" fill="var(--chart-2)" stackId="customers" radius={[0, 0, 0, 0]} barSize={28} name="Novos" />
-                  <Bar yAxisId="left" dataKey="recorrentes" fill="var(--primary)" stackId="customers" radius={[4, 4, 0, 0]} barSize={28} name="Recorrentes" />
-                  <Line yAxisId="right" type="monotone" dataKey="taxaRecorrencia" stroke="var(--chart-5)" strokeWidth={2} dot={{ r: 3, fill: "var(--chart-5)" }} name="Taxa %" />
+                  {activeMetrics.has("faturamento") && <Bar yAxisId="left" dataKey="faturamento" fill="var(--primary)" radius={[4, 4, 0, 0]} barSize={32} fillOpacity={0.9} />}
+                  {activeMetrics.has("investimento") && <Bar yAxisId="left" dataKey="investimento" fill="var(--destructive)" radius={[4, 4, 0, 0]} barSize={32} fillOpacity={0.9} />}
+                  {activeMetrics.has("compras") && <Bar yAxisId="left" dataKey="compras" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={32} fillOpacity={0.9} />}
+
+                  {activeMetrics.has("ticketMedio") && <Line yAxisId="right" type="monotone" dataKey="ticketMedio" stroke="#8b5cf6" strokeWidth={2} dot={false} />}
+                  {activeMetrics.has("cpa") && <Line yAxisId="right" type="monotone" dataKey="cpa" stroke="#f59e0b" strokeWidth={2} dot={false} />}
+                  {activeMetrics.has("roas") && <Line yAxisId="right" type="monotone" dataKey="roas" stroke="#10b981" strokeWidth={2} dot={false} />}
                 </ComposedChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-72 flex items-center justify-center text-muted-foreground text-sm">
-                Sem dados de clientes para o periodo
+              <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+                Conecte uma plataforma para ver os dados graph
               </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Pedidos por Plataforma */}
-        <Card>
-          <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
+        {/* Profit Calendar - Takes 1/3 */}
+        <Card className="border border-border shadow-none rounded-lg p-5">
+          <EstimatedProfitCalendar
+            data={metricsData}
+            totalProfit={calcProfit(stats)}
+            currentMonthLabel={getMonthLabel()}
+          />
+        </Card>
+      </div>
+
+      {/* Row: Funnel (Visual Component) + Rates */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        {/* Funnel Visual */}
+        <div className="h-full">
+          <div className="h-full">
+            <div className="grid grid-cols-1 gap-4">
+              {/* Simplified Funnel using just one card */}
+              <Card className="border border-border shadow-none rounded-lg">
+                <CardHeader className="border-b border-border/50 px-5 py-4">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base font-semibold">Funil de Conversão</CardTitle>
+                    <Badge variant="outline" className="text-[10px] uppercase font-medium">E-commerce</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-5">
+                  {funnel && funnel.sessoes > 0 ? (
+                    <div className="space-y-4">
+                      <FunnelVisual data={{
+                        sessoes: funnel.sessoes,
+                        adicoesCarrinho: funnel.adicoesCarrinho,
+                        checkoutsIniciados: funnel.checkoutsIniciados,
+                        pedidosGerados: funnel.pedidosGerados
+                      }} />
+                    </div>
+                  ) : (
+                    <div className="py-10 text-center text-muted-foreground text-sm">Sem dados do funil</div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
+
+        {/* Rates Cards */}
+        <div className="space-y-4">
+          {/* Rate Card 1 */}
+          <RateCard
+            title="Taxa de Pagamento"
+            value={`${(rates?.paidRate || 0).toFixed(1)}%`}
+            subtext={`${rates?.paidOrders || 0} pagos de ${rates?.totalOrders || 0} gerados`}
+            progress={rates?.paidRate || 0}
+            colorClass="bg-primary"
+            icon={CheckCircle}
+          />
+
+          {/* Rate Card 2 */}
+          <RateCard
+            title="Taxa de Recompra"
+            value={`${(rates?.repurchaseRate || 0).toFixed(1)}%`}
+            subtext={`${rates?.repeatCustomers || 0} recompraram de ${rates?.uniqueCustomers || 0} únicos`}
+            progress={rates?.repurchaseRate || 0}
+            colorClass="bg-purple-500"
+            icon={Repeat}
+          />
+
+          {/* Rate Card 3 (Simple) */}
+          <Card className="border border-border shadow-none rounded-lg p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Clientes Únicos</p>
+                <p className="text-2xl font-bold tracking-tight">{fmtNum(rates?.uniqueCustomers || 0)}</p>
+                <p className="text-xs text-muted-foreground mt-1">Neste período</p>
+              </div>
+              <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500">
+                <Users className="w-5 h-5" />
+              </div>
+            </div>
+          </Card>
+        </div>
+      </div>
+
+      {/* Platform & Trends */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        {/* Customer Trends */}
+        <Card className="border border-border shadow-none rounded-lg">
+          <CardHeader className="border-b border-border/50 px-5 py-4">
+            <CardTitle className="text-base font-semibold">Tendências de Clientes</CardTitle>
+          </CardHeader>
+          <CardContent className="p-5">
+            <div className="h-[300px] w-full">
+              {customerTrends.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={customerTrends}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} opacity={0.5} />
+                    <XAxis dataKey="month" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
+                    <YAxis yAxisId="left" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
+                    <Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: '8px', border: '1px solid var(--border)' }} />
+                    <Bar dataKey="novos" fill="var(--primary)" stackId="a" radius={[0, 0, 0, 0]} barSize={20} />
+                    <Bar dataKey="recorrentes" fill="var(--muted)" stackId="a" radius={[4, 4, 0, 0]} barSize={20} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-muted-foreground text-xs">Sem dados</div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Platform Breakdown */}
+        <Card className="border border-border shadow-none rounded-lg">
+          <CardHeader className="border-b border-border/50 px-5 py-4">
             <CardTitle className="text-base font-semibold">Pedidos por Plataforma</CardTitle>
           </CardHeader>
-          <CardContent>
-            {platformData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={platformData} layout="vertical" barCategoryGap="20%">
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
-                  <XAxis type="number" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} tickLine={false} axisLine={false} />
-                  <YAxis type="category" dataKey="platform" tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} tickLine={false} axisLine={false} width={80} />
-                  <Tooltip
-                    formatter={(value, name) => [
-                      name === "revenue" ? fmt(Number(value)) : Number(value),
-                      name === "revenue" ? "Receita" : "Pedidos",
-                    ]}
-                    cursor={{ fill: "var(--primary)", fillOpacity: 0.06 }}
-                  />
-                  <Bar dataKey="orders" fill="var(--primary)" radius={[0, 6, 6, 0]} barSize={24} />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-72 flex items-center justify-center text-muted-foreground text-sm">
-                Conecte uma plataforma
-              </div>
-            )}
+          <CardContent className="p-5">
+            <div className="h-[300px] w-full">
+              {platformData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <RechartsBarChart data={platformData} layout="vertical" barSize={24} barCategoryGap={10}>
+                    <CartesianGrid horizontal={false} stroke="var(--border)" opacity={0.5} />
+                    <XAxis type="number" hide />
+                    <YAxis dataKey="platform" type="category" tick={{ fontSize: 11, fill: "var(--foreground)" }} width={80} axisLine={false} tickLine={false} />
+                    <Tooltip cursor={{ fill: 'var(--muted)', opacity: 0.2 }} contentStyle={{ borderRadius: '8px', border: '1px solid var(--border)' }} />
+                    <Bar dataKey="orders" fill="var(--primary)" radius={[0, 4, 4, 0]} background={{ fill: 'var(--muted)', opacity: 0.2, radius: [0, 4, 4, 0] }} />
+                  </RechartsBarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-muted-foreground text-xs">Sem dados</div>
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Recent Orders */}
-      <Card>
-        <CardHeader className="flex-row items-center justify-between space-y-0 pb-4">
-          <CardTitle className="text-base font-semibold">Pedidos Recentes</CardTitle>
-          <Link href="/orders" className="text-xs text-primary hover:underline">Ver todos</Link>
-        </CardHeader>
-        <CardContent>
-          {recentOrders.length > 0 ? (
-            <div className="space-y-0 divide-y divide-border">
-              {recentOrders.map((order) => {
-                const statusInfo = statusLabels[order.status] || { label: order.status, variant: "outline" as const };
-                return (
-                  <div key={order.id} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium">#{order.externalOrderId}</p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {order.customerName || "Sem nome"} &middot; {platformLabels[order.platform] || order.platform}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0 ml-4">
-                      <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
-                      <span className="text-sm font-semibold w-24 text-right">{fmt(order.totalAmount)}</span>
-                      <span className="text-xs text-muted-foreground w-14 text-right">{formatDate(order.orderDate)}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="h-32 flex items-center justify-center text-muted-foreground text-sm">
-              Nenhum pedido ainda. Conecte suas plataformas em{" "}
-              <Link href="/integrations" className="text-primary ml-1 hover:underline">Integracoes</Link>
-            </div>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }
 
-function KPICard({ icon: Icon, title, value, change, iconColor }: {
-  icon: LucideIcon; title: string; value: string; change: string; iconColor: string;
+// Subcomponents
+
+function KPICard({ label, value, change, icon: Icon, iconColor }: {
+  label: string; value: string; change: string; icon: LucideIcon; iconColor: string;
 }) {
-  const isPositive = change.startsWith("+");
-  const ChangeIcon = isPositive ? ArrowUpRight : ArrowDownRight;
+  const isPositive = change && change.startsWith("+");
+  const isNegative = change && change.startsWith("-");
+
   return (
-    <Card className="transition-all hover:shadow-md">
-      <CardContent className="pt-5 pb-5">
-        <div className="flex items-start justify-between mb-4">
-          <p className="text-sm text-muted-foreground font-medium">{title}</p>
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${iconColor}`}>
-            <Icon className="w-5 h-5" />
-          </div>
+    <Card className="border border-border shadow-none rounded-lg p-5 hover:border-primary/30 transition-colors">
+      <div className="flex justify-between items-start mb-2">
+        <span className="text-[11px] uppercase tracking-wider font-medium text-muted-foreground">{label}</span>
+        <div className={`w-9 h-9 rounded-full flex items-center justify-center ${iconColor}`}>
+          <Icon className="w-4 h-4" />
         </div>
-        <p className="text-2xl font-bold tracking-tight">{value}</p>
-        {change && (
-          <p className={`text-xs mt-2 font-medium flex items-center gap-1 ${isPositive ? "text-success" : "text-destructive"}`}>
-            <ChangeIcon className="w-3.5 h-3.5" />
+      </div>
+      <div>
+        <div className="text-2xl font-bold tracking-tight text-foreground">{value}</div>
+        <div className="flex items-center gap-1.5 mt-1">
+          {isPositive && <ArrowUpRight className="w-3.5 h-3.5 text-emerald-500" />}
+          {isNegative && <ArrowDownRight className="w-3.5 h-3.5 text-red-500" />}
+          <span className={`text-xs font-medium ${isPositive ? 'text-emerald-500' : isNegative ? 'text-red-500' : 'text-muted-foreground'}`}>
             {change}
-            <span className="text-muted-foreground font-normal ml-0.5">vs periodo anterior</span>
-          </p>
-        )}
-      </CardContent>
+          </span>
+          <span className="text-[10px] text-muted-foreground">vs anterior</span>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function RateCard({ title, value, subtext, progress, colorClass, icon: Icon }: any) {
+  return (
+    <Card className="border border-border shadow-none rounded-lg p-5">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{title}</span>
+        <Icon className="w-4 h-4 text-muted-foreground" />
+      </div>
+      <div className="text-2xl font-bold tracking-tight mb-3">{value}</div>
+      <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden mb-2">
+        <div className={`h-full rounded-full ${colorClass}`} style={{ width: `${Math.min(progress, 100)}%` }} />
+      </div>
+      <p className="text-xs text-muted-foreground">{subtext}</p>
     </Card>
   );
 }

@@ -17,7 +17,7 @@ import { MobileSidebar } from "@/components/layout/mobile-sidebar";
 
 export function Header() {
   return (
-    <header className="h-14 border-b border-border/50 bg-card/80 backdrop-blur-sm flex items-center justify-between px-4 md:px-6">
+    <header className="h-14 border-b border-border/30 bg-card flex items-center justify-between px-4 md:px-6">
       <div className="flex items-center gap-3">
         <MobileSidebar />
       </div>
@@ -32,6 +32,7 @@ export function Header() {
             <Button variant="ghost" className="relative h-8 w-8 rounded-full">
               <Avatar className="h-8 w-8">
                 <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
+                  {/* TODO: Get actual user initials */}
                   U
                 </AvatarFallback>
               </Avatar>
