@@ -37,6 +37,14 @@ export async function GET(request: NextRequest) {
             });
         }
 
+        // Validate localhost in production
+        if (process.env.NODE_ENV === 'production' && EVOLUTION_API_URL.includes('localhost')) {
+            return NextResponse.json({
+                status: "DISCONNECTED",
+                error: "Erro na Vercel: Você configurou 'localhost' na ENV variavél. A Vercel não acessa seu PC local. Use um VPS ou Ngrok."
+            });
+        }
+
         // Check if instance exists
         const instanceRes = await fetch(`${EVOLUTION_API_URL}/instance/fetchInstances`, {
             headers: {
@@ -101,6 +109,14 @@ export async function POST(request: NextRequest) {
         const { organizationId } = await requireAdmin();
         const { action } = await request.json();
         const instanceName = `cdr-${organizationId}`;
+
+        // Validate localhost in production
+        if (process.env.NODE_ENV === 'production' && EVOLUTION_API_URL.includes('localhost')) {
+            return NextResponse.json({
+                success: false,
+                error: "Erro na Vercel: Você configurou 'localhost' na ENV variavél. A Vercel não acessa seu PC local. Use um VPS ou Ngrok."
+            }, { status: 400 });
+        }
 
         if (action === "create" || action === "init") {
             // Check if instance exists first to avoid error
