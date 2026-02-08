@@ -65,7 +65,7 @@ export function Sidebar() {
     { name: "Mais Vendidos", href: "/best-sellers", icon: ShoppingBag },
     { name: "Anuncios", href: "/ads", icon: Megaphone },
     // Relatórios restricted to internal team
-    { name: "Relatorios", href: "/reports", icon: FileText, internalOnly: true },
+    { name: "Relatórios", href: "/reports", icon: FileText, internalOnly: true },
   ];
 
   const settingsNavItems = [

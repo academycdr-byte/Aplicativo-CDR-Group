@@ -40,6 +40,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       return token;
     },
+    async session({ session, token }) {
+      if (token.sub) {
+        session.user.id = token.sub;
+      }
+      if (token.organizationId) {
+        session.user.organizationId = token.organizationId as string;
+      }
+      if (token.role) {
+        session.user.role = token.role as string;
+      }
+      return session;
+    },
   },
   providers: [
     Credentials({
