@@ -68,7 +68,8 @@ export function Sidebar() {
 
   // STRICT: Only push Relatórios if isSuperAdmin is TRUE
   if (session?.user?.email?.toLowerCase() === "academy.cdr@gmail.com") {
-    mainNavItems.push({ name: "Relatórios", href: "/reports", icon: FileText, internalOnly: true } as any);
+    // REMOVED internalOnly: true to bypass the filter check. If it's pushed here, IT MUST SHOW.
+    mainNavItems.push({ name: "Relatórios", href: "/reports", icon: FileText } as any);
   }
 
   const settingsNavItems = [
@@ -136,6 +137,13 @@ export function Sidebar() {
       <div className="px-4 py-4 border-t border-white/5">
         <div className="flex flex-col gap-1">
           <p className="text-[10px] text-sidebar-text/30 text-center">CDR Group &copy; 2025</p>
+          {/* Minimal debug info to verify EMAIL detection */}
+          {session?.user && (
+            <div className="text-[9px] text-sidebar-text/20 text-center flex flex-col items-center mt-2">
+              <span className="truncate max-w-[150px]">{session.user.email}</span>
+              <span className="uppercase tracking-wider">{userRole}</span>
+            </div>
+          )}
         </div>
       </div>
     </aside>
