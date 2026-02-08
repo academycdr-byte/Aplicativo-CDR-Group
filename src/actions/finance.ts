@@ -1,6 +1,6 @@
 "use server";
 
-import { db } from "@/lib/db";
+import { prisma as db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
 // Types
