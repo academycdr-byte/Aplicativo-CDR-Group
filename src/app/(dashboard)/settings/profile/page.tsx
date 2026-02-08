@@ -79,9 +79,9 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6 max-w-2xl animate-in fade-in duration-500">
       <div>
-        <h2 className="text-xl font-bold">Meu Perfil</h2>
+        <h2 className="text-2xl font-bold tracking-tight">Meu Perfil</h2>
         <p className="text-muted-foreground text-sm mt-1">
           Gerencie suas informacoes pessoais e senha.
         </p>

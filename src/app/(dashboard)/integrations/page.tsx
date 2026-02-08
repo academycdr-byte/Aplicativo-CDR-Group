@@ -337,9 +337,9 @@ function IntegrationsContent() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in duration-500">
       <div>
-        <h2 className="text-xl font-bold">Plataformas</h2>
+        <h2 className="text-2xl font-bold tracking-tight">Plataformas</h2>
         <p className="text-muted-foreground text-sm mt-1">
           Conecte suas plataformas para centralizar os dados no dashboard.
         </p>
@@ -351,7 +351,7 @@ function IntegrationsContent() {
           const isConnected = status === "CONNECTED";
 
           return (
-            <Card key={platform.platform} className="flex flex-col group hover-card border-border/60">
+            <Card key={platform.platform} className="flex flex-col group border-border/20">
               <CardContent className="pt-6 flex flex-col flex-1">
                 <div className="flex items-center gap-4 mb-4">
                   <div className="relative w-14 h-14 rounded-2xl overflow-hidden flex-shrink-0 bg-white shadow-sm border border-black/5 flex items-center justify-center transition-transform duration-300">

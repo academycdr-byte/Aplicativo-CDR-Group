@@ -383,11 +383,11 @@ export default function AdsPage() {
   const ctr = t.impressions > 0 ? (t.clicks / t.impressions) * 100 : 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in duration-500">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-semibold tracking-tight">Anúncios</h2>
+          <h2 className="text-2xl font-bold tracking-tight">Anúncios</h2>
           <p className="text-muted-foreground text-sm mt-0.5">
             Gestão de performance Mídia Paga.
           </p>
@@ -414,7 +414,7 @@ export default function AdsPage() {
       />
 
       {/* KPI Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 xl:grid-cols-8 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 2xl:grid-cols-8 gap-4">
         <KPICard title="Gasto" value={t.spend} prevValue={p.spend} icon={DollarSign} prefix="R$" variant="destructive" />
         <KPICard title="Impressões" value={t.impressions} prevValue={p.impressions} icon={Eye} variant="blue" />
         <KPICard title="Alcance" value={t.reach} prevValue={p.reach} icon={Users} variant="purple" />
@@ -496,10 +496,10 @@ export default function AdsPage() {
                   {dayData.length > 0 ? (
                     <ResponsiveContainer width="100%" height={300}>
                       <LineChart data={dayData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} opacity={0.5} />
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} opacity={0.3} />
                         <XAxis
                           dataKey="date"
-                          tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                          tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
                           tickLine={false}
                           axisLine={false}
                           tickFormatter={(v) => {
@@ -509,7 +509,7 @@ export default function AdsPage() {
                           minTickGap={30}
                         />
                         <YAxis
-                          tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                          tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
                           tickLine={false}
                           axisLine={false}
                           tickFormatter={(v) => {
@@ -519,7 +519,7 @@ export default function AdsPage() {
                           }}
                         />
                         <Tooltip
-                          contentStyle={{ backgroundColor: "var(--card)", borderColor: "var(--border)", borderRadius: "8px" }}
+                          contentStyle={{ backgroundColor: "var(--card)", borderColor: "var(--border)", borderRadius: "12px" }}
                           labelFormatter={(d) => new Date(d + "T00:00:00").toLocaleDateString("pt-BR")}
                           formatter={(val, name) => {
                             const v = Number(val) || 0;
@@ -735,7 +735,7 @@ export default function AdsPage() {
               .map((c) => (
                 <Card
                   key={c.adId}
-                  className={`group overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-xl hover:scale-[1.02] border border-border shadow-none rounded-lg border-l-4 ${c.roas >= 3 ? "border-l-emerald-500" : c.roas >= 1 ? "border-l-amber-500" : "border-l-red-500"
+                  className={`group overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-sm border border-border shadow-none rounded-lg border-l-4 ${c.roas >= 3 ? "border-l-emerald-500" : c.roas >= 1 ? "border-l-amber-500" : "border-l-red-500"
                     }`}
                   onClick={() => {
                     setSelectedCreative(c);
@@ -745,7 +745,7 @@ export default function AdsPage() {
                   {/* Thumbnail */}
                   <div className="relative aspect-video bg-muted flex items-center justify-center overflow-hidden">
                     {c.thumbnailUrl ? (
-                      <Image src={c.thumbnailUrl} alt="" fill className="object-cover transition-transform group-hover:scale-105" unoptimized />
+                      <Image src={c.thumbnailUrl} alt="" fill className="object-cover transition-transform" unoptimized />
                     ) : <ImageIcon className="w-8 h-8 opacity-20" />}
 
                     {/* Overlay Play Icon if we assume it's a video or just generally for "Detail View" affordance */}

@@ -51,7 +51,7 @@ export default function RootLayout({
         <SessionProvider>
           <ThemeProvider>
             {children}
-            <Toaster richColors position="top-right" />
+            <Toaster richColors position="top-right" toastOptions={{ className: "rounded-xl" }} />
           </ThemeProvider>
         </SessionProvider>
       </body>

@@ -141,9 +141,9 @@ export default function OrganizationPage() {
   const isOwnerOrAdmin = orgRole === "OWNER" || orgRole === "ADMIN";
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6 max-w-3xl animate-in fade-in duration-500">
       <div>
-        <h2 className="text-xl font-bold">Organizacao</h2>
+        <h2 className="text-2xl font-bold tracking-tight">Organizacao</h2>
         <p className="text-muted-foreground text-sm mt-1">
           Gerencie sua organizacao e equipe.
         </p>

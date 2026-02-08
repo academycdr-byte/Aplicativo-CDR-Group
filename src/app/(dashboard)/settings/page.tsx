@@ -19,9 +19,9 @@ const settingsItems = [
 
 export default function SettingsPage() {
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in duration-500">
       <div>
-        <h2 className="text-xl font-bold">Configuracoes</h2>
+        <h2 className="text-2xl font-bold tracking-tight">Configuracoes</h2>
         <p className="text-muted-foreground text-sm mt-1">
           Gerencie as configuracoes da sua conta e organizacao.
         </p>
@@ -30,7 +30,7 @@ export default function SettingsPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {settingsItems.map((item) => (
           <Link key={item.href} href={item.href}>
-            <Card className="hover-card h-full border-border/60">
+            <Card className="h-full">
               <CardContent className="pt-6">
                 <div className="flex items-start gap-4">
                   <div className="p-3 bg-secondary/80 rounded-xl">

@@ -89,7 +89,7 @@ export default function AdminPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <h2 className="text-xl font-bold">Administracao</h2>
+        <h2 className="text-2xl font-bold tracking-tight">Administracao</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
             <Card key={i}>
@@ -109,7 +109,7 @@ export default function AdminPage() {
   if (!stats) {
     return (
       <div className="space-y-6">
-        <h2 className="text-xl font-bold">Administracao</h2>
+        <h2 className="text-2xl font-bold tracking-tight">Administracao</h2>
         <Card>
           <CardContent className="py-16 text-center">
             <p className="text-muted-foreground">
@@ -122,9 +122,9 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in duration-500">
       <div>
-        <h2 className="text-xl font-bold">Administracao</h2>
+        <h2 className="text-2xl font-bold tracking-tight">Administracao</h2>
         <p className="text-muted-foreground text-sm mt-1">
           Visao geral do sistema e monitoramento de sincronizacoes.
         </p>

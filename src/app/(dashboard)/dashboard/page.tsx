@@ -209,7 +209,7 @@ export default function DashboardPage() {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-foreground">Visão Geral</h2>
+          <h2 className="text-2xl font-bold tracking-tight text-foreground">Visão Geral</h2>
           <p className="text-muted-foreground mt-1 text-[15px]">
             Performance das suas campanhas em tempo real.
           </p>
@@ -257,7 +257,7 @@ export default function DashboardPage() {
       {/* Main Chart + Calendar Section */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Performance Chart */}
-        <Card className="xl:col-span-2 shadow-card hover-card">
+        <Card className="xl:col-span-2 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
             <div className="space-y-1">
               <CardTitle>Performance</CardTitle>
@@ -297,7 +297,7 @@ export default function DashboardPage() {
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} opacity={0.3} />
                   <XAxis
                     dataKey="date"
-                    tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                    tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
                     tickLine={false}
                     axisLine={false}
                     tickMargin={12}
@@ -308,7 +308,7 @@ export default function DashboardPage() {
                   />
                   <YAxis
                     yAxisId="left"
-                    tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                    tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
                     tickLine={false}
                     axisLine={false}
                     tickFormatter={(v) => fmtShort(v)}
@@ -317,7 +317,7 @@ export default function DashboardPage() {
                   <YAxis
                     yAxisId="right"
                     orientation="right"
-                    tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                    tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
                     tickLine={false}
                     axisLine={false}
                     width={30}
@@ -377,7 +377,7 @@ export default function DashboardPage() {
         </Card>
 
         {/* Profit Calendar */}
-        <Card className="shadow-card hover-card">
+        <Card className="shadow-sm">
           <CardHeader>
             <CardTitle>Lucro Estimado</CardTitle>
             <CardDescription>{getMonthLabel()}</CardDescription>
@@ -397,7 +397,7 @@ export default function DashboardPage() {
       {/* Row: Funnel + Rates */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         {/* Funnel Visual */}
-        <Card className="shadow-card hover-card overflow-hidden">
+        <Card className="shadow-sm overflow-hidden">
           <CardHeader className="border-b border-border/40 bg-muted/20">
             <div className="flex items-center justify-between">
               <div className="space-y-1">
@@ -441,7 +441,7 @@ export default function DashboardPage() {
             icon={Repeat}
           />
 
-          <Card className="sm:col-span-2 shadow-card hover-card p-6 flex items-center justify-between bg-gradient-to-br from-card to-secondary/20">
+          <Card className="sm:col-span-2 shadow-sm p-6 flex items-center justify-between bg-gradient-to-br from-card to-secondary/20">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Total de Clientes Únicos</p>
               <div className="flex items-baseline gap-2">
@@ -459,7 +459,7 @@ export default function DashboardPage() {
       {/* Platform & Trends */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         {/* Customer Trends */}
-        <Card className="shadow-card hover-card">
+        <Card className="shadow-sm">
           <CardHeader>
             <CardTitle>Tendências de Clientes</CardTitle>
             <CardDescription>Novos vs Recorrentes</CardDescription>
@@ -470,8 +470,8 @@ export default function DashboardPage() {
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart data={customerTrends} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} opacity={0.3} />
-                    <XAxis dataKey="month" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} tickMargin={10} />
-                    <YAxis yAxisId="left" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
+                    <XAxis dataKey="month" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} tickMargin={10} />
+                    <YAxis yAxisId="left" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
                     <Tooltip
                       cursor={{ fill: 'var(--muted)', opacity: 0.1 }}
                       contentStyle={{ borderRadius: '12px', border: '1px solid var(--border)', backgroundColor: 'var(--card)', boxShadow: 'var(--shadow-lg)' }}
@@ -488,7 +488,7 @@ export default function DashboardPage() {
         </Card>
 
         {/* Platform Breakdown */}
-        <Card className="shadow-card hover-card">
+        <Card className="shadow-sm">
           <CardHeader>
             <CardTitle>Pedidos por Plataforma</CardTitle>
             <CardDescription>Origem das vendas</CardDescription>
@@ -500,7 +500,7 @@ export default function DashboardPage() {
                   <RechartsBarChart data={platformData} layout="vertical" barSize={32} barCategoryGap={10} margin={{ top: 0, right: 20, left: 0, bottom: 0 }}>
                     <CartesianGrid horizontal={false} stroke="var(--border)" opacity={0.3} />
                     <XAxis type="number" hide />
-                    <YAxis dataKey="platform" type="category" tick={{ fontSize: 12, fill: "var(--foreground)", fontWeight: 500 }} width={100} axisLine={false} tickLine={false} />
+                    <YAxis dataKey="platform" type="category" tick={{ fontSize: 11, fill: "var(--foreground)", fontWeight: 500 }} width={100} axisLine={false} tickLine={false} />
                     <Tooltip
                       cursor={{ fill: 'var(--muted)', opacity: 0.1 }}
                       contentStyle={{ borderRadius: '12px', border: '1px solid var(--border)', backgroundColor: 'var(--card)', boxShadow: 'var(--shadow-lg)' }}
@@ -529,7 +529,7 @@ function KPICard({ label, value, change, icon: Icon, trend }: {
   const isNegative = change && change.startsWith("-") || trend === "down";
 
   return (
-    <Card className="shadow-card hover-card group relative overflow-hidden">
+    <Card className="shadow-sm group relative overflow-hidden">
       <div className="absolute right-0 top-0 p-3 opacity-5 group-hover:opacity-10 transition-opacity">
         <Icon className="w-16 h-16" />
       </div>
@@ -559,7 +559,7 @@ function KPICard({ label, value, change, icon: Icon, trend }: {
 
 function RateCard({ title, value, subtext, progress, colorClass, icon: Icon }: any) {
   return (
-    <Card className="shadow-card hover-card flex flex-col justify-between p-6">
+    <Card className="shadow-sm flex flex-col justify-between p-6">
       <div className="flex items-center justify-between mb-4">
         <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{title}</span>
         <Icon className="w-4 h-4 text-muted-foreground/50" />

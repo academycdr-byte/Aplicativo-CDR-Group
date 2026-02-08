@@ -29,7 +29,7 @@ export function Header() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Buscar..."
-            className="pl-9 h-10 w-full bg-secondary/50 border-transparent hover:bg-secondary/80 focus:bg-background focus:border-primary/20 transition-all"
+            className="pl-9 h-10 w-full bg-muted/50 border-transparent rounded-xl focus:bg-background focus:border-primary/20 transition-all"
           />
         </div>
       </div>
@@ -40,7 +40,7 @@ export function Header() {
         </Button>
         <ThemeToggle />
 
-        <div className="h-6 w-px bg-border/50 mx-1" />
+        <div className="h-5 w-px bg-border/30 mx-1" />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

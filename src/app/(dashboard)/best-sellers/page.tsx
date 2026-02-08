@@ -94,7 +94,7 @@ export default function BestSellersPage() {
             {/* Header Section */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border/40 pb-6">
                 <div>
-                    <h2 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">
+                    <h2 className="text-2xl font-bold tracking-tight text-foreground">
                         Mais Vendidos
                     </h2>
                     <p className="text-muted-foreground mt-2 max-w-2xl">
@@ -154,7 +154,7 @@ export default function BestSellersPage() {
                         >
                             {products.map((product, index) => (
                                 <motion.div key={product.id} variants={item}>
-                                    <Card className="group overflow-hidden bg-gradient-to-b from-card/50 to-card/30 border-white/5 hover:border-primary/50 transition-all duration-300 hover:shadow-2xl hover:shadow-primary/5 h-full flex flex-col backdrop-blur-sm">
+                                    <Card className="group overflow-hidden bg-gradient-to-b from-card/50 to-card/30 border-white/5 transition-all duration-300 h-full flex flex-col backdrop-blur-sm">
                                         {/* Image Container */}
                                         <div className="relative aspect-[4/5] overflow-hidden bg-muted/20">
                                             {product.imageUrl ? (
@@ -162,7 +162,7 @@ export default function BestSellersPage() {
                                                     src={product.imageUrl}
                                                     alt={product.title}
                                                     fill
-                                                    className="object-cover transition-transform duration-700 group-hover:scale-105"
+                                                    className="object-cover transition-transform duration-700"
                                                     sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                                                 />
                                             ) : (
@@ -219,11 +219,11 @@ export default function BestSellersPage() {
                             ))}
                         </motion.div>
                     ) : (
-                        <div className="flex flex-col items-center justify-center py-20 text-center border border-dashed border-border/50 rounded-xl bg-card/20 animate-in fade-in zoom-in duration-500">
-                            <div className="w-16 h-16 rounded-full bg-muted/20 flex items-center justify-center mb-6">
-                                <ShoppingBag className="w-8 h-8 text-muted-foreground/60" />
+                        <div className="flex flex-col items-center justify-center py-20 text-center border border-dashed border-border/30 rounded-xl bg-muted/5 animate-in fade-in zoom-in duration-500">
+                            <div className="w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mb-6">
+                                <ShoppingBag className="w-10 h-10 text-muted-foreground/50" />
                             </div>
-                            <h3 className="text-xl font-semibold mb-2">Nenhum produto encontrado</h3>
+                            <h3 className="text-lg font-semibold mb-2">Nenhum produto encontrado</h3>
                             <p className="text-muted-foreground max-w-sm mx-auto mb-6">
                                 Não encontramos produtos na sua loja correspondentes aos filtros selecionados.
                             </p>

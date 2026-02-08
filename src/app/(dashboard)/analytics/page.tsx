@@ -123,11 +123,11 @@ export default function AnalyticsPage() {
     }
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 animate-in fade-in duration-500">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h2 className="text-xl font-semibold tracking-tight">Analytics</h2>
+                    <h2 className="text-2xl font-bold tracking-tight">Analytics</h2>
                     <p className="text-muted-foreground text-sm mt-0.5">
                         Visão detalhada de performance e criativos.
                     </p>
@@ -153,10 +153,10 @@ export default function AnalyticsPage() {
                     <CardContent className="p-5 h-[350px]">
                         <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={dailyData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} opacity={0.5} />
+                                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} opacity={0.3} />
                                 <XAxis
                                     dataKey="date"
-                                    tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                                    tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
                                     axisLine={false}
                                     tickLine={false}
                                     tickFormatter={(v) => {
@@ -164,10 +164,10 @@ export default function AnalyticsPage() {
                                         return `${d.getDate()}/${d.getMonth() + 1}`;
                                     }}
                                 />
-                                <YAxis yAxisId="left" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${v / 1000}k`} />
-                                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${v / 1000}k`} />
+                                <YAxis yAxisId="left" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${v / 1000}k`} />
+                                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${v / 1000}k`} />
                                 <Tooltip
-                                    contentStyle={{ backgroundColor: "var(--card)", borderColor: "var(--border)", borderRadius: "8px" }}
+                                    contentStyle={{ backgroundColor: "var(--card)", borderColor: "var(--border)", borderRadius: "12px" }}
                                     itemStyle={{ fontSize: "12px" }}
                                     labelStyle={{ fontSize: "12px", marginBottom: "8px", color: "var(--foreground)" }}
                                 />
@@ -191,7 +191,7 @@ export default function AnalyticsPage() {
                                 <PolarAngleAxis dataKey="subject" tick={{ fill: "var(--muted-foreground)", fontSize: 10 }} />
                                 <PolarRadiusAxis angle={30} domain={[0, 150]} tick={false} axisLine={false} />
                                 <Radar name="Performance" dataKey="A" stroke="var(--primary)" fill="var(--primary)" fillOpacity={0.2} />
-                                <Tooltip contentStyle={{ borderRadius: "8px" }} />
+                                <Tooltip contentStyle={{ borderRadius: "12px" }} />
                             </RadarChart>
                         </ResponsiveContainer>
                     </CardContent>

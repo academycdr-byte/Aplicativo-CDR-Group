@@ -65,10 +65,10 @@ export default function SalesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold">Vendas</h2>
+          <h2 className="text-2xl font-bold tracking-tight">Vendas</h2>
           <p className="text-muted-foreground text-sm mt-1">
             Analise suas vendas em todas as plataformas.
           </p>
@@ -128,21 +128,21 @@ export default function SalesPage() {
                     <stop offset="100%" stopColor="var(--primary)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} opacity={0.3} />
                 <XAxis
                   dataKey="date"
-                  tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
-                  tickLine={{ stroke: "var(--border)" }}
-                  axisLine={{ stroke: "var(--border)" }}
+                  tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                  tickLine={false}
+                  axisLine={false}
                   tickFormatter={(v) => {
                     const d = new Date(v + "T00:00:00");
                     return `${d.getDate()}/${d.getMonth() + 1}`;
                   }}
                 />
                 <YAxis
-                  tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
-                  tickLine={{ stroke: "var(--border)" }}
-                  axisLine={{ stroke: "var(--border)" }}
+                  tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                  tickLine={false}
+                  axisLine={false}
                   tickFormatter={(v) => `R$${v}`}
                 />
                 <Tooltip
@@ -187,17 +187,17 @@ export default function SalesPage() {
             {stats && stats.byPlatform.length > 0 ? (
               <ResponsiveContainer width="100%" height={256}>
                 <BarChart data={stats.byPlatform}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} opacity={0.3} />
                   <XAxis
                     dataKey="platform"
-                    tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
-                    tickLine={{ stroke: "var(--border)" }}
-                    axisLine={{ stroke: "var(--border)" }}
+                    tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                    tickLine={false}
+                    axisLine={false}
                   />
                   <YAxis
-                    tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
-                    tickLine={{ stroke: "var(--border)" }}
-                    axisLine={{ stroke: "var(--border)" }}
+                    tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                    tickLine={false}
+                    axisLine={false}
                     tickFormatter={(v) => `R$${v}`}
                   />
                   <Tooltip
@@ -228,19 +228,19 @@ export default function SalesPage() {
             {statusData.length > 0 ? (
               <ResponsiveContainer width="100%" height={256}>
                 <BarChart data={statusData} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} opacity={0.3} />
                   <XAxis
                     type="number"
-                    tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
-                    tickLine={{ stroke: "var(--border)" }}
-                    axisLine={{ stroke: "var(--border)" }}
+                    tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                    tickLine={false}
+                    axisLine={false}
                   />
                   <YAxis
                     type="category"
                     dataKey="status"
-                    tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
-                    tickLine={{ stroke: "var(--border)" }}
-                    axisLine={{ stroke: "var(--border)" }}
+                    tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                    tickLine={false}
+                    axisLine={false}
                     width={100}
                   />
                   <Tooltip cursor={{ fill: "var(--primary)", fillOpacity: 0.08 }} />

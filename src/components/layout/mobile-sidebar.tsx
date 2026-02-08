@@ -87,15 +87,15 @@ export function MobileSidebar() {
       <Link
         href={item.href}
         onClick={() => setOpen(false)}
-        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-all relative ${isActive
-            ? "bg-primary/8 text-primary"
+        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[14px] font-medium transition-all relative ${isActive
+            ? "bg-primary/10 text-primary font-semibold"
             : "text-sidebar-text/70 hover:text-sidebar-text hover:bg-sidebar-hover"
           }`}
       >
         {isActive && (
           <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 bg-primary rounded-r-full" />
         )}
-        <Icon className="w-[18px] h-[18px] shrink-0" />
+        <Icon className="w-5 h-5 shrink-0" strokeWidth={1.8} />
         {item.name}
       </Link>
     );
@@ -122,7 +122,7 @@ export function MobileSidebar() {
         </SheetHeader>
         <nav className="px-3 pt-4 pb-4 space-y-6">
           <div className="space-y-1">
-            <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-sidebar-text/30">
+            <p className="px-3 mb-3 text-[11px] font-semibold uppercase tracking-widest text-sidebar-text/40">
               CDR AI
             </p>
             {filteredAiNav.map((item) => (
@@ -131,7 +131,7 @@ export function MobileSidebar() {
           </div>
 
           <div className="space-y-1">
-            <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-sidebar-text/30">
+            <p className="px-3 mb-3 text-[11px] font-semibold uppercase tracking-widest text-sidebar-text/40">
               Plataforma
             </p>
             {filteredPlatformNav.map((item) => (
@@ -140,7 +140,7 @@ export function MobileSidebar() {
           </div>
 
           <div className="space-y-1">
-            <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-sidebar-text/30">
+            <p className="px-3 mb-3 text-[11px] font-semibold uppercase tracking-widest text-sidebar-text/40">
               Gestão
             </p>
             {filteredManagementNav.map((item) => (

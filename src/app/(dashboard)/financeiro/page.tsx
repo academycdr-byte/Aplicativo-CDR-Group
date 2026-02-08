@@ -92,10 +92,10 @@ export default function FinancePage() {
     const profitPct = (metrics.netProfit / revenue) * 100;
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 animate-in fade-in duration-500">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h2 className="text-xl font-semibold tracking-tight">Financeiro</h2>
+                    <h2 className="text-2xl font-bold tracking-tight">Financeiro</h2>
                     <p className="text-muted-foreground text-sm mt-0.5">
                         Gestão de lucro líquido e unit economics.
                     </p>
@@ -113,7 +113,7 @@ export default function FinancePage() {
             ) : (
                 <>
                     {/* KPI Grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-6 gap-4">
                         <FinancialCard
                             title="Receita Bruta"
                             value={fmt(metrics.revenue)}

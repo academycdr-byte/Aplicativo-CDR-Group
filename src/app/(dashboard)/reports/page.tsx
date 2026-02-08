@@ -219,11 +219,11 @@ export default function ReportsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in duration-500">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-bold">Relatórios</h2>
+          <h2 className="text-2xl font-bold tracking-tight">Relatórios</h2>
           <p className="text-muted-foreground text-sm mt-1">
             Envie relatórios de performance via WhatsApp para seus clientes.
           </p>

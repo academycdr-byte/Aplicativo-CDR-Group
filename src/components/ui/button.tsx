@@ -33,7 +33,7 @@ const buttonVariants = cva(
         "icon-lg": "size-12 rounded-xl",
       },
       radius: {
-        default: "rounded-xl",
+        default: "rounded-2xl",
         full: "rounded-full",
         sm: "rounded-lg",
       }

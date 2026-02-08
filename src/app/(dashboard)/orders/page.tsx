@@ -121,10 +121,10 @@ export default function OrdersPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-semibold tracking-tight">Pedidos</h2>
+          <h2 className="text-2xl font-bold tracking-tight">Pedidos</h2>
           <p className="text-muted-foreground text-sm mt-0.5">
             Gerencie e acompanhe todos os pedidos.
           </p>
@@ -214,10 +214,10 @@ export default function OrdersPage() {
       <Card className="border border-border shadow-none rounded-lg overflow-hidden">
         {orders.length === 0 ? (
           <div className="px-6 py-20 text-center flex flex-col items-center justify-center">
-            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
-              <ShoppingBag className="w-8 h-8 text-muted-foreground/50" />
+            <div className="w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+              <ShoppingBag className="w-10 h-10 text-muted-foreground/50" />
             </div>
-            <h3 className="text-lg font-medium">Nenhum pedido encontrado</h3>
+            <h3 className="text-lg font-semibold">Nenhum pedido encontrado</h3>
             <p className="text-muted-foreground text-sm max-w-sm mt-2">
               {hasFilters
                 ? "Tente ajustar os filtros ou a busca para encontrar o que procura."
