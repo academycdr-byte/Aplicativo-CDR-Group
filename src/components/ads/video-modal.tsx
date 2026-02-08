@@ -85,7 +85,7 @@ export function VideoModal({ isOpen, onClose, creative }: VideoModalProps) {
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-card border-border">
+            <DialogContent className="w-full max-w-5xl h-[95vh] md:h-auto md:max-h-[90vh] p-4 md:p-6 overflow-y-auto bg-card border-border flex flex-col">
                 <DialogHeader>
                     <DialogTitle className="truncate pr-8">{creative.adName || "Detalhes do Criativo"}</DialogTitle>
                     <DialogDescription>
@@ -93,10 +93,10 @@ export function VideoModal({ isOpen, onClose, creative }: VideoModalProps) {
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8 mt-2 h-full">
                     {/* Media Column */}
-                    <div className="space-y-4">
-                        <div className="relative aspect-video w-full bg-black/50 rounded-lg overflow-hidden flex items-center justify-center border border-border/50">
+                    <div className="space-y-4 flex flex-col justify-center">
+                        <div className="relative w-full h-[50vh] md:h-[500px] lg:h-[600px] bg-black/90 rounded-lg overflow-hidden flex items-center justify-center border border-border/50 shadow-lg">
                             {isLoadingVideo ? (
                                 <div className="flex flex-col items-center gap-2 text-muted-foreground">
                                     <Loader2 className="w-8 h-8 animate-spin" />
