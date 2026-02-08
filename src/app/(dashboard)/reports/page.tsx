@@ -1039,42 +1039,48 @@ function WhatsAppTab({ status: initialStatus, onRefresh }: { status: string; onR
   // Generate QR Code
   async function generateQR() {
     setLoading(true);
+    setQrCode(null);
     try {
-      // First check if instance exists
-      const statusRes = await fetch("/api/whatsapp");
-      const statusData = await statusRes.json();
-
-      let action = "connect";
-      if (statusData.status === "NOT_CREATED") {
-        action = "create";
-      }
-
+      // Use "init" action which handles both creaetion and connection
       const res = await fetch("/api/whatsapp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ action: "init" }),
       });
 
       const data = await res.json();
 
-      if (data.success && data.qrcode) {
-        setQrCode(data.qrcode);
-        setStatus("CONNECTING");
-        toast.success("QR Code gerado! Escaneie com seu WhatsApp.");
+      if (data.success) {
+        if (data.qrcode) {
+          setQrCode(data.qrcode);
+          setStatus("CONNECTING");
+          toast.success("QR Code gerado! Escaneie com seu WhatsApp.");
 
-        // Start polling for connection status
-        const interval = setInterval(checkStatus, 3000);
-        setPollingInterval(interval);
+          // Start polling for connection status
+          if (pollingInterval) clearInterval(pollingInterval);
+          const interval = setInterval(checkStatus, 3000);
+          setPollingInterval(interval);
 
-        // Stop polling after 2 minutes
-        setTimeout(() => {
-          clearInterval(interval);
-          setPollingInterval(null);
-        }, 120000);
-      } else if (data.error) {
-        toast.error(data.error);
+          // Stop polling after 2 minutes
+          setTimeout(() => {
+            if (interval) clearInterval(interval);
+            setPollingInterval(null);
+          }, 120000);
+        } else if (data.status === "CONNECTED" || data.status === "open") {
+          setStatus("CONNECTED");
+          toast.success("WhatsApp já está conectado!");
+          onRefresh();
+        }
+      } else {
+        console.error("Generate QR error:", data);
+        toast.error(data.error || "Erro ao gerar QR Code");
+
+        if (data.error?.includes("Evolution API")) {
+          toast.error("Verifique a configuração da Evolution API na Vercel.");
+        }
       }
     } catch (error: any) {
+      console.error("Generate QR exception:", error);
       toast.error("Erro ao gerar QR Code: " + error.message);
     } finally {
       setLoading(false);

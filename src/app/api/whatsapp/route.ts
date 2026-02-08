@@ -29,6 +29,14 @@ export async function GET(request: NextRequest) {
         const { organizationId } = await requireAdmin();
         const instanceName = `cdr-${organizationId}`;
 
+        // Check if environment variables are set
+        if (!process.env.EVOLUTION_API_URL) {
+            return NextResponse.json({
+                status: "DISCONNECTED",
+                error: "URL da Evolution API não configurada"
+            });
+        }
+
         // Check if instance exists
         const instanceRes = await fetch(`${EVOLUTION_API_URL}/instance/fetchInstances`, {
             headers: {
@@ -37,9 +45,11 @@ export async function GET(request: NextRequest) {
         });
 
         if (!instanceRes.ok) {
+            const errorText = await instanceRes.text();
+            console.error("Evolution API fetchInstances error:", errorText);
             return NextResponse.json({
                 status: "DISCONNECTED",
-                error: "Evolution API não disponível"
+                error: "Evolution API não disponível ou chave inválida"
             });
         }
 
@@ -92,41 +102,64 @@ export async function POST(request: NextRequest) {
         const { action } = await request.json();
         const instanceName = `cdr-${organizationId}`;
 
-        if (action === "create") {
-            // Create new instance
-            const createRes = await fetch(`${EVOLUTION_API_URL}/instance/create`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "apikey": EVOLUTION_API_KEY,
-                },
-                body: JSON.stringify({
-                    instanceName,
-                    qrcode: true,
-                    integration: "WHATSAPP-BAILEYS",
-                }),
+        if (action === "create" || action === "init") {
+            // Check if instance exists first to avoid error
+            const checkRes = await fetch(`${EVOLUTION_API_URL}/instance/fetchInstances`, {
+                headers: { "apikey": EVOLUTION_API_KEY },
             });
 
-            if (!createRes.ok) {
-                const error = await createRes.text();
-                console.error("Create instance error:", error);
-                return NextResponse.json({
-                    success: false,
-                    error: "Erro ao criar instância"
-                }, { status: 400 });
+            let instanceExists = false;
+            if (checkRes.ok) {
+                const instances = await checkRes.json();
+                instanceExists = instances.some((i: any) => i.instance?.instanceName === instanceName);
             }
 
-            const data = await createRes.json();
+            if (!instanceExists) {
+                // Create new instance
+                const createRes = await fetch(`${EVOLUTION_API_URL}/instance/create`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "apikey": EVOLUTION_API_KEY,
+                    },
+                    body: JSON.stringify({
+                        instanceName,
+                        qrcode: true,
+                        integration: "WHATSAPP-BAILEYS",
+                    }),
+                });
 
-            return NextResponse.json({
-                success: true,
-                instanceName,
-                qrcode: data.qrcode?.base64 || null,
-                status: "CONNECTING",
-            });
+                if (!createRes.ok) {
+                    const error = await createRes.text();
+                    console.error("Create instance error:", error);
+                    return NextResponse.json({
+                        success: false,
+                        error: "Erro ao criar instância: " + error
+                    }, { status: 400 });
+                }
+
+                const data = await createRes.json();
+
+                return NextResponse.json({
+                    success: true,
+                    instanceName,
+                    qrcode: data.qrcode?.base64 || null,
+                    status: "CONNECTING",
+                });
+            } else {
+                // Instance forces exist, so connect
+                // Fall through to connect logic if action was 'init'
+                // Or just return error if action was explicitly 'create'
+                if (action === "create") {
+                    return NextResponse.json({
+                        success: false,
+                        error: "Instância já existe"
+                    }, { status: 400 });
+                }
+            }
         }
 
-        if (action === "connect") {
+        if (action === "connect" || action === "init") {
             // Connect existing instance (get new QR)
             const connectRes = await fetch(`${EVOLUTION_API_URL}/instance/connect/${instanceName}`, {
                 headers: {
@@ -135,10 +168,21 @@ export async function POST(request: NextRequest) {
             });
 
             if (!connectRes.ok) {
-                // Instance may not exist, try to create it
+                const errorText = await connectRes.text();
+                // Check if error is specifically about instance not existing
+                if (errorText.includes("Instance not found") || errorText.includes("does not exist")) {
+                    // If init, try to create (recursive call via separate logic, simpler to just error here for now as UI handles it via 'init' logic above)
+                    // Actually, if we are here via 'init', it means instance check PASSED (it existed).
+                    // So this error is unexpected.
+                    return NextResponse.json({
+                        success: false,
+                        error: "Erro ao conectar: Instância não encontrada"
+                    }, { status: 400 });
+                }
+
                 return NextResponse.json({
                     success: false,
-                    error: "Instância não existe. Crie uma nova."
+                    error: "Erro ao conectar: " + errorText
                 }, { status: 400 });
             }
 

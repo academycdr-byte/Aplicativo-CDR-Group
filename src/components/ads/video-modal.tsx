@@ -85,7 +85,7 @@ export function VideoModal({ isOpen, onClose, creative }: VideoModalProps) {
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="w-full max-w-5xl h-[95vh] md:h-auto md:max-h-[90vh] p-4 md:p-6 overflow-y-auto bg-card border-border flex flex-col">
+            <DialogContent className="w-full sm:max-w-5xl h-[95vh] md:h-auto md:max-h-[85vh] p-4 md:p-6 overflow-y-auto bg-card border-border flex flex-col">
                 <DialogHeader>
                     <DialogTitle className="truncate pr-8">{creative.adName || "Detalhes do Criativo"}</DialogTitle>
                     <DialogDescription>
