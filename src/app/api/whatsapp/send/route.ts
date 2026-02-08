@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-
-const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL || "http://localhost:8080";
-const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY || "";
+import { sendZApiText } from "@/lib/zapi"; // Import Z-API helper
 
 async function requireAdmin() {
     const session = await auth();
@@ -20,7 +18,7 @@ async function requireAdmin() {
     return { organizationId: membership.organizationId };
 }
 
-// Format phone number for WhatsApp
+// Format phone number for WhatsApp (Z-API prefers 55DDD9XXXXXXXX or 55DDDXXXXXXXX)
 function formatPhoneNumber(phone: string): string {
     // Remove all non-digits
     let cleaned = phone.replace(/\D/g, "");
@@ -29,7 +27,8 @@ function formatPhoneNumber(phone: string): string {
     if (cleaned.length === 11) {
         cleaned = "55" + cleaned;
     } else if (cleaned.length === 10) {
-        // Add 9 for mobile (old format)
+        // Add 9 for mobile (old format - though most gateways prefer clean numbers)
+        // Z-API handles this well, but standardizing to 55 + 11 digits is safest
         cleaned = "55" + cleaned.substring(0, 2) + "9" + cleaned.substring(2);
     }
 
@@ -40,47 +39,24 @@ function formatPhoneNumber(phone: string): string {
 export async function POST(request: NextRequest) {
     try {
         const { organizationId } = await requireAdmin();
-        const { phone, message, groupId } = await request.json();
-        const instanceName = `cdr-${organizationId}`;
+        const { phone, message, groupId } = await request.json(); // groupId not fully supported in this Z-API helper yet, strictly text for now
 
-        // Send to group or individual
-        const endpoint = groupId
-            ? `${EVOLUTION_API_URL}/message/sendText/${instanceName}`
-            : `${EVOLUTION_API_URL}/message/sendText/${instanceName}`;
-
-        const payload = groupId
-            ? {
-                number: groupId,
-                text: message,
-            }
-            : {
-                number: formatPhoneNumber(phone),
-                text: message,
-            };
-
-        const sendRes = await fetch(endpoint, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "apikey": EVOLUTION_API_KEY,
-            },
-            body: JSON.stringify(payload),
-        });
-
-        if (!sendRes.ok) {
-            const error = await sendRes.text();
-            console.error("Send message error:", error);
+        // Check env vars
+        if (!process.env.ZAPI_INSTANCE_ID) {
             return NextResponse.json({
                 success: false,
-                error: "Erro ao enviar mensagem",
-            }, { status: 400 });
+                error: "Z-API não configurada"
+            }, { status: 500 });
         }
 
-        const result = await sendRes.json();
+        const targetPhone = groupId ? groupId : formatPhoneNumber(phone);
+
+        // Use Z-API helper
+        const result = await sendZApiText(targetPhone, message);
 
         return NextResponse.json({
             success: true,
-            messageId: result.key?.id,
+            messageId: result.messageId || "sent",
         });
     } catch (error: any) {
         console.error("Send message error:", error);
