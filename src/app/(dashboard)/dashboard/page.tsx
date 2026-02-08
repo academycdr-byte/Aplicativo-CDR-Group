@@ -300,8 +300,8 @@ export default function DashboardPage() {
                   key={m.key}
                   onClick={() => toggleMetric(m.key)}
                   className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-[10px] uppercase tracking-wider font-semibold border transition-all ${activeMetrics.has(m.key)
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-transparent text-muted-foreground border-border hover:border-primary/50"
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-transparent text-muted-foreground border-border hover:border-primary/50"
                     }`}
                 >
                   {m.label}
@@ -481,8 +481,8 @@ export default function DashboardPage() {
                     <XAxis dataKey="month" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
                     <YAxis yAxisId="left" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
                     <Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: '8px', border: '1px solid var(--border)' }} />
-                    <Bar dataKey="novos" fill="var(--primary)" stackId="a" radius={[0, 0, 0, 0]} barSize={20} />
-                    <Bar dataKey="recorrentes" fill="var(--muted)" stackId="a" radius={[4, 4, 0, 0]} barSize={20} />
+                    <Bar dataKey="novos" fill="var(--primary)" stackId="a" radius={[0, 0, 0, 0] as any} barSize={20} />
+                    <Bar dataKey="recorrentes" fill="var(--muted)" stackId="a" radius={[4, 4, 0, 0] as any} barSize={20} />
                   </ComposedChart>
                 </ResponsiveContainer>
               ) : (
@@ -506,7 +506,7 @@ export default function DashboardPage() {
                     <XAxis type="number" hide />
                     <YAxis dataKey="platform" type="category" tick={{ fontSize: 11, fill: "var(--foreground)" }} width={80} axisLine={false} tickLine={false} />
                     <Tooltip cursor={{ fill: 'var(--muted)', opacity: 0.2 }} contentStyle={{ borderRadius: '8px', border: '1px solid var(--border)' }} />
-                    <Bar dataKey="orders" fill="var(--primary)" radius={[0, 4, 4, 0]} background={{ fill: 'var(--muted)', opacity: 0.2, radius: [0, 4, 4, 0] }} />
+                    <Bar dataKey="orders" fill="var(--primary)" radius={[0, 4, 4, 0] as any} background={{ fill: 'var(--muted)', opacity: 0.2, radius: [0, 4, 4, 0] as any }} />
                   </RechartsBarChart>
                 </ResponsiveContainer>
               ) : (

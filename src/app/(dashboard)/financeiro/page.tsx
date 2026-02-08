@@ -12,6 +12,7 @@ import {
     ShoppingCart,
     PieChart
 } from "lucide-react";
+import { subDays } from "date-fns";
 import {
     getFinancialMetrics,
     getProductCosts,
@@ -43,9 +44,19 @@ export default function FinancePage() {
         try {
             const { days, from, to } = periodToParams(period);
 
+            // Calculate dates
+            let fromDate: Date, toDate: Date;
+            if (from && to) {
+                fromDate = new Date(from);
+                toDate = new Date(to);
+            } else {
+                toDate = new Date();
+                fromDate = subDays(toDate, days);
+            }
+
             // Fetch all data in parallel
             const [metricsData, costsData, configData] = await Promise.all([
-                getFinancialMetrics({ from, to }),
+                getFinancialMetrics({ from: fromDate, to: toDate }),
                 getProductCosts(),
                 getFinancialConfig(),
             ]);
