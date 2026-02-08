@@ -147,21 +147,31 @@ export async function POST(request: NextRequest) {
 
                 if (!createRes.ok) {
                     const error = await createRes.text();
-                    console.error("Create instance error:", error);
+                    // If error is 403 and message says "already in use", treat as existing instance
+                    // This happens if fetchInstances failed to find it (race condition or cache)
+                    // We only proceed if action is 'init' (which implies "connect if exists")
+                    const isAlreadyInUse = createRes.status === 403 && (error.includes("already in use") || error.includes("Forbidden"));
+
+                    if (isAlreadyInUse && action === "init") {
+                        console.log("Instance already exists (caught via 403), proceeding to connect...");
+                        instanceExists = true; // Mark as true so we fall through to connect logic
+                    } else {
+                        console.error("Create instance error:", error);
+                        return NextResponse.json({
+                            success: false,
+                            error: "Erro ao criar instância: " + (isAlreadyInUse ? "Já existe" : error)
+                        }, { status: 400 });
+                    }
+                } else {
+                    const data = await createRes.json();
+
                     return NextResponse.json({
-                        success: false,
-                        error: "Erro ao criar instância: " + error
-                    }, { status: 400 });
+                        success: true,
+                        instanceName,
+                        qrcode: data.qrcode?.base64 || null,
+                        status: "CONNECTING",
+                    });
                 }
-
-                const data = await createRes.json();
-
-                return NextResponse.json({
-                    success: true,
-                    instanceName,
-                    qrcode: data.qrcode?.base64 || null,
-                    status: "CONNECTING",
-                });
             } else {
                 // Instance forces exist, so connect
                 // Fall through to connect logic if action was 'init'
