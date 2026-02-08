@@ -68,7 +68,7 @@ export default function LoginPage() {
         <div className="relative p-1 bg-secondary/50 rounded-xl flex">
           <div
             className={cn(
-              "absolute top-1 bottom-1 w-[calc(50%-4px)] bg-background rounded-lg shadow-sm transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)]",
+              "absolute top-1 bottom-1 w-[calc(50%-4px)] bg-background rounded-lg shadow-sm transition-all duration-300 ease-apple",
               loginType === "ADMIN" ? "translate-x-[calc(100%+4px)]" : "translate-x-0"
             )}
           />
