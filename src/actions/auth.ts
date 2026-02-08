@@ -70,8 +70,17 @@ export async function registerUser(formData: {
 export async function loginUser(formData: {
   email: string;
   password: string;
+  loginType?: "ADMIN" | "CLIENT";
 }) {
   try {
+    // STRICT ENFORCEMENT: If trying to login as ADMIN, email MUST be academy.cdr@gmail.com
+    if (formData.loginType === "ADMIN") {
+      const adminEmail = "academy.cdr@gmail.com";
+      if (formData.email.trim().toLowerCase() !== adminEmail) {
+        return { error: "Acesso administrativo negado para este e-mail." };
+      }
+    }
+
     await signIn("credentials", {
       email: formData.email,
       password: formData.password,

@@ -34,7 +34,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const result = await loginUser({ email, password });
+      const result = await loginUser({ email, password, loginType });
       if (result?.error) {
         setError(result.error);
       }
