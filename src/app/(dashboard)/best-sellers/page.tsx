@@ -46,15 +46,14 @@ export default function BestSellersPage() {
                     }
                 }
 
-                const [productsData, collectionsData] = await Promise.all([
+                const results = await Promise.allSettled([
                     getBestSellersAction(selectedCollection === "all" ? undefined : selectedCollection, fromDate, toDate),
                     getCollectionsAction()
                 ]);
 
-                setProducts(productsData);
-
-                if (collections.length === 0 && collectionsData.length > 0) {
-                    setCollections(collectionsData);
+                if (results[0].status === "fulfilled") setProducts(results[0].value);
+                if (results[1].status === "fulfilled" && collections.length === 0 && results[1].value.length > 0) {
+                    setCollections(results[1].value);
                 }
             } catch (err) {
                 console.error("Failed to fetch data:", err);

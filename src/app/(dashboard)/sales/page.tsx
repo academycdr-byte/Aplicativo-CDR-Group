@@ -45,15 +45,19 @@ export default function SalesPage() {
   const [period, setPeriod] = useState<PeriodValue>({ type: "preset", days: 30 });
 
   const loadData = useCallback(async () => {
-    const { days, from, to } = periodToParams(period);
-    const [s, daily, status] = await Promise.all([
-      getSalesData(days, from, to),
-      getSalesByDay(days, from, to),
-      getSalesByStatus(),
-    ]);
-    if (s) setStats(s);
-    setDailyData(daily);
-    setStatusData(status);
+    try {
+      const { days, from, to } = periodToParams(period);
+      const results = await Promise.allSettled([
+        getSalesData(days, from, to),
+        getSalesByDay(days, from, to),
+        getSalesByStatus(),
+      ]);
+      if (results[0].status === "fulfilled" && results[0].value) setStats(results[0].value);
+      if (results[1].status === "fulfilled") setDailyData(results[1].value);
+      if (results[2].status === "fulfilled") setStatusData(results[2].value);
+    } catch (error) {
+      console.error("Failed to load sales data", error);
+    }
   }, [period]);
 
   useEffect(() => {

@@ -54,21 +54,24 @@ export default function FinancePage() {
                 fromDate = subDays(toDate, days);
             }
 
-            // Fetch all data in parallel
-            const [metricsData, costsData, configData] = await Promise.all([
+            // Fetch all data in parallel with graceful degradation
+            const results = await Promise.allSettled([
                 getFinancialMetrics({ from: fromDate, to: toDate }),
                 getProductCosts(),
                 getFinancialConfig(),
             ]);
 
-            setMetrics(metricsData);
-            setCosts(costsData);
-            if (configData) {
+            if (results[0].status === "fulfilled") setMetrics(results[0].value);
+            if (results[1].status === "fulfilled") setCosts(results[1].value);
+            if (results[2].status === "fulfilled" && results[2].value) {
                 setConfig({
-                    defaultTaxRate: Number(configData.defaultTaxRate),
-                    fixedTransactionFee: Number(configData.fixedTransactionFee)
+                    defaultTaxRate: Number(results[2].value.defaultTaxRate),
+                    fixedTransactionFee: Number(results[2].value.fixedTransactionFee)
                 });
             }
+
+            const failed = results.filter((r) => r.status === "rejected");
+            if (failed.length > 0) console.error("Some financial data failed to load", failed);
         } catch (error) {
             console.error("Failed to load financial data", error);
         } finally {

@@ -212,7 +212,6 @@ export async function getFunnelData(days: number = 30, from?: string, to?: strin
     deliveredOrders,
     storeFunnelAgg,
     adAgg,
-    adMetricsRaw,
   ] = await Promise.all([
     prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter } }),
     prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter, status: "paid" } }),
@@ -228,11 +227,6 @@ export async function getFunnelData(days: number = 30, from?: string, to?: strin
       where: { organizationId: orgId, date: dateFilter },
       _sum: { clicks: true, addToCart: true, initiateCheckout: true },
     }).catch(() => ({ _sum: { clicks: 0, addToCart: 0, initiateCheckout: 0 } })),
-    // Source 3: Facebook Ads raw data (for parsing add_to_cart from actions array)
-    prisma.adMetric.findMany({
-      where: { organizationId: orgId, date: dateFilter },
-      select: { rawData: true },
-    }),
   ]);
 
   // Store platform data
@@ -246,8 +240,12 @@ export async function getFunnelData(days: number = 30, from?: string, to?: strin
   const fbInitiateCheckout = Number(adAgg._sum.initiateCheckout || 0);
   let fbAddToCart = Number(adAgg._sum.addToCart || 0);
 
-  // Parse rawData for add_to_cart if the addToCart column has no data
+  // Lazy-load rawData only if addToCart column has no data (avoids heavy JSON fetch)
   if (fbAddToCart === 0) {
+    const adMetricsRaw = await prisma.adMetric.findMany({
+      where: { organizationId: orgId, date: dateFilter },
+      select: { rawData: true },
+    });
     for (const m of adMetricsRaw) {
       if (m.rawData && typeof m.rawData === "object") {
         const raw = m.rawData as Record<string, unknown>;
@@ -290,25 +288,18 @@ export async function getPaidAndRepurchaseRates(days: number = 30, from?: string
   const orgId = ctx.organization.id;
   const dateFilter = buildDateFilter(getDateRange(days, from, to));
 
-  const [totalOrders, paidOrders, allCustomers] = await Promise.all([
+  const [totalOrders, paidOrders, customerGroups] = await Promise.all([
     prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter } }),
     prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter, status: "paid" } }),
-    prisma.order.findMany({
+    prisma.order.groupBy({
+      by: ["customerEmail"],
       where: { organizationId: orgId, orderDate: dateFilter, customerEmail: { not: null } },
-      select: { customerEmail: true },
+      _count: { id: true },
     }),
   ]);
 
-  // Count unique customers and those with more than 1 order
-  const emailCounts: Record<string, number> = {};
-  for (const o of allCustomers) {
-    if (o.customerEmail) {
-      emailCounts[o.customerEmail] = (emailCounts[o.customerEmail] || 0) + 1;
-    }
-  }
-
-  const uniqueCustomers = Object.keys(emailCounts).length;
-  const repeatCustomers = Object.values(emailCounts).filter((c) => c > 1).length;
+  const uniqueCustomers = customerGroups.length;
+  const repeatCustomers = customerGroups.filter((g) => g._count.id > 1).length;
 
   return {
     paidRate: totalOrders > 0 ? (paidOrders / totalOrders) * 100 : 0,

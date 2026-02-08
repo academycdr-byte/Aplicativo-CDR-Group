@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -58,43 +59,39 @@ export function Sidebar() {
   const isInternal = userRole === "OWNER" || userRole === "ADMIN" || userRole === "MEMBER";
   const isAdmin = userRole === "OWNER" || userRole === "ADMIN";
 
-  // CDR AI Group
-  const aiNavItems = [
-    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  ];
+  const { filteredAiNav, filteredPlatformNav, filteredManagementNav } = useMemo(() => {
+    const filterNav = (items: NavItem[]) =>
+      items.filter((item) => {
+        if (item.adminOnly) return isAdmin;
+        if (item.internalOnly) return isInternal;
+        return true;
+      });
 
-  // PLATAFORMA Group
-  const platformNavItems = [
-    { name: "Pedidos", href: "/orders", icon: ShoppingBag },
-    { name: "Vendas", href: "/sales", icon: TrendingUp },
-    { name: "Mais Vendidos", href: "/best-sellers", icon: ShoppingBag },
-    { name: "Anuncios", href: "/ads", icon: Megaphone },
-    { name: "Financeiro", href: "/financeiro", icon: Wallet },
-    { name: "Analytics", href: "/analytics", icon: BarChart3 },
-  ];
+    const aiNavItems: NavItem[] = [
+      { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+    ];
 
-  // Logic for Reports tab (restrict to admin roles)
-  if (isAdmin) {
-    platformNavItems.push({ name: "Relatórios", href: "/reports", icon: FileText } as NavItem);
-  }
+    const platformNavItems: NavItem[] = [
+      { name: "Pedidos", href: "/orders", icon: ShoppingBag },
+      { name: "Vendas", href: "/sales", icon: TrendingUp },
+      { name: "Mais Vendidos", href: "/best-sellers", icon: ShoppingBag },
+      { name: "Anuncios", href: "/ads", icon: Megaphone },
+      { name: "Financeiro", href: "/financeiro", icon: Wallet },
+      { name: "Analytics", href: "/analytics", icon: BarChart3 },
+      ...(isAdmin ? [{ name: "Relatórios", href: "/reports", icon: FileText }] : []),
+    ];
 
-  // GESTÃO Group
-  const managementNavItems = [
-    { name: "Integrações", href: "/integrations", icon: Link2, internalOnly: true },
-    { name: "Configurações", href: "/settings", icon: Settings },
-  ];
+    const managementNavItems: NavItem[] = [
+      { name: "Integrações", href: "/integrations", icon: Link2, internalOnly: true },
+      { name: "Configurações", href: "/settings", icon: Settings },
+    ];
 
-  const filterNav = (items: any[]) => {
-    return items.filter(item => {
-      if (item.adminOnly) return isAdmin;
-      if (item.internalOnly) return isInternal;
-      return true;
-    });
-  };
-
-  const filteredAiNav = filterNav(aiNavItems);
-  const filteredPlatformNav = filterNav(platformNavItems);
-  const filteredManagementNav = filterNav(managementNavItems);
+    return {
+      filteredAiNav: filterNav(aiNavItems),
+      filteredPlatformNav: filterNav(platformNavItems),
+      filteredManagementNav: filterNav(managementNavItems),
+    };
+  }, [isAdmin, isInternal]);
 
   return (
     <aside className="hidden md:flex md:w-[260px] md:flex-col bg-sidebar-bg border-r border-sidebar-border h-screen sticky top-0 z-30">
