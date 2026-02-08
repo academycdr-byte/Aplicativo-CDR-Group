@@ -138,21 +138,7 @@ export function VideoModal({ isOpen, onClose, creative }: VideoModalProps) {
                             </p>
                         )}
 
-                        <div className="flex flex-col items-center gap-2">
-                            <Button variant="outline" className="gap-2" asChild>
-                                <a
-                                    href={`https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=BR&q=${encodeURIComponent(creative.adName || creative.adId)}`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                >
-                                    <ExternalLink className="w-4 h-4" />
-                                    Buscar na Biblioteca de Anuncios
-                                </a>
-                            </Button>
-                            <p className="text-xs text-muted-foreground text-center">
-                                Nota: Resultados dependem do status do anuncio no Meta
-                            </p>
-                        </div>
+
                     </div>
 
                     {/* Metrics Column */}

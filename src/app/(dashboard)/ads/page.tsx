@@ -17,6 +17,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { PeriodSelector, periodToParams, type PeriodValue } from "@/components/period-selector";
 import {
   Table,
@@ -60,8 +62,7 @@ import { getAdMetrics, getAdMetricsByDay, getCreativePerformance } from "@/actio
 import { AdsFilter } from "@/components/ads/ads-filter";
 import { FunnelChart } from "@/components/ads/funnel-chart";
 import { VideoModal } from "@/components/ads/video-modal";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
+
 
 // Types
 type AdTotals = {
@@ -169,6 +170,9 @@ export default function AdsPage() {
   const [selectedCreative, setSelectedCreative] = useState<Creative | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // Creative Filtering
+  const [uniqueCreatives, setUniqueCreatives] = useState(false);
+
   // Load Data
   const loadData = useCallback(async () => {
     const { days, from, to } = periodToParams(period);
@@ -238,7 +242,7 @@ export default function AdsPage() {
   }, [metrics, metricsSortKey, metricsSortDir]);
 
   const sortedCreatives = useMemo(() => {
-    const withDerived = creatives.map((c) => ({
+    let withDerived = creatives.map((c) => ({
       ...c,
       ctr: c.impressions > 0 ? (c.clicks / c.impressions) * 100 : 0,
       cpc: c.clicks > 0 ? c.spend / c.clicks : 0,
@@ -247,12 +251,44 @@ export default function AdsPage() {
       cpa: c.conversions > 0 ? c.spend / c.conversions : 0,
       ticket: c.conversions > 0 ? c.revenue / c.conversions : 0,
     }));
+
+    if (uniqueCreatives) {
+      // Group by adName and keep best (High ROAS > High Conversions > High Spend)
+      const bestMap = new Map<string, typeof withDerived[0]>();
+
+      for (const c of withDerived) {
+        const key = (c.adName || "Sem Nome").trim().toLowerCase(); // Normalize name
+        const existing = bestMap.get(key);
+
+        if (!existing) {
+          bestMap.set(key, c);
+        } else {
+          // Compare logic: Is current 'c' better than 'existing'?
+          // 1. ROAS
+          if (c.roas > existing.roas) {
+            bestMap.set(key, c);
+          } else if (c.roas === existing.roas) {
+            // 2. Conversions
+            if (c.conversions > existing.conversions) {
+              bestMap.set(key, c);
+            } else if (c.conversions === existing.conversions) {
+              // 3. Spend (Higher spend usually means main ad)
+              if (c.spend > existing.spend) {
+                bestMap.set(key, c);
+              }
+            }
+          }
+        }
+      }
+      withDerived = Array.from(bestMap.values());
+    }
+
     return withDerived.sort((a, b) => {
       const aVal = (a as any)[creativesSortKey] ?? 0;
       const bVal = (b as any)[creativesSortKey] ?? 0;
       return creativesSortDir === "desc" ? bVal - aVal : aVal - bVal;
     });
-  }, [creatives, creativesSortKey, creativesSortDir]);
+  }, [creatives, creativesSortKey, creativesSortDir, uniqueCreatives]);
 
   // Top Performers Logic
   const topCreatives = useMemo(() => {
@@ -661,20 +697,32 @@ export default function AdsPage() {
           {/* Creatives Toolbar */}
           <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
             <p className="text-sm text-muted-foreground">Exibindo {sortedCreatives.length} criativos</p>
-            <div className="flex items-center gap-2">
-              <ListFilter className="w-4 h-4 text-muted-foreground" />
-              <Select value={creativesSortKey} onValueChange={setCreativesSortKey}>
-                <SelectTrigger className="w-[180px] h-8 text-xs">
-                  <SelectValue placeholder="Ordenar por" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="spend">Maior Gasto</SelectItem>
-                  <SelectItem value="roas">Maior ROAS</SelectItem>
-                  <SelectItem value="revenue">Maior Receita</SelectItem>
-                  <SelectItem value="ctr">Maior CTR</SelectItem>
-                  <SelectItem value="conversions">Mais Conversoes</SelectItem>
-                </SelectContent>
-              </Select>
+
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="unique-mode"
+                  checked={uniqueCreatives}
+                  onCheckedChange={setUniqueCreatives}
+                />
+                <Label htmlFor="unique-mode" className="text-sm cursor-pointer">Ocultar duplicatas</Label>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <ListFilter className="w-4 h-4 text-muted-foreground" />
+                <Select value={creativesSortKey} onValueChange={setCreativesSortKey}>
+                  <SelectTrigger className="w-[180px] h-8 text-xs">
+                    <SelectValue placeholder="Ordenar por" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="spend">Maior Gasto</SelectItem>
+                    <SelectItem value="roas">Maior ROAS</SelectItem>
+                    <SelectItem value="revenue">Maior Receita</SelectItem>
+                    <SelectItem value="ctr">Maior CTR</SelectItem>
+                    <SelectItem value="conversions">Mais Conversoes</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 
