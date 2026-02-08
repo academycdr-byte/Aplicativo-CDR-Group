@@ -37,8 +37,8 @@ function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
     <Link
       href={item.href}
       className={`group flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-200 relative ${isActive
-          ? "bg-primary/10 text-primary"
-          : "text-sidebar-text/70 hover:text-sidebar-text hover:bg-sidebar-hover"
+        ? "bg-primary/10 text-primary"
+        : "text-sidebar-text/70 hover:text-sidebar-text hover:bg-sidebar-hover"
         }`}
     >
       {isActive && (
@@ -101,7 +101,7 @@ export function Sidebar() {
     <aside className="hidden md:flex md:w-[260px] md:flex-col bg-sidebar-bg border-r border-sidebar-border h-screen sticky top-0 z-30">
       {/* Brand */}
       <div className="flex items-center gap-3 px-6 py-6 mb-2">
-        <div className="relative w-9 h-9 flex items-center justify-center bg-white/5 rounded-xl shadow-inner border border-white/5">
+        <div className="relative w-12 h-12 flex items-center justify-center bg-white/5 rounded-xl shadow-inner border border-white/5">
           <Image
             src="/logo.png.png"
             alt="CDR Group"
@@ -111,8 +111,8 @@ export function Sidebar() {
           />
         </div>
         <div>
-          <p className="font-semibold text-sm leading-tight text-white tracking-wide">CDR Group</p>
-          <p className="text-[11px] text-sidebar-text/50 leading-tight font-medium">Performance</p>
+          <p className="font-semibold text-base leading-tight text-white tracking-wide">CDR Group</p>
+          <p className="text-xs text-sidebar-text/50 leading-tight font-medium">Performance</p>
         </div>
       </div>
 
