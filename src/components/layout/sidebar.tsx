@@ -97,15 +97,14 @@ export function Sidebar() {
     <aside className="hidden md:flex md:w-[260px] md:flex-col bg-sidebar-bg border-r border-sidebar-border h-screen sticky top-0 z-30">
       {/* Brand */}
       <div className="flex items-center gap-3 px-6 py-6 mb-2">
-        <div className="relative w-12 h-12 flex items-center justify-center bg-white/5 rounded-xl shadow-inner border border-white/5">
-          <Image
-            src="/logo-cdr.png"
-            alt="CDR Group"
-            fill
-            className="object-contain p-1.5"
-            priority
-          />
-        </div>
+        <Image
+          src="/logo-cdr.png"
+          alt="CDR Group"
+          width={40}
+          height={40}
+          className="rounded-lg"
+          priority
+        />
         <div>
           <p className="font-semibold text-base leading-tight text-white tracking-wide">CDR Group</p>
           <p className="text-xs text-sidebar-text/50 leading-tight font-medium">Performance</p>

@@ -112,14 +112,13 @@ export function MobileSidebar() {
       <SheetContent side="left" className="w-64 p-0 bg-sidebar-bg text-sidebar-text overflow-y-auto">
         <SheetHeader className="px-5 py-5 border-b border-white/5">
           <SheetTitle className="flex items-center gap-3 text-sidebar-text">
-            <div className="relative w-8 h-8 flex items-center justify-center bg-white/5 rounded-lg border border-white/5">
-              <Image
-                src="/logo-cdr.png"
-                alt="CDR Group"
-                fill
-                className="object-contain p-1"
-              />
-            </div>
+            <Image
+              src="/logo-cdr.png"
+              alt="CDR Group"
+              width={32}
+              height={32}
+              className="rounded-lg"
+            />
             <div>
               <p className="font-semibold text-sm leading-tight">CDR Group</p>
               <p className="text-[11px] text-sidebar-text/50 leading-tight">Performance</p>
