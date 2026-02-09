@@ -115,8 +115,8 @@ export function MobileSidebar() {
             <Image
               src="/logo-cdr.png"
               alt="CDR Group"
-              width={28}
-              height={28}
+              width={36}
+              height={36}
               className="rounded-lg"
             />
             <div>
