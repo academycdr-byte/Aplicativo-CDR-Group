@@ -13,7 +13,6 @@ import {
   ArrowDownRight,
   CheckCircle,
   Repeat,
-  Users,
   BarChart,
   Target,
   Search,
@@ -23,7 +22,6 @@ import {
 import {
   ResponsiveContainer,
   ComposedChart,
-  BarChart as RechartsBarChart,
   Bar,
   Line,
   XAxis,
@@ -80,14 +78,6 @@ type RatesData = {
   uniqueCustomers: number;
 };
 
-type CustomerTrend = {
-  month: string;
-  novos: number;
-  recorrentes: number;
-  taxaRecorrencia: number;
-};
-
-type PlatformData = { platform: string; orders: number; revenue: number };
 type RecentOrder = {
   id: string;
   externalOrderId: string;
@@ -111,11 +101,9 @@ const metricToggles = [
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [metricsData, setMetricsData] = useState<MetricPoint[]>([]);
-  const [platformData, setPlatformData] = useState<PlatformData[]>([]);
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [funnel, setFunnel] = useState<FunnelData | null>(null);
   const [rates, setRates] = useState<RatesData | null>(null);
-  const [customerTrends, setCustomerTrends] = useState<CustomerTrend[]>([]);
   const [period, setPeriod] = useState<PeriodValue>({ type: "preset", days: 30 });
   const [syncing, setSyncing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -134,11 +122,9 @@ export default function DashboardPage() {
 
       if (data.dashboard) setStats(data.dashboard);
       setMetricsData(data.metrics);
-      setPlatformData(data.platforms);
       setRecentOrders(data.orders);
       setFunnel(data.funnel);
       setRates(data.rates);
-      setCustomerTrends(data.trends);
 
       if (data.failedCount > 0) {
         toast.error(`Erro ao carregar ${data.failedCount} seção(ões) do dashboard`);
@@ -440,80 +426,7 @@ export default function DashboardPage() {
             colorClass="bg-purple-500"
             icon={Repeat}
           />
-
-          <Card className="sm:col-span-2 shadow-sm p-6 flex items-center justify-between bg-gradient-to-br from-card to-secondary/20">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Total de Clientes Únicos</p>
-              <div className="flex items-baseline gap-2">
-                <p className="text-3xl font-bold tracking-tight text-foreground">{fmtNum(rates?.uniqueCustomers || 0)}</p>
-                <span className="text-xs text-muted-foreground">no período</span>
-              </div>
-            </div>
-            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
-              <Users className="w-6 h-6" />
-            </div>
-          </Card>
         </div>
-      </div>
-
-      {/* Platform & Trends */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        {/* Customer Trends */}
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle>Tendências de Clientes</CardTitle>
-            <CardDescription>Novos vs Recorrentes</CardDescription>
-          </CardHeader>
-          <CardContent className="px-2 pb-6">
-            <div className="h-[300px] w-full">
-              {customerTrends.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={customerTrends} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} opacity={0.3} />
-                    <XAxis dataKey="month" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} tickMargin={10} />
-                    <YAxis yAxisId="left" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
-                    <Tooltip
-                      cursor={{ fill: 'var(--muted)', opacity: 0.1 }}
-                      contentStyle={{ borderRadius: '12px', border: '1px solid var(--border)', backgroundColor: 'var(--card)', boxShadow: 'var(--shadow-lg)' }}
-                    />
-                    <Bar dataKey="novos" name="Novos" fill="var(--primary)" stackId="a" radius={[0, 0, 0, 0] as any} barSize={24} />
-                    <Bar dataKey="recorrentes" name="Recorrentes" fill="var(--muted-foreground)" opacity={0.3} stackId="a" radius={[4, 4, 0, 0] as any} barSize={24} />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-full flex items-center justify-center text-muted-foreground text-xs">Sem dados</div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Platform Breakdown */}
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle>Pedidos por Plataforma</CardTitle>
-            <CardDescription>Origem das vendas</CardDescription>
-          </CardHeader>
-          <CardContent className="px-2 pb-6">
-            <div className="h-[300px] w-full">
-              {platformData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <RechartsBarChart data={platformData} layout="vertical" barSize={32} barCategoryGap={10} margin={{ top: 0, right: 20, left: 0, bottom: 0 }}>
-                    <CartesianGrid horizontal={false} stroke="var(--border)" opacity={0.3} />
-                    <XAxis type="number" hide />
-                    <YAxis dataKey="platform" type="category" tick={{ fontSize: 11, fill: "var(--foreground)", fontWeight: 500 }} width={100} axisLine={false} tickLine={false} />
-                    <Tooltip
-                      cursor={{ fill: 'var(--muted)', opacity: 0.1 }}
-                      contentStyle={{ borderRadius: '12px', border: '1px solid var(--border)', backgroundColor: 'var(--card)', boxShadow: 'var(--shadow-lg)' }}
-                    />
-                    <Bar dataKey="orders" name="Pedidos" fill="var(--chart-2)" radius={[0, 6, 6, 0] as any} background={{ fill: 'var(--muted)', opacity: 0.1, radius: [0, 6, 6, 0] as any }} />
-                  </RechartsBarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-full flex items-center justify-center text-muted-foreground text-xs">Sem dados</div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
     </div>
