@@ -318,11 +318,13 @@ model StoreFunnel {
   organizationId     String
   platform           Platform
   date               DateTime @db.Date
-  sessions           Int      @default(0)
-  addToCart           Int      @default(0)
-  checkoutsInitiated Int      @default(0)
-  ordersGenerated    Int      @default(0)
-  createdAt          DateTime @default(now())
+  sessions             Int      @default(0)
+  addToCart             Int      @default(0)
+  checkoutsInitiated   Int      @default(0)
+  ordersGenerated      Int      @default(0)
+  totalCustomers       Int      @default(0)
+  returningCustomers   Int      @default(0)
+  createdAt            DateTime @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 

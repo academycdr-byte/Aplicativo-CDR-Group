@@ -436,22 +436,67 @@ export async function syncShopifyFunnel(organizationId: string) {
     const accessToken = decrypt(integration.accessToken);
     const shop = integration.externalStoreId || "";
 
-    // Get orders by date from our database
+    // Get orders by date from our database (with customer emails for repurchase rate)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const orders = await prisma.order.findMany({
-      where: {
-        organizationId,
-        platform: "SHOPIFY",
-        orderDate: { gte: thirtyDaysAgo },
-      },
-      select: { orderDate: true },
-    });
+    const [orders, allHistoricalOrders] = await Promise.all([
+      prisma.order.findMany({
+        where: {
+          organizationId,
+          platform: "SHOPIFY",
+          orderDate: { gte: thirtyDaysAgo },
+        },
+        select: { orderDate: true, customerEmail: true },
+      }),
+      // All historical orders for first-order date map
+      prisma.order.findMany({
+        where: { organizationId, platform: "SHOPIFY", customerEmail: { not: null } },
+        select: { customerEmail: true, orderDate: true },
+        orderBy: { orderDate: "asc" },
+      }),
+    ]);
 
     const ordersByDate: Record<string, number> = {};
     for (const o of orders) {
       const key = o.orderDate.toISOString().split("T")[0];
       ordersByDate[key] = (ordersByDate[key] || 0) + 1;
+    }
+
+    // Build first-order-date map and per-day customer metrics (Shopify-compatible)
+    const firstOrderByCustomer = new Map<string, Date>();
+    for (const o of allHistoricalOrders) {
+      const email = o.customerEmail!.toLowerCase();
+      if (!firstOrderByCustomer.has(email)) {
+        firstOrderByCustomer.set(email, o.orderDate);
+      }
+    }
+
+    // Group period orders by day → unique customers
+    const customersByDay = new Map<string, Set<string>>();
+    for (const o of orders) {
+      if (!o.customerEmail) continue;
+      const dayKey = o.orderDate.toISOString().split("T")[0];
+      const email = o.customerEmail.toLowerCase();
+      if (!customersByDay.has(dayKey)) {
+        customersByDay.set(dayKey, new Set());
+      }
+      customersByDay.get(dayKey)!.add(email);
+    }
+
+    // Compute per-day: totalCustomers and returningCustomers
+    const customerMetricsByDay: Record<string, { total: number; returning: number }> = {};
+    for (const [dayKey, emails] of customersByDay) {
+      const dayStart = new Date(dayKey);
+      let total = 0;
+      let returning = 0;
+      for (const email of emails) {
+        total++;
+        const firstOrder = firstOrderByCustomer.get(email);
+        if (firstOrder && firstOrder < dayStart) {
+          returning++;
+        }
+      }
+      customerMetricsByDay[dayKey] = { total, returning };
     }
 
     // Strategy 1: Try ShopifyQL FROM sessions (exact analytics data)
@@ -465,6 +510,7 @@ export async function syncShopifyFunnel(organizationId: string) {
           ? metrics.ordersCompleted
           : (ordersByDate[dateKey] || 0);
 
+        const custMetrics = customerMetricsByDay[dateKey] || { total: 0, returning: 0 };
         await prisma.storeFunnel.upsert({
           where: {
             organizationId_platform_date: {
@@ -481,12 +527,16 @@ export async function syncShopifyFunnel(organizationId: string) {
             addToCart: metrics.addToCart,
             checkoutsInitiated: metrics.checkoutsStarted,
             ordersGenerated: dayOrders,
+            totalCustomers: custMetrics.total,
+            returningCustomers: custMetrics.returning,
           },
           update: {
             sessions: metrics.sessions,
             addToCart: metrics.addToCart,
             checkoutsInitiated: metrics.checkoutsStarted,
             ordersGenerated: dayOrders,
+            totalCustomers: custMetrics.total,
+            returningCustomers: custMetrics.returning,
           },
         });
         synced++;
@@ -516,9 +566,12 @@ export async function syncShopifyFunnel(organizationId: string) {
 
       // IMPORTANT: Only include sessions in the update if we actually got session data.
       // Never overwrite existing session data with 0.
+      const custMetrics = customerMetricsByDay[dateKey] || { total: 0, returning: 0 };
       const updateData: Record<string, number> = {
         checkoutsInitiated: abandoned + dayOrders,
         ordersGenerated: dayOrders,
+        totalCustomers: custMetrics.total,
+        returningCustomers: custMetrics.returning,
       };
       if (hasSalesSessionData && sessions > 0) {
         updateData.sessions = sessions;
@@ -540,6 +593,8 @@ export async function syncShopifyFunnel(organizationId: string) {
           addToCart: 0,
           checkoutsInitiated: abandoned + dayOrders,
           ordersGenerated: dayOrders,
+          totalCustomers: custMetrics.total,
+          returningCustomers: custMetrics.returning,
         },
         update: updateData,
       });

@@ -76,6 +76,7 @@ type RatesData = {
   totalOrders: number;
   repurchaseRate: number;
   repeatCustomers: number;
+  totalCustomersInDays: number;
   uniqueCustomers: number;
 };
 
@@ -432,9 +433,9 @@ export default function DashboardPage() {
           />
 
           <RateCard
-            title="Taxa de Recompra"
+            title="Taxa de Clientes Recorrentes"
             value={`${(rates?.repurchaseRate || 0).toFixed(1)}%`}
-            subtext={`${rates?.repeatCustomers || 0} recorrentes`}
+            subtext={`${rates?.repeatCustomers || 0} recorrentes de ${rates?.totalCustomersInDays || 0}`}
             progress={rates?.repurchaseRate || 0}
             colorClass="bg-purple-500"
             icon={Repeat}

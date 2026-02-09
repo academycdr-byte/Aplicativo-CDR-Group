@@ -276,7 +276,12 @@ export async function getFunnelData(days: number = 30, from?: string, to?: strin
 }
 
 /**
- * % paid orders and % repurchase rate
+ * % paid orders and % repurchase rate (Shopify-compatible per-day calculation)
+ *
+ * Shopify formula: For each day, count unique customers and returning customers.
+ * A "returning customer" on day X = customer who ordered on day X AND has at least
+ * one order BEFORE day X (any time in history, not just before the period).
+ * Period rate = SUM(returning per day) / SUM(customers per day) * 100
  */
 export async function getPaidAndRepurchaseRates(days: number = 30, from?: string, to?: string) {
   const ctx = await getSessionWithOrg();
@@ -285,19 +290,16 @@ export async function getPaidAndRepurchaseRates(days: number = 30, from?: string
   const orgId = ctx.organization.id;
   const dateFilter = buildDateFilter(getDateRange(days, from, to));
 
-  const range = getDateRange(days, from, to);
-
-  const [totalOrders, paidOrders, customersInPeriod, allHistoricalCustomers] = await Promise.all([
+  const [totalOrders, paidOrders, ordersInPeriod, allHistoricalOrders] = await Promise.all([
     prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter } }),
     // Only truly PAID orders (not pending/authorized)
     prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter, status: "paid" } }),
-    // Unique customers who ordered in this period
+    // All orders in period with email + date (for per-day grouping)
     prisma.order.findMany({
       where: { organizationId: orgId, orderDate: dateFilter, customerEmail: { not: null } },
-      select: { customerEmail: true },
-      distinct: ["customerEmail"],
+      select: { customerEmail: true, orderDate: true },
     }),
-    // ALL customers who have EVER ordered (full history, no date limit)
+    // ALL orders ever (full history) to build first-order map
     prisma.order.findMany({
       where: { organizationId: orgId, customerEmail: { not: null } },
       select: { customerEmail: true, orderDate: true },
@@ -305,33 +307,52 @@ export async function getPaidAndRepurchaseRates(days: number = 30, from?: string
     }),
   ]);
 
-  // Build map: email (lowercase) → first order date
+  // Build map: email (lowercase) → first order date ever
   const firstOrderByCustomer = new Map<string, Date>();
-  for (const o of allHistoricalCustomers) {
+  for (const o of allHistoricalOrders) {
     const email = o.customerEmail!.toLowerCase();
     if (!firstOrderByCustomer.has(email)) {
       firstOrderByCustomer.set(email, o.orderDate);
     }
   }
 
-  // A returning customer ordered in this period AND their FIRST order ever was before this period
-  const periodEmails = new Set(customersInPeriod.map((c) => c.customerEmail!.toLowerCase()));
-  const uniqueCustomers = periodEmails.size;
-  let repeatCustomers = 0;
-  for (const email of periodEmails) {
-    const firstOrder = firstOrderByCustomer.get(email);
-    if (firstOrder && firstOrder < range.since) {
-      repeatCustomers++;
+  // Group orders by day → unique customers per day
+  const customersByDay = new Map<string, Set<string>>();
+  for (const o of ordersInPeriod) {
+    const dayKey = o.orderDate.toISOString().split("T")[0];
+    const email = o.customerEmail!.toLowerCase();
+    if (!customersByDay.has(dayKey)) {
+      customersByDay.set(dayKey, new Set());
+    }
+    customersByDay.get(dayKey)!.add(email);
+  }
+
+  // Shopify per-day calculation: sum customers and returning customers across all days
+  let totalCustomersSum = 0;
+  let returningCustomersSum = 0;
+  for (const [dayKey, emails] of customersByDay) {
+    const dayStart = new Date(dayKey);
+    for (const email of emails) {
+      totalCustomersSum++;
+      const firstOrder = firstOrderByCustomer.get(email);
+      // Returning = first-ever order was BEFORE this specific day
+      if (firstOrder && firstOrder < dayStart) {
+        returningCustomersSum++;
+      }
     }
   }
+
+  // Unique customers across the entire period (for display)
+  const allPeriodEmails = new Set(ordersInPeriod.map((o) => o.customerEmail!.toLowerCase()));
 
   return {
     paidRate: totalOrders > 0 ? (paidOrders / totalOrders) * 100 : 0,
     paidOrders,
     totalOrders,
-    repurchaseRate: uniqueCustomers > 0 ? (repeatCustomers / uniqueCustomers) * 100 : 0,
-    repeatCustomers,
-    uniqueCustomers,
+    repurchaseRate: totalCustomersSum > 0 ? (returningCustomersSum / totalCustomersSum) * 100 : 0,
+    repeatCustomers: returningCustomersSum,
+    totalCustomersInDays: totalCustomersSum,
+    uniqueCustomers: allPeriodEmails.size,
   };
 }
 

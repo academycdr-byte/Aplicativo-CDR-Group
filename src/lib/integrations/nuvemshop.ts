@@ -141,20 +141,62 @@ export async function syncNuvemshopFunnel(organizationId: string) {
       thirtyDaysAgo
     );
 
-    // 2. Get orders by date from our database
-    const orders = await prisma.order.findMany({
-      where: {
-        organizationId,
-        platform: "NUVEMSHOP",
-        orderDate: { gte: thirtyDaysAgo },
-      },
-      select: { orderDate: true },
-    });
+    // 2. Get orders by date from our database (with emails for customer metrics)
+    const [orders, allHistoricalOrders] = await Promise.all([
+      prisma.order.findMany({
+        where: {
+          organizationId,
+          platform: "NUVEMSHOP",
+          orderDate: { gte: thirtyDaysAgo },
+        },
+        select: { orderDate: true, customerEmail: true },
+      }),
+      prisma.order.findMany({
+        where: { organizationId, platform: "NUVEMSHOP", customerEmail: { not: null } },
+        select: { customerEmail: true, orderDate: true },
+        orderBy: { orderDate: "asc" },
+      }),
+    ]);
 
     const ordersByDate: Record<string, number> = {};
     for (const o of orders) {
       const key = o.orderDate.toISOString().split("T")[0];
       ordersByDate[key] = (ordersByDate[key] || 0) + 1;
+    }
+
+    // Build first-order-date map and per-day customer metrics
+    const firstOrderByCustomer = new Map<string, Date>();
+    for (const o of allHistoricalOrders) {
+      const email = o.customerEmail!.toLowerCase();
+      if (!firstOrderByCustomer.has(email)) {
+        firstOrderByCustomer.set(email, o.orderDate);
+      }
+    }
+
+    const customersByDay = new Map<string, Set<string>>();
+    for (const o of orders) {
+      if (!o.customerEmail) continue;
+      const dayKey = o.orderDate.toISOString().split("T")[0];
+      const email = o.customerEmail.toLowerCase();
+      if (!customersByDay.has(dayKey)) {
+        customersByDay.set(dayKey, new Set());
+      }
+      customersByDay.get(dayKey)!.add(email);
+    }
+
+    const customerMetricsByDay: Record<string, { total: number; returning: number }> = {};
+    for (const [dayKey, emails] of customersByDay) {
+      const dayStart = new Date(dayKey);
+      let total = 0;
+      let returning = 0;
+      for (const email of emails) {
+        total++;
+        const firstOrder = firstOrderByCustomer.get(email);
+        if (firstOrder && firstOrder < dayStart) {
+          returning++;
+        }
+      }
+      customerMetricsByDay[dayKey] = { total, returning };
     }
 
     // 3. Merge and upsert into StoreFunnel
@@ -167,6 +209,7 @@ export async function syncNuvemshopFunnel(organizationId: string) {
     for (const dateKey of allDates) {
       const abandoned = abandonedByDate[dateKey] || 0;
       const dayOrders = ordersByDate[dateKey] || 0;
+      const custMetrics = customerMetricsByDay[dateKey] || { total: 0, returning: 0 };
 
       await prisma.storeFunnel.upsert({
         where: {
@@ -184,10 +227,14 @@ export async function syncNuvemshopFunnel(organizationId: string) {
           addToCart: 0,
           checkoutsInitiated: abandoned + dayOrders,
           ordersGenerated: dayOrders,
+          totalCustomers: custMetrics.total,
+          returningCustomers: custMetrics.returning,
         },
         update: {
           checkoutsInitiated: abandoned + dayOrders,
           ordersGenerated: dayOrders,
+          totalCustomers: custMetrics.total,
+          returningCustomers: custMetrics.returning,
         },
       });
       synced++;
