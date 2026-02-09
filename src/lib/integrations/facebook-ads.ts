@@ -184,10 +184,10 @@ export async function syncFacebookAdsMetrics(organizationId: string) {
 
     const adAccountId = integration.externalAccountId || "";
 
-    // Fetch insights at AD level for the last 30 days
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const since = thirtyDaysAgo.toISOString().split("T")[0];
+    // Fetch insights at AD level for the last 1095 days (3 years - max allowed by Facebook API)
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 1095);
+    const since = startDate.toISOString().split("T")[0];
     const until = new Date().toISOString().split("T")[0];
 
     const fields = [
