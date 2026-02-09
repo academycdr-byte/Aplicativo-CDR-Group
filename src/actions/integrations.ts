@@ -172,6 +172,10 @@ export async function disconnectIntegration(platform: Platform) {
     ...(isAdPlatform
       ? [prisma.adMetric.deleteMany({ where: { organizationId: orgId, platform } })]
       : []),
+    // Delete analytics metrics for Google Analytics
+    ...(platform === "GOOGLE_ANALYTICS"
+      ? [prisma.analyticsMetric.deleteMany({ where: { organizationId: orgId } })]
+      : []),
     // Delete reportana events if applicable
     ...(platform === "REPORTANA"
       ? [prisma.reportanaEvent.deleteMany({ where: { organizationId: orgId } })]
@@ -237,6 +241,43 @@ export async function selectFacebookAdAccount(accountId: string) {
   });
 
   return { success: true, accountName: selected.name };
+}
+
+export async function selectGoogleAnalyticsProperty(propertyId: string) {
+  const ctx = await getSessionWithOrg();
+  if (!ctx) return { error: "Nao autenticado." };
+
+  const integration = await prisma.integration.findUnique({
+    where: {
+      organizationId_platform: {
+        organizationId: ctx.organization.id,
+        platform: "GOOGLE_ANALYTICS",
+      },
+    },
+  });
+
+  if (!integration || !integration.accessToken) {
+    return { error: "Google Analytics nao conectado. Faca login novamente." };
+  }
+
+  const metadata = integration.metadata as { properties?: { id: string; name: string }[] } | null;
+  const properties = metadata?.properties || [];
+  const selected = properties.find((p) => p.id === propertyId);
+
+  if (!selected) {
+    return { error: "Propriedade nao encontrada." };
+  }
+
+  await prisma.integration.update({
+    where: { id: integration.id },
+    data: {
+      status: "CONNECTED",
+      externalAccountId: propertyId,
+      errorMessage: null,
+    },
+  });
+
+  return { success: true, propertyName: selected.name };
 }
 
 export async function getIntegrationCredentials(platform: Platform) {

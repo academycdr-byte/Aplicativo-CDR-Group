@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Link2, Unlink, RefreshCw, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
-import { getIntegrations, connectApiKeyIntegration, connectShopifyDirect, disconnectIntegration, selectFacebookAdAccount } from "@/actions/integrations";
+import { getIntegrations, connectApiKeyIntegration, connectShopifyDirect, disconnectIntegration, selectFacebookAdAccount, selectGoogleAnalyticsProperty } from "@/actions/integrations";
 import { syncPlatform } from "@/actions/sync";
 import { Platform } from "@prisma/client";
 
@@ -87,6 +87,14 @@ const platforms: PlatformConfig[] = [
     fields: [],
   },
   {
+    name: "Google Analytics",
+    platform: "GOOGLE_ANALYTICS",
+    description: "Conecte sua propriedade do Google Analytics 4 (GA4).",
+    authType: "oauth",
+    color: "#E37400",
+    fields: [],
+  },
+  {
     name: "Reportana",
     platform: "REPORTANA",
     description: "Conecte o Reportana usando sua API Key.",
@@ -113,6 +121,11 @@ type FacebookAdAccount = {
   account_status?: number;
 };
 
+type GA4Property = {
+  id: string;
+  name: string;
+};
+
 export default function IntegrationsPage() {
   return (
     <Suspense fallback={<div className="text-muted-foreground text-sm p-4">Carregando...</div>}>
@@ -136,6 +149,10 @@ function IntegrationsContent() {
   const [fbAccounts, setFbAccounts] = useState<FacebookAdAccount[]>([]);
   const [selectedFbAccount, setSelectedFbAccount] = useState<string>("");
   const [fbSearch, setFbSearch] = useState("");
+  const [gaPropertyDialog, setGaPropertyDialog] = useState(false);
+  const [gaProperties, setGaProperties] = useState<GA4Property[]>([]);
+  const [selectedGaProperty, setSelectedGaProperty] = useState<string>("");
+  const [gaSearch, setGaSearch] = useState("");
   const searchParams = useSearchParams();
 
   useEffect(() => {
@@ -173,6 +190,18 @@ function IntegrationsContent() {
       });
     } else if (error === "facebook_oauth_failed") {
       toast.error(`Erro ao conectar Facebook Ads${detail ? `: ${detail}` : ""}`, { duration: 10000 });
+    } else if (success === "google_analytics") {
+      toast.success("Google Analytics conectado com sucesso! Sincronizando dados...");
+      syncPlatform("GOOGLE_ANALYTICS").then((result) => {
+        if ("error" in result && result.error) {
+          toast.error(`Erro ao sincronizar Google Analytics: ${result.error}`);
+        } else {
+          toast.success("Dados do Google Analytics sincronizados!");
+          loadIntegrations();
+        }
+      });
+    } else if (error === "google_analytics_oauth_failed") {
+      toast.error(`Erro ao conectar Google Analytics${detail ? `: ${detail}` : ""}`, { duration: 10000 });
     } else if (error === "missing_params") {
       toast.error("Erro no fluxo OAuth: parametros ausentes");
     } else if (error === "missing_shop") {
@@ -181,9 +210,21 @@ function IntegrationsContent() {
       toast.error("Voce nao tem permissao para esta integracao");
     }
 
-    // Handle Facebook ad account selection after OAuth
+    // Handle account/property selection after OAuth
     const selectAccount = searchParams.get("select_account");
-    if (selectAccount === "facebook") {
+    if (selectAccount === "google_analytics") {
+      getIntegrations().then((data) => {
+        const gaIntegration = data.find((i) => i.platform === "GOOGLE_ANALYTICS");
+        const properties = (gaIntegration?.metadata as { properties?: GA4Property[] })?.properties || [];
+        if (properties.length > 0) {
+          setGaProperties(properties);
+          setSelectedGaProperty(properties[0]?.id || "");
+          setGaPropertyDialog(true);
+        }
+        setIntegrations(data);
+      });
+      toast.info("Selecione a propriedade GA4 que deseja conectar.");
+    } else if (selectAccount === "facebook") {
       getIntegrations().then((data) => {
         const fbIntegration = data.find((i) => i.platform === "FACEBOOK_ADS");
         const accounts = (fbIntegration?.metadata as { adAccounts?: FacebookAdAccount[] })?.adAccounts || [];
@@ -223,6 +264,7 @@ function IntegrationsContent() {
         NUVEMSHOP: "/api/integrations/nuvemshop",
         FACEBOOK_ADS: "/api/integrations/facebook",
         GOOGLE_ADS: "/api/integrations/google",
+        GOOGLE_ANALYTICS: "/api/integrations/google-analytics",
       };
       const route = oauthRoutes[platform.platform];
       if (route) {
@@ -325,6 +367,29 @@ function IntegrationsContent() {
     setLoading(false);
   }
 
+  async function handleSelectGaProperty() {
+    if (!selectedGaProperty) return;
+    setLoading(true);
+
+    const result = await selectGoogleAnalyticsProperty(selectedGaProperty);
+    if (result.error) {
+      toast.error(result.error);
+    } else {
+      setGaPropertyDialog(false);
+      toast.success(`Propriedade "${result.propertyName}" conectada! Sincronizando dados...`);
+      loadIntegrations();
+      syncPlatform("GOOGLE_ANALYTICS").then((syncResult) => {
+        if ("error" in syncResult && syncResult.error) {
+          toast.error(`Erro ao sincronizar Google Analytics: ${syncResult.error}`);
+        } else {
+          toast.success("Dados do Google Analytics sincronizados!");
+          loadIntegrations();
+        }
+      });
+    }
+    setLoading(false);
+  }
+
   async function handleDisconnect(platform: Platform) {
     if (!confirm("Tem certeza que deseja desconectar esta integracao?")) return;
     const result = await disconnectIntegration(platform);
@@ -402,18 +467,28 @@ function IntegrationsContent() {
                         <Unlink className="w-4 h-4" />
                       </Button>
                     </div>
-                  ) : status === "PENDING" && platform.platform === "FACEBOOK_ADS" ? (
+                  ) : status === "PENDING" && (platform.platform === "FACEBOOK_ADS" || platform.platform === "GOOGLE_ANALYTICS") ? (
                     <Button size="sm" variant="outline" onClick={() => {
-                      const fbIntegration = integrations.find((i) => i.platform === "FACEBOOK_ADS");
-                      const accounts = (fbIntegration?.metadata as { adAccounts?: FacebookAdAccount[] })?.adAccounts || [];
-                      if (accounts.length > 0) {
-                        setFbAccounts(accounts);
-                        setSelectedFbAccount(accounts[0]?.id || "");
-                        setFbAccountDialog(true);
+                      if (platform.platform === "FACEBOOK_ADS") {
+                        const fbIntegration = integrations.find((i) => i.platform === "FACEBOOK_ADS");
+                        const accounts = (fbIntegration?.metadata as { adAccounts?: FacebookAdAccount[] })?.adAccounts || [];
+                        if (accounts.length > 0) {
+                          setFbAccounts(accounts);
+                          setSelectedFbAccount(accounts[0]?.id || "");
+                          setFbAccountDialog(true);
+                        }
+                      } else if (platform.platform === "GOOGLE_ANALYTICS") {
+                        const gaIntegration = integrations.find((i) => i.platform === "GOOGLE_ANALYTICS");
+                        const properties = (gaIntegration?.metadata as { properties?: GA4Property[] })?.properties || [];
+                        if (properties.length > 0) {
+                          setGaProperties(properties);
+                          setSelectedGaProperty(properties[0]?.id || "");
+                          setGaPropertyDialog(true);
+                        }
                       }
                     }}>
                       <Link2 className="w-4 h-4 mr-1" />
-                      Selecionar Conta
+                      {platform.platform === "FACEBOOK_ADS" ? "Selecionar Conta" : "Selecionar Propriedade"}
                     </Button>
                   ) : (
                     <Button size="sm" onClick={() => openConnect(platform)}>
@@ -625,6 +700,76 @@ function IntegrationsContent() {
             </Button>
             <Button onClick={handleSelectFbAccount} disabled={loading || !selectedFbAccount}>
               {loading ? "Conectando..." : "Conectar Conta"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Google Analytics Property Selection Dialog */}
+      <Dialog open={gaPropertyDialog} onOpenChange={(open) => { setGaPropertyDialog(open); if (!open) setGaSearch(""); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Selecione a Propriedade GA4</DialogTitle>
+            <DialogDescription>
+              {gaProperties.length} propriedade{gaProperties.length !== 1 ? "s" : ""} encontrada{gaProperties.length !== 1 ? "s" : ""}. Escolha qual deseja conectar.
+            </DialogDescription>
+          </DialogHeader>
+
+          <Input
+            placeholder="Pesquisar por nome ou ID..."
+            value={gaSearch}
+            onChange={(e) => setGaSearch(e.target.value)}
+          />
+
+          <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+            {(() => {
+              const query = gaSearch.toLowerCase().trim();
+              const filtered = query
+                ? gaProperties.filter((p) =>
+                  (p.name || "").toLowerCase().includes(query) ||
+                  p.id.toLowerCase().includes(query)
+                )
+                : gaProperties;
+
+              if (filtered.length === 0) {
+                return (
+                  <p className="text-sm text-muted-foreground text-center py-6">
+                    Nenhuma propriedade encontrada para &quot;{gaSearch}&quot;
+                  </p>
+                );
+              }
+
+              return filtered.map((property) => (
+                <label
+                  key={property.id}
+                  className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${selectedGaProperty === property.id
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:bg-muted/50"
+                    }`}
+                >
+                  <input
+                    type="radio"
+                    name="ga_property"
+                    value={property.id}
+                    checked={selectedGaProperty === property.id}
+                    onChange={() => setSelectedGaProperty(property.id)}
+                    className="accent-primary"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate">{property.name}</p>
+                    <p className="text-xs text-muted-foreground">ID: {property.id}</p>
+                  </div>
+                </label>
+              ));
+            })()}
+          </div>
+
+          <div className="flex justify-end gap-3 mt-2">
+            <Button variant="outline" onClick={() => setGaPropertyDialog(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSelectGaProperty} disabled={loading || !selectedGaProperty}>
+              {loading ? "Conectando..." : "Conectar Propriedade"}
             </Button>
           </div>
         </DialogContent>

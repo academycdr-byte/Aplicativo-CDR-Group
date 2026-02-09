@@ -315,6 +315,7 @@ export async function loadAllAnalyticsData(days: number, from?: string, to?: str
     getMetricsAnalysis(days, from, to),
     getCreativePerformance(adParams),
     getOrdersByPlatform(),
+    loadGoogleAnalyticsData(ctx.organization.id, days, from, to),
   ]);
 
   return {
@@ -322,6 +323,126 @@ export async function loadAllAnalyticsData(days: number, from?: string, to?: str
     dailyData: results[1].status === "fulfilled" ? results[1].value : [],
     creatives: results[2].status === "fulfilled" ? results[2].value : [],
     platformData: results[3].status === "fulfilled" ? results[3].value : [],
+    gaData: results[4].status === "fulfilled" ? results[4].value : null,
     failedCount: results.filter((r) => r.status === "rejected").length,
+  };
+}
+
+/**
+ * Load Google Analytics data for the analytics page.
+ */
+async function loadGoogleAnalyticsData(organizationId: string, days: number, from?: string, to?: string) {
+  const { since, until } = getDateRange(days, from, to);
+
+  const metrics = await prisma.analyticsMetric.findMany({
+    where: {
+      organizationId,
+      date: { gte: since, lte: until },
+    },
+    orderBy: { date: "asc" },
+  });
+
+  if (metrics.length === 0) return null;
+
+  // Calculate totals
+  let totalSessions = 0;
+  let totalActiveUsers = 0;
+  let totalNewUsers = 0;
+  let totalPageViews = 0;
+  let totalConversions = 0;
+  let bounceRateSum = 0;
+  let engagementRateSum = 0;
+  let avgDurationSum = 0;
+
+  for (const m of metrics) {
+    totalSessions += m.sessions;
+    totalActiveUsers += m.activeUsers;
+    totalNewUsers += m.newUsers;
+    totalPageViews += m.screenPageViews;
+    totalConversions += m.conversions;
+    bounceRateSum += Number(m.bounceRate);
+    engagementRateSum += Number(m.engagementRate);
+    avgDurationSum += Number(m.averageSessionDuration);
+  }
+
+  const count = metrics.length;
+
+  // Aggregate traffic sources across all days
+  const trafficAgg: Record<string, { sessions: number; activeUsers: number }> = {};
+  const devicesAgg: Record<string, { sessions: number; activeUsers: number }> = {};
+  const geoAgg: Record<string, { sessions: number; activeUsers: number }> = {};
+  const pagesAgg: Record<string, { screenPageViews: number; activeUsers: number }> = {};
+
+  for (const m of metrics) {
+    const traffic = m.trafficSources as Record<string, { sessions: number; activeUsers: number }> | null;
+    if (traffic) {
+      for (const [key, val] of Object.entries(traffic)) {
+        if (!trafficAgg[key]) trafficAgg[key] = { sessions: 0, activeUsers: 0 };
+        trafficAgg[key].sessions += val.sessions || 0;
+        trafficAgg[key].activeUsers += val.activeUsers || 0;
+      }
+    }
+
+    const devices = m.devices as Record<string, { sessions: number; activeUsers: number }> | null;
+    if (devices) {
+      for (const [key, val] of Object.entries(devices)) {
+        if (!devicesAgg[key]) devicesAgg[key] = { sessions: 0, activeUsers: 0 };
+        devicesAgg[key].sessions += val.sessions || 0;
+        devicesAgg[key].activeUsers += val.activeUsers || 0;
+      }
+    }
+
+    const geo = m.geography as Record<string, { sessions: number; activeUsers: number }> | null;
+    if (geo) {
+      for (const [key, val] of Object.entries(geo)) {
+        if (!geoAgg[key]) geoAgg[key] = { sessions: 0, activeUsers: 0 };
+        geoAgg[key].sessions += val.sessions || 0;
+        geoAgg[key].activeUsers += val.activeUsers || 0;
+      }
+    }
+
+    const pages = m.topPages as Record<string, { screenPageViews: number; activeUsers: number }> | null;
+    if (pages) {
+      for (const [key, val] of Object.entries(pages)) {
+        if (!pagesAgg[key]) pagesAgg[key] = { screenPageViews: 0, activeUsers: 0 };
+        pagesAgg[key].screenPageViews += val.screenPageViews || 0;
+        pagesAgg[key].activeUsers += val.activeUsers || 0;
+      }
+    }
+  }
+
+  return {
+    totals: {
+      sessions: totalSessions,
+      activeUsers: totalActiveUsers,
+      newUsers: totalNewUsers,
+      screenPageViews: totalPageViews,
+      conversions: totalConversions,
+      bounceRate: count > 0 ? bounceRateSum / count : 0,
+      engagementRate: count > 0 ? engagementRateSum / count : 0,
+      avgSessionDuration: count > 0 ? avgDurationSum / count : 0,
+    },
+    dailyData: metrics.map((m) => ({
+      date: m.date.toISOString().split("T")[0],
+      sessions: m.sessions,
+      activeUsers: m.activeUsers,
+      screenPageViews: m.screenPageViews,
+      newUsers: m.newUsers,
+    })),
+    trafficSources: Object.entries(trafficAgg)
+      .map(([source, val]) => ({ source, ...val }))
+      .sort((a, b) => b.sessions - a.sessions)
+      .slice(0, 10),
+    devices: Object.entries(devicesAgg)
+      .map(([device, val]) => ({ device, ...val }))
+      .sort((a, b) => b.sessions - a.sessions),
+    geography: Object.entries(geoAgg)
+      .map(([country, val]) => ({ country, ...val }))
+      .sort((a, b) => b.sessions - a.sessions)
+      .slice(0, 10),
+    topPages: Object.entries(pagesAgg)
+      .map(([path, val]) => ({ path, ...val }))
+      .sort((a, b) => b.screenPageViews - a.screenPageViews)
+      .slice(0, 10),
   };
 }

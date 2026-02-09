@@ -23,6 +23,7 @@ enum Platform {
   NUVEMSHOP
   FACEBOOK_ADS
   GOOGLE_ADS
+  GOOGLE_ANALYTICS
   REPORTANA
 }
 
@@ -116,6 +117,7 @@ model Organization {
   syncLogs        SyncLog[]
   reportanaEvents ReportanaEvent[]
   storeFunnels    StoreFunnel[]
+  analyticsMetrics AnalyticsMetric[]
   reportClients   ReportClient[]
   whatsAppSession WhatsAppSession?
   
@@ -327,6 +329,42 @@ model StoreFunnel {
   @@unique([organizationId, platform, date])
   @@index([organizationId, date])
   @@map("store_funnels")
+}
+
+// ─── GOOGLE ANALYTICS METRICS ──────────────────────
+
+model AnalyticsMetric {
+  id             String   @id @default(cuid())
+  organizationId String
+  propertyId     String
+  date           DateTime @db.Date
+
+  // Daily aggregate metrics
+  sessions               Int     @default(0)
+  activeUsers            Int     @default(0)
+  newUsers               Int     @default(0)
+  totalUsers             Int     @default(0)
+  screenPageViews        Int     @default(0)
+  bounceRate             Decimal @db.Decimal(5, 4) @default(0)
+  averageSessionDuration Decimal @db.Decimal(10, 2) @default(0)
+  engagementRate         Decimal @db.Decimal(5, 4) @default(0)
+  conversions            Int     @default(0)
+  eventCount             Int     @default(0)
+
+  // Breakdowns stored as JSON
+  trafficSources Json?
+  topPages       Json?
+  devices        Json?
+  geography      Json?
+  browsers       Json?
+
+  createdAt DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, propertyId, date])
+  @@index([organizationId, date])
+  @@map("analytics_metrics")
 }
 
 // ─── REPORTS & WHATSAPP ────────────────────────────
