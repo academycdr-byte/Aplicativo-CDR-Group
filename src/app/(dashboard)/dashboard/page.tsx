@@ -33,15 +33,7 @@ import {
   Area,
 } from "recharts";
 import { toast } from "sonner";
-import {
-  getDashboardData,
-  getMetricsAnalysis,
-  getOrdersByPlatform,
-  getRecentOrders,
-  getFunnelData,
-  getPaidAndRepurchaseRates,
-  getCustomerTrends,
-} from "@/actions/dashboard";
+import { loadAllDashboardData } from "@/actions/dashboard";
 import { syncAll } from "@/actions/sync";
 import { PeriodSelector, periodToParams, type PeriodValue } from "@/components/period-selector";
 import { EstimatedProfitCalendar } from "@/components/estimated-profit-calendar";
@@ -132,29 +124,26 @@ export default function DashboardPage() {
     setLoading(true);
     const { days, from, to } = periodToParams(period);
 
-    const results = await Promise.allSettled([
-      getDashboardData(days, from, to),
-      getMetricsAnalysis(days, from, to),
-      getOrdersByPlatform(),
-      getRecentOrders(5),
-      getFunnelData(days, from, to),
-      getPaidAndRepurchaseRates(days, from, to),
-      getCustomerTrends(days, from, to),
-    ]);
+    try {
+      const data = await loadAllDashboardData(days, from, to);
+      if (!data) {
+        setLoading(false);
+        return;
+      }
 
-    const [s, m, p, o, f, r, ct] = results;
+      if (data.dashboard) setStats(data.dashboard);
+      setMetricsData(data.metrics);
+      setPlatformData(data.platforms);
+      setRecentOrders(data.orders);
+      setFunnel(data.funnel);
+      setRates(data.rates);
+      setCustomerTrends(data.trends);
 
-    if (s.status === "fulfilled" && s.value) setStats(s.value);
-    if (m.status === "fulfilled") setMetricsData(m.value);
-    if (p.status === "fulfilled") setPlatformData(p.value);
-    if (o.status === "fulfilled") setRecentOrders(o.value);
-    if (f.status === "fulfilled") setFunnel(f.value);
-    if (r.status === "fulfilled") setRates(r.value);
-    if (ct.status === "fulfilled") setCustomerTrends(ct.value);
-
-    const failures = results.filter((r) => r.status === "rejected");
-    if (failures.length > 0) {
-      toast.error(`Erro ao carregar ${failures.length} seção(ões) do dashboard`);
+      if (data.failedCount > 0) {
+        toast.error(`Erro ao carregar ${data.failedCount} seção(ões) do dashboard`);
+      }
+    } catch {
+      toast.error("Erro ao carregar dados do dashboard");
     }
 
     setLoading(false);

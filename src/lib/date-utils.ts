@@ -1,39 +1,65 @@
 /**
  * Shared date utility functions for consistent date handling across actions.
- * Fixes timezone issues and ensures proper date range calculations.
+ *
+ * IMPORTANT: All dates are calculated relative to Brazil timezone (America/Sao_Paulo)
+ * to ensure "Hoje" means today in Brazil, not today in UTC (Vercel runs in UTC).
+ * Date boundaries use UTC midnight/end-of-day for consistent Prisma queries.
  */
+
+const BRAZIL_TZ = "America/Sao_Paulo";
+
+/**
+ * Get current date string in Brazil timezone (YYYY-MM-DD).
+ * When it's 11pm in Brazil (2am UTC next day), this still returns today's Brazil date.
+ */
+function getBrazilToday(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: BRAZIL_TZ });
+}
+
+/**
+ * Parse a YYYY-MM-DD string into a UTC Date at midnight.
+ */
+function parseDateUTC(dateStr: string): Date {
+  const clean = dateStr.split("T")[0];
+  const [year, month, day] = clean.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day));
+}
 
 /**
  * Get date range for queries.
  * - Always returns both `since` and `until`
- * - `until` is always set to end of day (23:59:59.999)
- * - When using custom from/to strings, parses as YYYY-MM-DD local dates
+ * - `since` is at UTC 00:00:00.000, `until` is at UTC 23:59:59.999
+ * - Preset periods (days) use Brazil timezone to determine "today"
+ * - Custom from/to strings are parsed as-is (YYYY-MM-DD)
  */
 export function getDateRange(
   days: number,
   from?: string,
   to?: string
 ): { since: Date; until: Date } {
-  let since: Date;
-  let until: Date;
+  let sinceStr: string;
+  let untilStr: string;
 
   if (from && to) {
-    // Parse as local date parts to avoid timezone shift
-    since = parseLocalDate(from);
-    until = parseLocalDate(to);
+    sinceStr = from.split("T")[0];
+    untilStr = to.split("T")[0];
   } else {
-    until = new Date();
-    since = new Date();
+    // Use Brazil timezone to determine "today"
+    untilStr = getBrazilToday();
     if (days === 0) {
-      since.setHours(0, 0, 0, 0);
+      sinceStr = untilStr;
     } else {
-      since.setDate(since.getDate() - days);
-      since.setHours(0, 0, 0, 0);
+      const ref = parseDateUTC(untilStr);
+      ref.setUTCDate(ref.getUTCDate() - days);
+      sinceStr = ref.toISOString().split("T")[0];
     }
   }
 
-  // Always set until to end of day
-  until.setHours(23, 59, 59, 999);
+  const since = parseDateUTC(sinceStr);
+  since.setUTCHours(0, 0, 0, 0);
+
+  const until = parseDateUTC(untilStr);
+  until.setUTCHours(23, 59, 59, 999);
 
   return { since, until };
 }
@@ -49,36 +75,17 @@ export function getPreviousDateRange(
 ): { since: Date; until: Date } {
   const current = getDateRange(days, from, to);
 
-  // Calculate duration in days (round up to at least 1)
   const durationMs = current.until.getTime() - current.since.getTime();
   const durationDays = Math.max(1, Math.ceil(durationMs / (1000 * 60 * 60 * 24)));
 
   // Previous period ends 1ms before current starts
   const previousUntil = new Date(current.since.getTime() - 1);
+
   const previousSince = new Date(previousUntil);
-  previousSince.setDate(previousSince.getDate() - durationDays);
-  previousSince.setHours(0, 0, 0, 0);
+  previousSince.setUTCDate(previousSince.getUTCDate() - durationDays);
+  previousSince.setUTCHours(0, 0, 0, 0);
 
   return { since: previousSince, until: previousUntil };
-}
-
-/**
- * Parse a date string as local date (not UTC).
- * Handles both "YYYY-MM-DD" and ISO strings.
- */
-function parseLocalDate(dateStr: string): Date {
-  // If it's a simple YYYY-MM-DD, parse as local
-  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-    const [year, month, day] = dateStr.split("-").map(Number);
-    return new Date(year, month - 1, day);
-  }
-  // For ISO strings, extract the date part and parse as local
-  const datePart = dateStr.split("T")[0];
-  if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
-    const [year, month, day] = datePart.split("-").map(Number);
-    return new Date(year, month - 1, day);
-  }
-  return new Date(dateStr);
 }
 
 /**

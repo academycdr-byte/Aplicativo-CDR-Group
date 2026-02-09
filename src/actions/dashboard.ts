@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { getSessionWithOrg } from "@/lib/session";
-import { getDateRange, buildDateFilter } from "@/lib/date-utils";
+import { getDateRange, getPreviousDateRange, buildDateFilter } from "@/lib/date-utils";
 
 export async function getDashboardData(days: number = 30, from?: string, to?: string) {
   const ctx = await getSessionWithOrg();
@@ -11,11 +11,8 @@ export async function getDashboardData(days: number = 30, from?: string, to?: st
   const orgId = ctx.organization.id;
   const range = getDateRange(days, from, to);
   const dateFilter = buildDateFilter(range);
-  const adDateFilter = dateFilter;
-
-  const compareDays = days === 0 ? 1 : days;
-  const prevSince = new Date();
-  prevSince.setDate(prevSince.getDate() - compareDays * 2);
+  const prevRange = getPreviousDateRange(days, from, to);
+  const prevDateFilter = buildDateFilter(prevRange);
 
   const [
     totalOrders,
@@ -30,26 +27,26 @@ export async function getDashboardData(days: number = 30, from?: string, to?: st
       where: { organizationId: orgId, orderDate: dateFilter },
     }),
     prisma.order.count({
-      where: { organizationId: orgId, orderDate: { gte: prevSince, lt: range.since } },
+      where: { organizationId: orgId, orderDate: prevDateFilter },
     }),
     prisma.order.aggregate({
       where: { organizationId: orgId, orderDate: dateFilter, status: "paid" },
       _sum: { totalAmount: true },
     }),
     prisma.order.aggregate({
-      where: { organizationId: orgId, orderDate: { gte: prevSince, lt: range.since }, status: "paid" },
+      where: { organizationId: orgId, orderDate: prevDateFilter, status: "paid" },
       _sum: { totalAmount: true },
     }),
     prisma.adMetric.aggregate({
-      where: { organizationId: orgId, date: adDateFilter },
+      where: { organizationId: orgId, date: dateFilter },
       _sum: { spend: true },
     }),
     prisma.adMetric.aggregate({
-      where: { organizationId: orgId, date: { gte: prevSince, lt: range.since } },
+      where: { organizationId: orgId, date: prevDateFilter },
       _sum: { spend: true },
     }),
     prisma.adMetric.aggregate({
-      where: { organizationId: orgId, date: adDateFilter },
+      where: { organizationId: orgId, date: dateFilter },
       _sum: { revenue: true },
     }),
   ]);
@@ -408,4 +405,35 @@ export async function getRecentOrders(limit: number = 5) {
     currency: o.currency,
     orderDate: o.orderDate,
   }));
+}
+
+/**
+ * Consolidated dashboard data loader.
+ * Makes a SINGLE server action call (1 HTTP round-trip) instead of 7 separate calls.
+ * React cache() on getSessionWithOrg ensures auth is checked only once.
+ */
+export async function loadAllDashboardData(days: number = 30, from?: string, to?: string) {
+  const ctx = await getSessionWithOrg();
+  if (!ctx) return null;
+
+  const results = await Promise.allSettled([
+    getDashboardData(days, from, to),
+    getMetricsAnalysis(days, from, to),
+    getOrdersByPlatform(),
+    getRecentOrders(5),
+    getFunnelData(days, from, to),
+    getPaidAndRepurchaseRates(days, from, to),
+    getCustomerTrends(days, from, to),
+  ]);
+
+  return {
+    dashboard: results[0].status === "fulfilled" ? results[0].value : null,
+    metrics: results[1].status === "fulfilled" ? results[1].value : [],
+    platforms: results[2].status === "fulfilled" ? results[2].value : [],
+    orders: results[3].status === "fulfilled" ? results[3].value : [],
+    funnel: results[4].status === "fulfilled" ? results[4].value : null,
+    rates: results[5].status === "fulfilled" ? results[5].value : null,
+    trends: results[6].status === "fulfilled" ? results[6].value : [],
+    failedCount: results.filter((r) => r.status === "rejected").length,
+  };
 }

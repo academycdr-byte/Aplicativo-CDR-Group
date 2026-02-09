@@ -58,7 +58,7 @@ import {
   Tooltip,
   Legend
 } from "recharts";
-import { getAdMetrics, getAdMetricsByDay, getCreativePerformance } from "@/actions/ads";
+import { loadAllAdsData } from "@/actions/ads";
 import { AdsFilter } from "@/components/ads/ads-filter";
 import { FunnelChart } from "@/components/ads/funnel-chart";
 import { VideoModal } from "@/components/ads/video-modal";
@@ -178,7 +178,6 @@ export default function AdsPage() {
     const { days, from, to } = periodToParams(period);
     const platform = platformFilter === "all" ? undefined : platformFilter;
 
-    // Pass search and exclude params to server actions
     const params = {
       platform,
       days,
@@ -188,20 +187,18 @@ export default function AdsPage() {
       exclude: excludedTerms
     };
 
-    const results = await Promise.allSettled([
-      getAdMetrics(params),
-      getAdMetricsByDay(days, from, to, searchQuery || undefined, excludedTerms, platform),
-      getCreativePerformance(params),
-    ]);
+    try {
+      const data = await loadAllAdsData(params, searchQuery || undefined, excludedTerms);
+      if (!data) return;
 
-    if (results[0].status === "fulfilled") {
-      const metricsData = results[0].value;
-      setTotals(metricsData.totals);
-      setPrevTotals(metricsData.previousTotals);
-      setMetrics(metricsData.metrics);
+      setTotals(data.metrics.totals);
+      setPrevTotals(data.metrics.previousTotals);
+      setMetrics(data.metrics.metrics);
+      setDayData(data.dailyData);
+      setCreatives(data.creatives);
+    } catch (error) {
+      console.error("Failed to load ads data", error);
     }
-    if (results[1].status === "fulfilled") setDayData(results[1].value);
-    if (results[2].status === "fulfilled") setCreatives(results[2].value);
     setMetricsPage(1);
     setCreativesPage(1);
   }, [period, platformFilter, searchQuery, excludedTerms]);

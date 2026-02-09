@@ -15,8 +15,8 @@ type SyncResult = {
 
 async function withRetry<T>(
   fn: () => Promise<T>,
-  maxRetries: number = 2,
-  baseDelay: number = 1000
+  maxRetries: number = 1,
+  baseDelay: number = 500
 ): Promise<T> {
   let lastError: unknown;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getSessionWithOrg } from "@/lib/session";
 import { getDateRange, getPreviousDateRange, buildDateFilter } from "@/lib/date-utils";
 import { Prisma } from "@prisma/client";
+import { getMetricsAnalysis, getOrdersByPlatform } from "@/actions/dashboard";
 
 type FilterParams = {
   platform?: string;
@@ -273,4 +274,54 @@ export async function getCreativePerformance(params?: FilterParams) {
       cpm: c.impressions > 0 ? (c.spend / c.impressions) * 1000 : 0,
     }))
     .sort((a, b) => b.spend - a.spend);
+}
+
+/**
+ * Consolidated ads page data loader (1 HTTP round-trip instead of 3).
+ */
+export async function loadAllAdsData(
+  params: FilterParams & { days: number; from?: string; to?: string },
+  searchQuery?: string,
+  excludedTerms?: string[],
+) {
+  const ctx = await getSessionWithOrg();
+  if (!ctx) return null;
+
+  const { days, from, to } = params;
+  const results = await Promise.allSettled([
+    getAdMetrics(params),
+    getAdMetricsByDay(days, from, to, searchQuery, excludedTerms, params.platform),
+    getCreativePerformance(params),
+  ]);
+
+  return {
+    metrics: results[0].status === "fulfilled" ? results[0].value : { metrics: [], totals: null, previousTotals: null },
+    dailyData: results[1].status === "fulfilled" ? results[1].value : [],
+    creatives: results[2].status === "fulfilled" ? results[2].value : [],
+    failedCount: results.filter((r) => r.status === "rejected").length,
+  };
+}
+
+/**
+ * Consolidated analytics page data loader (1 HTTP round-trip instead of 4).
+ */
+export async function loadAllAnalyticsData(days: number, from?: string, to?: string) {
+  const ctx = await getSessionWithOrg();
+  if (!ctx) return null;
+
+  const adParams = { days, from, to };
+  const results = await Promise.allSettled([
+    getAdMetrics(adParams),
+    getMetricsAnalysis(days, from, to),
+    getCreativePerformance(adParams),
+    getOrdersByPlatform(),
+  ]);
+
+  return {
+    adMetrics: results[0].status === "fulfilled" ? results[0].value : { metrics: [], totals: null, previousTotals: null },
+    dailyData: results[1].status === "fulfilled" ? results[1].value : [],
+    creatives: results[2].status === "fulfilled" ? results[2].value : [],
+    platformData: results[3].status === "fulfilled" ? results[3].value : [],
+    failedCount: results.filter((r) => r.status === "rejected").length,
+  };
 }
