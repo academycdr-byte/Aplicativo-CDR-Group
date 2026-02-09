@@ -149,6 +149,135 @@ async function fetchAdVideoUrls(
   return videoUrls;
 }
 
+/**
+ * Fetch all paginated insights from a single API URL.
+ */
+async function fetchAllInsights(url: string): Promise<any[]> {
+  const results: any[] = [];
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    console.error("[Facebook Ads] Insights fetch failed:", response.status, errorBody);
+    return results;
+  }
+
+  const data = await response.json();
+  if (data.error) {
+    console.error("[Facebook Ads] API error:", JSON.stringify(data.error));
+    return results;
+  }
+
+  if (data.data) results.push(...data.data);
+
+  let nextUrl = data.paging?.next;
+  while (nextUrl) {
+    const nextResponse = await fetch(nextUrl);
+    if (!nextResponse.ok) break;
+    const nextData = await nextResponse.json();
+    if (nextData.error) break;
+    if (nextData.data) results.push(...nextData.data);
+    nextUrl = nextData.paging?.next;
+  }
+
+  return results;
+}
+
+/**
+ * Process and save insights to database. Returns number of records saved.
+ */
+async function saveInsightsToDB(
+  insights: any[],
+  organizationId: string,
+  thumbnails: Record<string, string>,
+  videoUrls: Record<string, string>,
+): Promise<number> {
+  if (insights.length === 0) return 0;
+
+  let synced = 0;
+
+  // Batch upserts using Promise.all in groups of 20 for speed
+  const batchSize = 20;
+  for (let i = 0; i < insights.length; i += batchSize) {
+    const batch = insights.slice(i, i + batchSize);
+    await Promise.all(
+      batch.map((insight) => {
+        const actions = insight.actions || [];
+        const actionValues = insight.action_values || [];
+
+        const findAction = (types: string[]) =>
+          actions.find((a: { action_type: string }) => types.includes(a.action_type));
+        const findActionValue = (types: string[]) =>
+          actionValues.find((a: { action_type: string }) => types.includes(a.action_type));
+
+        const purchases = findAction(["purchase", "offsite_conversion.fb_pixel_purchase"]);
+        const purchaseValue = findActionValue(["purchase", "offsite_conversion.fb_pixel_purchase"]);
+        const addToCartAction = findAction(["add_to_cart", "offsite_conversion.fb_pixel_add_to_cart"]);
+        const initiateCheckoutAction = findAction(["initiate_checkout", "offsite_conversion.fb_pixel_initiate_checkout"]);
+
+        const conversions = parseInt(purchases?.value || "0");
+        const revenue = parseFloat(purchaseValue?.value || "0");
+        const addToCart = parseInt(addToCartAction?.value || "0");
+        const initiateCheckout = parseInt(initiateCheckoutAction?.value || "0");
+
+        return prisma.adMetric.upsert({
+          where: {
+            organizationId_platform_campaignId_adId_date: {
+              organizationId,
+              platform: "FACEBOOK_ADS",
+              campaignId: insight.campaign_id || "unknown",
+              adId: insight.ad_id || "unknown",
+              date: new Date(insight.date_start),
+            },
+          },
+          create: {
+            organizationId,
+            platform: "FACEBOOK_ADS",
+            campaignId: insight.campaign_id,
+            campaignName: insight.campaign_name,
+            adSetId: insight.adset_id,
+            adSetName: insight.adset_name,
+            adId: insight.ad_id,
+            adName: insight.ad_name,
+            thumbnailUrl: thumbnails[insight.ad_id] || null,
+            videoUrl: videoUrls[insight.ad_id] || null,
+            date: new Date(insight.date_start),
+            impressions: parseInt(insight.impressions || "0"),
+            reach: parseInt(insight.reach || "0"),
+            clicks: parseInt(insight.clicks || "0"),
+            spend: parseFloat(insight.spend || "0"),
+            conversions,
+            addToCart,
+            initiateCheckout,
+            revenue,
+            currency: "BRL",
+            rawData: insight,
+          },
+          update: {
+            campaignName: insight.campaign_name,
+            adSetName: insight.adset_name,
+            adName: insight.ad_name,
+            thumbnailUrl: thumbnails[insight.ad_id] || null,
+            videoUrl: videoUrls[insight.ad_id] || null,
+            impressions: parseInt(insight.impressions || "0"),
+            reach: parseInt(insight.reach || "0"),
+            clicks: parseInt(insight.clicks || "0"),
+            spend: parseFloat(insight.spend || "0"),
+            conversions,
+            addToCart,
+            initiateCheckout,
+            revenue,
+            rawData: insight,
+          },
+        });
+      })
+    );
+    synced += batch.length;
+  }
+
+  return synced;
+}
+
 export async function syncFacebookAdsMetrics(organizationId: string) {
   const integration = await prisma.integration.findUnique({
     where: { organizationId_platform: { organizationId, platform: "FACEBOOK_ADS" } },
@@ -194,136 +323,71 @@ export async function syncFacebookAdsMetrics(organizationId: string) {
       "cost_per_action_type",
     ].join(",");
 
-    // Fetch insights in 90-day chunks to avoid Facebook API 500 errors
-    const totalDays = 1095; // 3 years
-    const chunkSize = 90;
     const today = new Date();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const allInsights: any[] = [];
+    let totalSynced = 0;
 
-    for (let offset = 0; offset < totalDays; offset += chunkSize) {
+    // ===== PHASE 1: Recent 90 days (priority - saves to DB immediately) =====
+    const recentStart = new Date(today);
+    recentStart.setDate(today.getDate() - 90);
+    const recentTimeRange = JSON.stringify({
+      since: recentStart.toISOString().split("T")[0],
+      until: today.toISOString().split("T")[0],
+    });
+
+    const recentUrl = `https://graph.facebook.com/${FB_GRAPH_VERSION}/act_${adAccountId}/insights?fields=${fields}&level=ad&time_range=${encodeURIComponent(recentTimeRange)}&time_increment=1&limit=500&access_token=${accessToken}`;
+
+    const recentInsights = await fetchAllInsights(recentUrl);
+
+    // Fetch thumbnails + videos for recent ads in parallel
+    const recentAdIds = [...new Set(recentInsights.map((i) => i.ad_id).filter(Boolean))] as string[];
+    const [thumbnails, videoUrls] = await Promise.all([
+      fetchAdThumbnails(recentAdIds, accessToken),
+      fetchAdVideoUrls(recentAdIds, accessToken),
+    ]);
+
+    // Save recent data to DB immediately so dashboard shows data fast
+    totalSynced += await saveInsightsToDB(recentInsights, organizationId, thumbnails, videoUrls);
+
+    // ===== PHASE 2: Older data in 90-day chunks (91-1095 days ago) =====
+    const olderChunks: { since: string; until: string }[] = [];
+    for (let offset = 90; offset < 1095; offset += 90) {
       const chunkEnd = new Date(today);
       chunkEnd.setDate(today.getDate() - offset);
       const chunkStart = new Date(today);
-      chunkStart.setDate(today.getDate() - Math.min(offset + chunkSize, totalDays));
-
-      const since = chunkStart.toISOString().split("T")[0];
-      const until = chunkEnd.toISOString().split("T")[0];
-
-      const timeRange = JSON.stringify({ since, until });
-      const insightsUrl = `https://graph.facebook.com/${FB_GRAPH_VERSION}/act_${adAccountId}/insights?fields=${fields}&level=ad&time_range=${encodeURIComponent(timeRange)}&time_increment=1&limit=500&access_token=${accessToken}`;
-
-      const response = await fetch(insightsUrl);
-
-      if (!response.ok) {
-        const errorBody = await response.text();
-        console.error(`[Facebook Ads] Chunk ${since}→${until} failed:`, response.status, errorBody);
-        // Skip this chunk and continue with the next one
-        continue;
-      }
-
-      const data = await response.json();
-
-      if (data.error) {
-        console.error(`[Facebook Ads] Chunk ${since}→${until} API error:`, JSON.stringify(data.error));
-        continue;
-      }
-
-      if (data.data) {
-        allInsights.push(...data.data);
-      }
-
-      // Handle pagination within this chunk
-      let nextUrl = data.paging?.next;
-      while (nextUrl) {
-        const nextResponse = await fetch(nextUrl);
-        if (!nextResponse.ok) break;
-        const nextData = await nextResponse.json();
-        if (nextData.error) break;
-        if (nextData.data) {
-          allInsights.push(...nextData.data);
-        }
-        nextUrl = nextData.paging?.next;
-      }
+      chunkStart.setDate(today.getDate() - Math.min(offset + 90, 1095));
+      olderChunks.push({
+        since: chunkStart.toISOString().split("T")[0],
+        until: chunkEnd.toISOString().split("T")[0],
+      });
     }
 
-    // Fetch creative thumbnails and video URLs for unique ad IDs
-    const uniqueAdIds = [...new Set(allInsights.map((i: { ad_id: string }) => i.ad_id).filter(Boolean))] as string[];
-    const thumbnails = await fetchAdThumbnails(uniqueAdIds, accessToken);
-    const videoUrls = await fetchAdVideoUrls(uniqueAdIds, accessToken);
+    // Process older chunks 3 at a time for speed
+    const concurrency = 3;
+    for (let i = 0; i < olderChunks.length; i += concurrency) {
+      const batch = olderChunks.slice(i, i + concurrency);
+      const batchResults = await Promise.allSettled(
+        batch.map(async (chunk) => {
+          const timeRange = JSON.stringify({ since: chunk.since, until: chunk.until });
+          const url = `https://graph.facebook.com/${FB_GRAPH_VERSION}/act_${adAccountId}/insights?fields=${fields}&level=ad&time_range=${encodeURIComponent(timeRange)}&time_increment=1&limit=500&access_token=${accessToken}`;
+          const insights = await fetchAllInsights(url);
 
-    let synced = 0;
+          // Fetch thumbnails for new ad IDs not already cached
+          const chunkAdIds = [...new Set(insights.map((i) => i.ad_id).filter(Boolean))] as string[];
+          const newAdIds = chunkAdIds.filter((id) => !thumbnails[id]);
+          if (newAdIds.length > 0) {
+            const newThumbs = await fetchAdThumbnails(newAdIds, accessToken);
+            Object.assign(thumbnails, newThumbs);
+          }
 
-    for (const insight of allInsights) {
-      const actions = insight.actions || [];
-      const actionValues = insight.action_values || [];
+          return saveInsightsToDB(insights, organizationId, thumbnails, videoUrls);
+        })
+      );
 
-      const findAction = (types: string[]) =>
-        actions.find((a: { action_type: string }) => types.includes(a.action_type));
-      const findActionValue = (types: string[]) =>
-        actionValues.find((a: { action_type: string }) => types.includes(a.action_type));
-
-      const purchases = findAction(["purchase", "offsite_conversion.fb_pixel_purchase"]);
-      const purchaseValue = findActionValue(["purchase", "offsite_conversion.fb_pixel_purchase"]);
-      const addToCartAction = findAction(["add_to_cart", "offsite_conversion.fb_pixel_add_to_cart"]);
-      const initiateCheckoutAction = findAction(["initiate_checkout", "offsite_conversion.fb_pixel_initiate_checkout"]);
-
-      const conversions = parseInt(purchases?.value || "0");
-      const revenue = parseFloat(purchaseValue?.value || "0");
-      const addToCart = parseInt(addToCartAction?.value || "0");
-      const initiateCheckout = parseInt(initiateCheckoutAction?.value || "0");
-
-      await prisma.adMetric.upsert({
-        where: {
-          organizationId_platform_campaignId_adId_date: {
-            organizationId,
-            platform: "FACEBOOK_ADS",
-            campaignId: insight.campaign_id || "unknown",
-            adId: insight.ad_id || "unknown",
-            date: new Date(insight.date_start),
-          },
-        },
-        create: {
-          organizationId,
-          platform: "FACEBOOK_ADS",
-          campaignId: insight.campaign_id,
-          campaignName: insight.campaign_name,
-          adSetId: insight.adset_id,
-          adSetName: insight.adset_name,
-          adId: insight.ad_id,
-          adName: insight.ad_name,
-          thumbnailUrl: thumbnails[insight.ad_id] || null,
-          videoUrl: videoUrls[insight.ad_id] || null,
-          date: new Date(insight.date_start),
-          impressions: parseInt(insight.impressions || "0"),
-          reach: parseInt(insight.reach || "0"),
-          clicks: parseInt(insight.clicks || "0"),
-          spend: parseFloat(insight.spend || "0"),
-          conversions,
-          addToCart,
-          initiateCheckout,
-          revenue,
-          currency: "BRL",
-          rawData: insight,
-        },
-        update: {
-          campaignName: insight.campaign_name,
-          adSetName: insight.adset_name,
-          adName: insight.ad_name,
-          thumbnailUrl: thumbnails[insight.ad_id] || null,
-          videoUrl: videoUrls[insight.ad_id] || null,
-          impressions: parseInt(insight.impressions || "0"),
-          reach: parseInt(insight.reach || "0"),
-          clicks: parseInt(insight.clicks || "0"),
-          spend: parseFloat(insight.spend || "0"),
-          conversions,
-          addToCart,
-          initiateCheckout,
-          revenue,
-          rawData: insight,
-        },
-      });
-      synced++;
+      for (const result of batchResults) {
+        if (result.status === "fulfilled") {
+          totalSynced += result.value;
+        }
+      }
     }
 
     await prisma.integration.update({
@@ -333,10 +397,10 @@ export async function syncFacebookAdsMetrics(organizationId: string) {
 
     await prisma.syncLog.update({
       where: { id: syncLog.id },
-      data: { status: "SUCCESS", recordsSynced: synced, completedAt: new Date() },
+      data: { status: "SUCCESS", recordsSynced: totalSynced, completedAt: new Date() },
     });
 
-    return { success: true, synced };
+    return { success: true, synced: totalSynced };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : "Unknown error";
 
