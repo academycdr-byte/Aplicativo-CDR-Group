@@ -287,29 +287,43 @@ export async function getPaidAndRepurchaseRates(days: number = 30, from?: string
 
   const range = getDateRange(days, from, to);
 
-  const [totalOrders, paidOrders, customersInPeriod, customersWithPriorOrders] = await Promise.all([
+  const [totalOrders, paidOrders, customersInPeriod, allHistoricalCustomers] = await Promise.all([
     prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter } }),
-    prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter, status: { in: ["paid", "pending"] } } }),
+    // Only truly PAID orders (not pending/authorized)
+    prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter, status: "paid" } }),
     // Unique customers who ordered in this period
     prisma.order.findMany({
       where: { organizationId: orgId, orderDate: dateFilter, customerEmail: { not: null } },
       select: { customerEmail: true },
       distinct: ["customerEmail"],
     }),
-    // Customers who ordered BEFORE this period (historically)
+    // ALL customers who have EVER ordered (full history, no date limit)
     prisma.order.findMany({
-      where: { organizationId: orgId, orderDate: { lt: range.since }, customerEmail: { not: null } },
-      select: { customerEmail: true },
-      distinct: ["customerEmail"],
+      where: { organizationId: orgId, customerEmail: { not: null } },
+      select: { customerEmail: true, orderDate: true },
+      orderBy: { orderDate: "asc" },
     }),
   ]);
 
-  const periodEmails = new Set(customersInPeriod.map((c) => c.customerEmail!));
-  const priorEmails = new Set(customersWithPriorOrders.map((c) => c.customerEmail!));
+  // Build map: email (lowercase) → first order date
+  const firstOrderByCustomer = new Map<string, Date>();
+  for (const o of allHistoricalCustomers) {
+    const email = o.customerEmail!.toLowerCase();
+    if (!firstOrderByCustomer.has(email)) {
+      firstOrderByCustomer.set(email, o.orderDate);
+    }
+  }
 
+  // A returning customer ordered in this period AND their FIRST order ever was before this period
+  const periodEmails = new Set(customersInPeriod.map((c) => c.customerEmail!.toLowerCase()));
   const uniqueCustomers = periodEmails.size;
-  // A returning customer is someone who ordered in this period AND has ordered before
-  const repeatCustomers = [...periodEmails].filter((email) => priorEmails.has(email)).length;
+  let repeatCustomers = 0;
+  for (const email of periodEmails) {
+    const firstOrder = firstOrderByCustomer.get(email);
+    if (firstOrder && firstOrder < range.since) {
+      repeatCustomers++;
+    }
+  }
 
   return {
     paidRate: totalOrders > 0 ? (paidOrders / totalOrders) * 100 : 0,
