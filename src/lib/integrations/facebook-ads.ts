@@ -198,7 +198,8 @@ export async function syncFacebookAdsMetrics(organizationId: string) {
     const totalDays = 1095; // 3 years
     const chunkSize = 90;
     const today = new Date();
-    const allInsights: Record<string, unknown>[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const allInsights: any[] = [];
 
     for (let offset = 0; offset < totalDays; offset += chunkSize) {
       const chunkEnd = new Date(today);
@@ -247,7 +248,7 @@ export async function syncFacebookAdsMetrics(organizationId: string) {
     }
 
     // Fetch creative thumbnails and video URLs for unique ad IDs
-    const uniqueAdIds = [...new Set(allInsights.map((i) => (i as { ad_id?: string }).ad_id).filter(Boolean))] as string[];
+    const uniqueAdIds = [...new Set(allInsights.map((i: { ad_id: string }) => i.ad_id).filter(Boolean))] as string[];
     const thumbnails = await fetchAdThumbnails(uniqueAdIds, accessToken);
     const videoUrls = await fetchAdVideoUrls(uniqueAdIds, accessToken);
 
