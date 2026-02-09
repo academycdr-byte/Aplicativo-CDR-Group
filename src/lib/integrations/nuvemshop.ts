@@ -199,6 +199,17 @@ export async function syncNuvemshopFunnel(organizationId: string) {
       customerMetricsByDay[dayKey] = { total, returning };
     }
 
+    // Check if customer metric columns exist (migration may not be applied yet)
+    let hasCustomerColumns = true;
+    try {
+      await prisma.storeFunnel.findFirst({
+        where: { organizationId },
+        select: { totalCustomers: true, returningCustomers: true },
+      });
+    } catch {
+      hasCustomerColumns = false;
+    }
+
     // 3. Merge and upsert into StoreFunnel
     const allDates = new Set([
       ...Object.keys(abandonedByDate),
@@ -210,6 +221,9 @@ export async function syncNuvemshopFunnel(organizationId: string) {
       const abandoned = abandonedByDate[dateKey] || 0;
       const dayOrders = ordersByDate[dateKey] || 0;
       const custMetrics = customerMetricsByDay[dateKey] || { total: 0, returning: 0 };
+      const customerFields = hasCustomerColumns
+        ? { totalCustomers: custMetrics.total, returningCustomers: custMetrics.returning }
+        : {};
 
       await prisma.storeFunnel.upsert({
         where: {
@@ -227,14 +241,12 @@ export async function syncNuvemshopFunnel(organizationId: string) {
           addToCart: 0,
           checkoutsInitiated: abandoned + dayOrders,
           ordersGenerated: dayOrders,
-          totalCustomers: custMetrics.total,
-          returningCustomers: custMetrics.returning,
+          ...customerFields,
         },
         update: {
           checkoutsInitiated: abandoned + dayOrders,
           ordersGenerated: dayOrders,
-          totalCustomers: custMetrics.total,
-          returningCustomers: custMetrics.returning,
+          ...customerFields,
         },
       });
       synced++;

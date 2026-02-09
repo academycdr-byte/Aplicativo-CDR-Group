@@ -507,6 +507,18 @@ export async function syncShopifyFunnel(organizationId: string) {
       }
     }
 
+    // Check if customer metric columns exist (migration may not be applied yet)
+    let hasCustomerColumns = true;
+    try {
+      await prisma.storeFunnel.findFirst({
+        where: { organizationId },
+        select: { totalCustomers: true, returningCustomers: true },
+      });
+    } catch {
+      hasCustomerColumns = false;
+      console.warn("[Shopify Funnel] Customer columns not yet available, skipping customer metrics");
+    }
+
     // Strategy 1: Try ShopifyQL FROM sessions (exact analytics data)
     const sessionsFunnel = await fetchShopifySessionsFunnel(shop, accessToken);
 
@@ -519,6 +531,9 @@ export async function syncShopifyFunnel(organizationId: string) {
           : (ordersByDate[dateKey] || 0);
 
         const custMetrics = customerMetricsByDay[dateKey] || { total: 0, returning: 0 };
+        const customerFields = hasCustomerColumns
+          ? { totalCustomers: custMetrics.total, returningCustomers: custMetrics.returning }
+          : {};
         await prisma.storeFunnel.upsert({
           where: {
             organizationId_platform_date: {
@@ -535,16 +550,14 @@ export async function syncShopifyFunnel(organizationId: string) {
             addToCart: metrics.addToCart,
             checkoutsInitiated: metrics.checkoutsStarted,
             ordersGenerated: dayOrders,
-            totalCustomers: custMetrics.total,
-            returningCustomers: custMetrics.returning,
+            ...customerFields,
           },
           update: {
             sessions: metrics.sessions,
             addToCart: metrics.addToCart,
             checkoutsInitiated: metrics.checkoutsStarted,
             ordersGenerated: dayOrders,
-            totalCustomers: custMetrics.total,
-            returningCustomers: custMetrics.returning,
+            ...customerFields,
           },
         });
         synced++;
@@ -575,11 +588,13 @@ export async function syncShopifyFunnel(organizationId: string) {
       // IMPORTANT: Only include sessions in the update if we actually got session data.
       // Never overwrite existing session data with 0.
       const custMetrics = customerMetricsByDay[dateKey] || { total: 0, returning: 0 };
+      const customerFields = hasCustomerColumns
+        ? { totalCustomers: custMetrics.total, returningCustomers: custMetrics.returning }
+        : {};
       const updateData: Record<string, number> = {
         checkoutsInitiated: abandoned + dayOrders,
         ordersGenerated: dayOrders,
-        totalCustomers: custMetrics.total,
-        returningCustomers: custMetrics.returning,
+        ...(hasCustomerColumns ? { totalCustomers: custMetrics.total, returningCustomers: custMetrics.returning } : {}),
       };
       if (hasSalesSessionData && sessions > 0) {
         updateData.sessions = sessions;
@@ -601,8 +616,7 @@ export async function syncShopifyFunnel(organizationId: string) {
           addToCart: 0,
           checkoutsInitiated: abandoned + dayOrders,
           ordersGenerated: dayOrders,
-          totalCustomers: custMetrics.total,
-          returningCustomers: custMetrics.returning,
+          ...customerFields,
         },
         update: updateData,
       });
