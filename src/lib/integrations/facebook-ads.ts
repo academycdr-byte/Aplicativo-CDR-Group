@@ -325,61 +325,75 @@ export async function syncFacebookAdsMetrics(organizationId: string) {
 
     const today = new Date();
     let totalSynced = 0;
+    const noMedia: Record<string, string> = {};
 
-    // ===== PHASE 1: Recent 90 days (priority - saves to DB immediately) =====
-    const recentStart = new Date(today);
-    recentStart.setDate(today.getDate() - 90);
-    const recentTimeRange = JSON.stringify({
-      since: recentStart.toISOString().split("T")[0],
-      until: today.toISOString().split("T")[0],
-    });
+    // Helper to build Facebook insights URL for a date range
+    const buildUrl = (since: string, until: string) =>
+      `https://graph.facebook.com/${FB_GRAPH_VERSION}/act_${adAccountId}/insights?fields=${fields}&level=ad&time_range=${encodeURIComponent(JSON.stringify({ since, until }))}&time_increment=1&limit=500&access_token=${accessToken}`;
 
-    const recentUrl = `https://graph.facebook.com/${FB_GRAPH_VERSION}/act_${adAccountId}/insights?fields=${fields}&level=ad&time_range=${encodeURIComponent(recentTimeRange)}&time_increment=1&limit=500&access_token=${accessToken}`;
+    const daysAgo = (n: number) => {
+      const d = new Date(today);
+      d.setDate(today.getDate() - n);
+      return d.toISOString().split("T")[0];
+    };
 
-    const recentInsights = await fetchAllInsights(recentUrl);
+    // ===== PHASE 1: Last 7 days - NO thumbnails/videos - fastest possible =====
+    const phase1 = await fetchAllInsights(buildUrl(daysAgo(7), daysAgo(0)));
+    totalSynced += await saveInsightsToDB(phase1, organizationId, noMedia, noMedia);
 
-    // Fetch thumbnails + videos for recent ads in parallel
-    const recentAdIds = [...new Set(recentInsights.map((i) => i.ad_id).filter(Boolean))] as string[];
+    // ===== PHASE 2: Days 8-30 - save immediately, no media =====
+    const phase2 = await fetchAllInsights(buildUrl(daysAgo(30), daysAgo(7)));
+    totalSynced += await saveInsightsToDB(phase2, organizationId, noMedia, noMedia);
+
+    // ===== PHASE 3: Days 31-90 + fetch thumbnails for all recent ads =====
+    const phase3 = await fetchAllInsights(buildUrl(daysAgo(90), daysAgo(30)));
+    totalSynced += await saveInsightsToDB(phase3, organizationId, noMedia, noMedia);
+
+    // Now fetch thumbnails/videos for all synced ads and update records in background
+    const allRecentInsights = [...phase1, ...phase2, ...phase3];
+    const allAdIds = [...new Set(allRecentInsights.map((i) => i.ad_id).filter(Boolean))] as string[];
     const [thumbnails, videoUrls] = await Promise.all([
-      fetchAdThumbnails(recentAdIds, accessToken),
-      fetchAdVideoUrls(recentAdIds, accessToken),
+      fetchAdThumbnails(allAdIds, accessToken),
+      fetchAdVideoUrls(allAdIds, accessToken),
     ]);
 
-    // Save recent data to DB immediately so dashboard shows data fast
-    totalSynced += await saveInsightsToDB(recentInsights, organizationId, thumbnails, videoUrls);
+    // Batch-update thumbnails/videos for already-saved records
+    if (Object.keys(thumbnails).length > 0 || Object.keys(videoUrls).length > 0) {
+      const updateBatchSize = 30;
+      for (let i = 0; i < allAdIds.length; i += updateBatchSize) {
+        const batch = allAdIds.slice(i, i + updateBatchSize);
+        await Promise.all(
+          batch
+            .filter((adId) => thumbnails[adId] || videoUrls[adId])
+            .map((adId) =>
+              prisma.adMetric.updateMany({
+                where: { organizationId, platform: "FACEBOOK_ADS", adId },
+                data: {
+                  ...(thumbnails[adId] ? { thumbnailUrl: thumbnails[adId] } : {}),
+                  ...(videoUrls[adId] ? { videoUrl: videoUrls[adId] } : {}),
+                },
+              })
+            )
+        );
+      }
+    }
 
-    // ===== PHASE 2: Older data in 90-day chunks (91-1095 days ago) =====
+    // ===== PHASE 4: Older data 91-1095 days in parallel chunks =====
     const olderChunks: { since: string; until: string }[] = [];
     for (let offset = 90; offset < 1095; offset += 90) {
-      const chunkEnd = new Date(today);
-      chunkEnd.setDate(today.getDate() - offset);
-      const chunkStart = new Date(today);
-      chunkStart.setDate(today.getDate() - Math.min(offset + 90, 1095));
       olderChunks.push({
-        since: chunkStart.toISOString().split("T")[0],
-        until: chunkEnd.toISOString().split("T")[0],
+        since: daysAgo(Math.min(offset + 90, 1095)),
+        until: daysAgo(offset),
       });
     }
 
-    // Process older chunks 3 at a time for speed
     const concurrency = 3;
     for (let i = 0; i < olderChunks.length; i += concurrency) {
       const batch = olderChunks.slice(i, i + concurrency);
       const batchResults = await Promise.allSettled(
         batch.map(async (chunk) => {
-          const timeRange = JSON.stringify({ since: chunk.since, until: chunk.until });
-          const url = `https://graph.facebook.com/${FB_GRAPH_VERSION}/act_${adAccountId}/insights?fields=${fields}&level=ad&time_range=${encodeURIComponent(timeRange)}&time_increment=1&limit=500&access_token=${accessToken}`;
-          const insights = await fetchAllInsights(url);
-
-          // Fetch thumbnails for new ad IDs not already cached
-          const chunkAdIds = [...new Set(insights.map((i) => i.ad_id).filter(Boolean))] as string[];
-          const newAdIds = chunkAdIds.filter((id) => !thumbnails[id]);
-          if (newAdIds.length > 0) {
-            const newThumbs = await fetchAdThumbnails(newAdIds, accessToken);
-            Object.assign(thumbnails, newThumbs);
-          }
-
-          return saveInsightsToDB(insights, organizationId, thumbnails, videoUrls);
+          const insights = await fetchAllInsights(buildUrl(chunk.since, chunk.until));
+          return saveInsightsToDB(insights, organizationId, thumbnails, noMedia);
         })
       );
 
