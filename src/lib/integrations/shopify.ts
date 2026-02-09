@@ -339,7 +339,7 @@ export async function syncShopifyOrders(organizationId: string) {
           totalAmount: parseFloat(order.total_price || "0"),
           currency: order.currency || "BRL",
           itemCount: order.line_items?.length || 0,
-          orderDate: new Date(order.created_at),
+          orderDate: parseShopifyLocalDate(order.created_at),
           rawData: order,
         },
         update: {
@@ -350,6 +350,7 @@ export async function syncShopifyOrders(organizationId: string) {
             : null,
           customerEmail: order.customer?.email || null,
           itemCount: order.line_items?.length || 0,
+          orderDate: parseShopifyLocalDate(order.created_at),
           rawData: order,
         },
       });
@@ -394,6 +395,17 @@ function mapShopifyStatus(status: string): string {
     authorized: "pending",
   };
   return map[status] || status;
+}
+
+/**
+ * Extract the local date from a Shopify timestamp, preserving the store's timezone.
+ * Shopify sends dates like "2026-02-08T22:00:00-03:00". If we just do new Date(),
+ * this becomes 2026-02-09T01:00:00Z (wrong day in Brazil). Instead, we extract
+ * the date part "2026-02-08" and store it at noon UTC to avoid any edge cases.
+ */
+function parseShopifyLocalDate(createdAt: string): Date {
+  const localDate = createdAt.split("T")[0]; // "2026-02-08"
+  return new Date(localDate + "T12:00:00Z");
 }
 
 /**

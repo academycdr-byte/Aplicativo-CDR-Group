@@ -30,11 +30,11 @@ export async function getDashboardData(days: number = 30, from?: string, to?: st
       where: { organizationId: orgId, orderDate: prevDateFilter },
     }),
     prisma.order.aggregate({
-      where: { organizationId: orgId, orderDate: dateFilter, status: "paid" },
+      where: { organizationId: orgId, orderDate: dateFilter, status: { in: ["paid", "pending"] } },
       _sum: { totalAmount: true },
     }),
     prisma.order.aggregate({
-      where: { organizationId: orgId, orderDate: prevDateFilter, status: "paid" },
+      where: { organizationId: orgId, orderDate: prevDateFilter, status: { in: ["paid", "pending"] } },
       _sum: { totalAmount: true },
     }),
     prisma.adMetric.aggregate({
@@ -84,7 +84,7 @@ export async function getRevenueByDay(days: number = 30, from?: string, to?: str
     where: {
       organizationId: ctx.organization.id,
       orderDate: dateFilter,
-      status: "paid",
+      status: { in: ["paid", "pending"] },
     },
     select: { orderDate: true, totalAmount: true },
     orderBy: { orderDate: "asc" },
@@ -163,7 +163,7 @@ export async function getMetricsAnalysis(days: number = 30, from?: string, to?: 
   for (const o of orders) {
     const key = o.orderDate.toISOString().split("T")[0];
     if (!grouped[key]) grouped[key] = { date: key, faturamento: 0, investimento: 0, compras: 0, ticketMedio: 0, cpa: 0, roas: 0 };
-    if (o.status === "paid") {
+    if (o.status === "paid" || o.status === "pending") {
       grouped[key].faturamento += Number(o.totalAmount);
       grouped[key].compras += 1;
     }
@@ -285,18 +285,31 @@ export async function getPaidAndRepurchaseRates(days: number = 30, from?: string
   const orgId = ctx.organization.id;
   const dateFilter = buildDateFilter(getDateRange(days, from, to));
 
-  const [totalOrders, paidOrders, customerGroups] = await Promise.all([
+  const range = getDateRange(days, from, to);
+
+  const [totalOrders, paidOrders, customersInPeriod, customersWithPriorOrders] = await Promise.all([
     prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter } }),
-    prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter, status: "paid" } }),
-    prisma.order.groupBy({
-      by: ["customerEmail"],
+    prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter, status: { in: ["paid", "pending"] } } }),
+    // Unique customers who ordered in this period
+    prisma.order.findMany({
       where: { organizationId: orgId, orderDate: dateFilter, customerEmail: { not: null } },
-      _count: { id: true },
+      select: { customerEmail: true },
+      distinct: ["customerEmail"],
+    }),
+    // Customers who ordered BEFORE this period (historically)
+    prisma.order.findMany({
+      where: { organizationId: orgId, orderDate: { lt: range.since }, customerEmail: { not: null } },
+      select: { customerEmail: true },
+      distinct: ["customerEmail"],
     }),
   ]);
 
-  const uniqueCustomers = customerGroups.length;
-  const repeatCustomers = customerGroups.filter((g) => g._count.id > 1).length;
+  const periodEmails = new Set(customersInPeriod.map((c) => c.customerEmail!));
+  const priorEmails = new Set(customersWithPriorOrders.map((c) => c.customerEmail!));
+
+  const uniqueCustomers = periodEmails.size;
+  // A returning customer is someone who ordered in this period AND has ordered before
+  const repeatCustomers = [...periodEmails].filter((email) => priorEmails.has(email)).length;
 
   return {
     paidRate: totalOrders > 0 ? (paidOrders / totalOrders) * 100 : 0,
