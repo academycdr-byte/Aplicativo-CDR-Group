@@ -232,12 +232,14 @@ export async function getFunnelData(days: number = 30, from?: string, to?: strin
     prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter, status: "paid" } }),
     prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter, status: { in: ["shipped", "delivered"] } } }),
     prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter, status: "delivered" } }),
-    // StoreFunnel (Shopify ShopifyQL sessions data)
+    // StoreFunnel: only aggregate records with sessions > 0 (real ShopifyQL data).
+    // Strategy 2 fallback records have sessions=0 and wrong addToCart/checkouts values.
     prisma.storeFunnel.aggregate({
       where: {
         organizationId: orgId,
         date: dateFilter,
         ...(shopifyOnly ? { platform: "SHOPIFY" } : {}),
+        sessions: { gt: 0 },
       },
       _sum: { sessions: true, addToCart: true, checkoutsInitiated: true, ordersGenerated: true },
     }).catch(() => ({ _sum: { sessions: 0, addToCart: 0, checkoutsInitiated: 0, ordersGenerated: 0 } })),

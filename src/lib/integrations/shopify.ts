@@ -582,17 +582,18 @@ export async function syncShopifyFunnel(organizationId: string) {
     let synced = 0;
     for (const dateKey of allDates) {
       const sessions = salesSessions[dateKey] || 0;
-      const abandoned = abandonedByDate[dateKey] || 0;
       const dayOrders = ordersByDate[dateKey] || 0;
 
-      // IMPORTANT: Only include sessions in the update if we actually got session data.
-      // Never overwrite existing session data with 0.
       const custMetrics = customerMetricsByDay[dateKey] || { total: 0, returning: 0 };
       const customerFields = hasCustomerColumns
         ? { totalCustomers: custMetrics.total, returningCustomers: custMetrics.returning }
         : {};
+
+      // Strategy 2 only updates ordersGenerated and sessions (if available).
+      // NEVER overwrite addToCart or checkoutsInitiated - those fields are only
+      // accurate from Strategy 1 (ShopifyQL FROM sessions). Strategy 2 doesn't
+      // have real cart/checkout session data.
       const updateData: Record<string, number> = {
-        checkoutsInitiated: abandoned + dayOrders,
         ordersGenerated: dayOrders,
         ...(hasCustomerColumns ? { totalCustomers: custMetrics.total, returningCustomers: custMetrics.returning } : {}),
       };
@@ -614,7 +615,7 @@ export async function syncShopifyFunnel(organizationId: string) {
           date: new Date(dateKey),
           sessions,
           addToCart: 0,
-          checkoutsInitiated: abandoned + dayOrders,
+          checkoutsInitiated: 0,
           ordersGenerated: dayOrders,
           ...customerFields,
         },
@@ -705,7 +706,9 @@ async function fetchShopifySessionsFunnel(
   accessToken: string
 ): Promise<Record<string, DailyFunnelMetrics> | null> {
   const queries = [
-    // Full funnel data
+    // Full funnel data (matches Shopify Analytics exactly)
+    `FROM sessions SHOW sessions, sessions_with_cart_additions, sessions_that_reached_checkout, sessions_that_completed_checkout, conversion_rate WHERE human_or_bot_session IN ('human', 'bot') TIMESERIES day SINCE -30d UNTIL today ORDER BY day ASC LIMIT 1000`,
+    // Without WHERE filter as fallback
     `FROM sessions SHOW sessions, sessions_with_cart_additions, sessions_that_reached_checkout, sessions_that_completed_checkout TIMESERIES day SINCE -30d UNTIL today ORDER BY day ASC`,
     // Sessions only fallback
     `FROM sessions SHOW sessions TIMESERIES day SINCE -30d UNTIL today ORDER BY day ASC`,
