@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { mapShopifyStatus, parseShopifyLocalDate } from "@/lib/integrations/shopify";
 import crypto from "crypto";
 
 export async function POST(req: NextRequest) {
@@ -82,6 +83,12 @@ export async function POST(req: NextRequest) {
     }
 
     if (topic === "orders/create" || topic === "orders/updated") {
+      const customerName = data.customer
+        ? `${data.customer.first_name || ""} ${data.customer.last_name || ""}`.trim()
+        : null;
+      const amount = parseFloat(data.current_total_price || data.total_price || "0");
+      const orderDate = parseShopifyLocalDate(data.created_at);
+
       await prisma.order.upsert({
         where: {
           organizationId_platform_externalOrderId: {
@@ -92,25 +99,26 @@ export async function POST(req: NextRequest) {
         },
         update: {
           status: mapShopifyStatus(data.financial_status),
-          totalAmount: parseFloat(data.total_price || "0"),
-          customerName: data.customer
-            ? `${data.customer.first_name || ""} ${data.customer.last_name || ""}`.trim()
-            : null,
+          totalAmount: amount,
+          customerName,
           customerEmail: data.customer?.email || null,
+          itemCount: data.line_items?.length || 0,
+          orderDate,
+          currency: data.currency || "BRL",
+          rawData: data,
         },
         create: {
           organizationId: integration.organizationId,
           platform: "SHOPIFY",
           externalOrderId: String(data.id),
           status: mapShopifyStatus(data.financial_status),
-          customerName: data.customer
-            ? `${data.customer.first_name || ""} ${data.customer.last_name || ""}`.trim()
-            : null,
+          customerName,
           customerEmail: data.customer?.email || null,
-          totalAmount: parseFloat(data.total_price || "0"),
+          totalAmount: amount,
           currency: data.currency || "BRL",
           itemCount: data.line_items?.length || 0,
-          orderDate: new Date(data.created_at),
+          orderDate,
+          rawData: data,
         },
       });
     }
@@ -122,14 +130,3 @@ export async function POST(req: NextRequest) {
   }
 }
 
-function mapShopifyStatus(status: string): string {
-  const map: Record<string, string> = {
-    paid: "paid",
-    pending: "pending",
-    refunded: "refunded",
-    voided: "cancelled",
-    partially_refunded: "refunded",
-    authorized: "pending",
-  };
-  return map[status] || "pending";
-}

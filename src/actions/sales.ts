@@ -10,22 +10,23 @@ export async function getSalesData(days: number = 30, from?: string, to?: string
 
   const orgId = ctx.organization.id;
   const dateFilter = buildDateFilter(getDateRange(days, from, to));
+  const paidStatuses = { in: ["paid", "partially_refunded"] };
 
   const [totalRevenue, totalOrders, avgTicket, topProducts] = await Promise.all([
     prisma.order.aggregate({
-      where: { organizationId: orgId, orderDate: dateFilter, status: "paid" },
+      where: { organizationId: orgId, orderDate: dateFilter, status: paidStatuses },
       _sum: { totalAmount: true },
     }),
     prisma.order.count({
-      where: { organizationId: orgId, orderDate: dateFilter, status: "paid" },
+      where: { organizationId: orgId, orderDate: dateFilter, status: paidStatuses },
     }),
     prisma.order.aggregate({
-      where: { organizationId: orgId, orderDate: dateFilter, status: "paid" },
+      where: { organizationId: orgId, orderDate: dateFilter, status: paidStatuses },
       _avg: { totalAmount: true },
     }),
     prisma.order.groupBy({
       by: ["platform"],
-      where: { organizationId: orgId, orderDate: dateFilter },
+      where: { organizationId: orgId, orderDate: dateFilter, status: paidStatuses },
       _count: { id: true },
       _sum: { totalAmount: true },
     }),
@@ -60,6 +61,7 @@ export async function getSalesByDay(days: number = 30, from?: string, to?: strin
     where: {
       organizationId: ctx.organization.id,
       orderDate: dateFilter,
+      status: { in: ["paid", "partially_refunded"] },
     },
     select: { orderDate: true, totalAmount: true, status: true },
     orderBy: { orderDate: "asc" },
@@ -73,9 +75,7 @@ export async function getSalesByDay(days: number = 30, from?: string, to?: strin
       grouped[dateKey] = { date: dateKey, revenue: 0, orders: 0 };
     }
     grouped[dateKey].orders += 1;
-    if (order.status === "paid") {
-      grouped[dateKey].revenue += Number(order.totalAmount);
-    }
+    grouped[dateKey].revenue += Number(order.totalAmount);
   }
 
   return Object.values(grouped).sort((a, b) => a.date.localeCompare(b.date));
@@ -93,6 +93,7 @@ export async function getSalesByStatus() {
 
   const statusLabels: Record<string, string> = {
     paid: "Pago",
+    partially_refunded: "Parcialmente Reembolsado",
     pending: "Pendente",
     cancelled: "Cancelado",
     refunded: "Reembolsado",

@@ -336,7 +336,7 @@ export async function syncShopifyOrders(organizationId: string) {
             ? `${order.customer.first_name || ""} ${order.customer.last_name || ""}`.trim()
             : null,
           customerEmail: order.customer?.email || null,
-          totalAmount: parseFloat(order.total_price || "0"),
+          totalAmount: parseFloat(order.current_total_price || order.total_price || "0"),
           currency: order.currency || "BRL",
           itemCount: order.line_items?.length || 0,
           orderDate: parseShopifyLocalDate(order.created_at),
@@ -344,7 +344,7 @@ export async function syncShopifyOrders(organizationId: string) {
         },
         update: {
           status: mapShopifyStatus(order.financial_status),
-          totalAmount: parseFloat(order.total_price || "0"),
+          totalAmount: parseFloat(order.current_total_price || order.total_price || "0"),
           customerName: order.customer
             ? `${order.customer.first_name || ""} ${order.customer.last_name || ""}`.trim()
             : null,
@@ -385,13 +385,14 @@ export async function syncShopifyOrders(organizationId: string) {
   }
 }
 
-function mapShopifyStatus(status: string): string {
+export function mapShopifyStatus(status: string): string {
   const map: Record<string, string> = {
     paid: "paid",
+    partially_paid: "paid",
     pending: "pending",
     refunded: "refunded",
     voided: "cancelled",
-    partially_refunded: "refunded",
+    partially_refunded: "partially_refunded",
     authorized: "pending",
   };
   return map[status] || status;
@@ -403,7 +404,7 @@ function mapShopifyStatus(status: string): string {
  * this becomes 2026-02-09T01:00:00Z (wrong day in Brazil). Instead, we extract
  * the date part "2026-02-08" and store it at noon UTC to avoid any edge cases.
  */
-function parseShopifyLocalDate(createdAt: string): Date {
+export function parseShopifyLocalDate(createdAt: string): Date {
   const localDate = createdAt.split("T")[0]; // "2026-02-08"
   return new Date(localDate + "T12:00:00Z");
 }
