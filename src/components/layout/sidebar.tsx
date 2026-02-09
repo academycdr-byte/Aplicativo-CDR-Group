@@ -100,8 +100,8 @@ export function Sidebar() {
         <Image
           src="/logo-cdr.png"
           alt="CDR Group"
-          width={40}
-          height={40}
+          width={52}
+          height={52}
           className="rounded-lg"
           priority
         />
