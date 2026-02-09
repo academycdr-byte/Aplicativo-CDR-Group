@@ -184,12 +184,6 @@ export async function syncFacebookAdsMetrics(organizationId: string) {
 
     const adAccountId = integration.externalAccountId || "";
 
-    // Fetch insights at AD level for the last 1095 days (3 years - max allowed by Facebook API)
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - 1095);
-    const since = startDate.toISOString().split("T")[0];
-    const until = new Date().toISOString().split("T")[0];
-
     const fields = [
       "date_start",
       "campaign_id", "campaign_name",
@@ -200,46 +194,60 @@ export async function syncFacebookAdsMetrics(organizationId: string) {
       "cost_per_action_type",
     ].join(",");
 
-    const timeRange = JSON.stringify({ since, until });
-    const insightsUrl = `https://graph.facebook.com/${FB_GRAPH_VERSION}/act_${adAccountId}/insights?fields=${fields}&level=ad&time_range=${encodeURIComponent(timeRange)}&time_increment=1&limit=500&access_token=${accessToken}`;
+    // Fetch insights in 90-day chunks to avoid Facebook API 500 errors
+    const totalDays = 1095; // 3 years
+    const chunkSize = 90;
+    const today = new Date();
+    const allInsights: Record<string, unknown>[] = [];
 
-    const response = await fetch(insightsUrl);
+    for (let offset = 0; offset < totalDays; offset += chunkSize) {
+      const chunkEnd = new Date(today);
+      chunkEnd.setDate(today.getDate() - offset);
+      const chunkStart = new Date(today);
+      chunkStart.setDate(today.getDate() - Math.min(offset + chunkSize, totalDays));
 
-    if (!response.ok) {
-      const errorBody = await response.text();
-      console.error("[Facebook Ads] Insights fetch failed:", response.status, errorBody);
-      throw new Error(`Facebook API error: ${response.status}`);
-    }
+      const since = chunkStart.toISOString().split("T")[0];
+      const until = chunkEnd.toISOString().split("T")[0];
 
-    const data = await response.json();
+      const timeRange = JSON.stringify({ since, until });
+      const insightsUrl = `https://graph.facebook.com/${FB_GRAPH_VERSION}/act_${adAccountId}/insights?fields=${fields}&level=ad&time_range=${encodeURIComponent(timeRange)}&time_increment=1&limit=500&access_token=${accessToken}`;
 
-    // Validate API response
-    if (data.error) {
-      console.error("[Facebook Ads] API error in response:", JSON.stringify(data.error));
-      throw new Error(`Facebook API error: ${data.error.message || "Unknown"}`);
-    }
+      const response = await fetch(insightsUrl);
 
-    let allInsights = data.data || [];
-
-    // Handle pagination
-    let nextUrl = data.paging?.next;
-    while (nextUrl) {
-      const nextResponse = await fetch(nextUrl);
-      if (!nextResponse.ok) {
-        console.error("[Facebook Ads] Pagination failed:", nextResponse.status);
-        break;
+      if (!response.ok) {
+        const errorBody = await response.text();
+        console.error(`[Facebook Ads] Chunk ${since}→${until} failed:`, response.status, errorBody);
+        // Skip this chunk and continue with the next one
+        continue;
       }
-      const nextData = await nextResponse.json();
-      if (nextData.error) {
-        console.error("[Facebook Ads] Pagination API error:", JSON.stringify(nextData.error));
-        break;
+
+      const data = await response.json();
+
+      if (data.error) {
+        console.error(`[Facebook Ads] Chunk ${since}→${until} API error:`, JSON.stringify(data.error));
+        continue;
       }
-      allInsights = allInsights.concat(nextData.data || []);
-      nextUrl = nextData.paging?.next;
+
+      if (data.data) {
+        allInsights.push(...data.data);
+      }
+
+      // Handle pagination within this chunk
+      let nextUrl = data.paging?.next;
+      while (nextUrl) {
+        const nextResponse = await fetch(nextUrl);
+        if (!nextResponse.ok) break;
+        const nextData = await nextResponse.json();
+        if (nextData.error) break;
+        if (nextData.data) {
+          allInsights.push(...nextData.data);
+        }
+        nextUrl = nextData.paging?.next;
+      }
     }
 
     // Fetch creative thumbnails and video URLs for unique ad IDs
-    const uniqueAdIds = [...new Set(allInsights.map((i: { ad_id: string }) => i.ad_id).filter(Boolean))] as string[];
+    const uniqueAdIds = [...new Set(allInsights.map((i) => (i as { ad_id?: string }).ad_id).filter(Boolean))] as string[];
     const thumbnails = await fetchAdThumbnails(uniqueAdIds, accessToken);
     const videoUrls = await fetchAdVideoUrls(uniqueAdIds, accessToken);
 
