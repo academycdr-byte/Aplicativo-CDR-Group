@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, ShoppingCart, MousePointerClick, Package, ArrowDown } from "lucide-react";
+import { Eye, ShoppingCart, MousePointerClick, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type FunnelData = {
@@ -34,7 +34,7 @@ export function FunnelVisual({ data }: FunnelVisualProps) {
         },
         {
             id: "atc",
-            label: "Add. Carrinho",
+            label: "Adicionado ao Carrinho",
             value: data.adicoesCarrinho,
             icon: ShoppingCart,
             color: "bg-blue-500/10 text-blue-500 border-blue-500/20",
@@ -42,7 +42,7 @@ export function FunnelVisual({ data }: FunnelVisualProps) {
         },
         {
             id: "checkout",
-            label: "Checkout",
+            label: "Chegou ao Checkout",
             value: data.checkoutsIniciados,
             icon: MousePointerClick,
             color: "bg-amber-500/10 text-amber-500 border-amber-500/20",
@@ -50,7 +50,7 @@ export function FunnelVisual({ data }: FunnelVisualProps) {
         },
         {
             id: "orders",
-            label: "Compras",
+            label: "Checkout Concluído",
             value: data.pedidosGerados,
             icon: Package,
             color: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
@@ -58,8 +58,15 @@ export function FunnelVisual({ data }: FunnelVisualProps) {
         },
     ];
 
-    /* Calculate percentages relative to sessions (max width) */
     const maxVal = Math.max(data.sessoes, 1);
+
+    // Key conversion rates (Shopify-style)
+    const taxaAdicaoCarrinho = data.sessoes > 0
+        ? (data.adicoesCarrinho / data.sessoes) * 100 : 0;
+    const taxaConversaoCheckout = data.checkoutsIniciados > 0
+        ? (data.pedidosGerados / data.checkoutsIniciados) * 100 : 0;
+    const taxaConversaoSessao = data.sessoes > 0
+        ? (data.pedidosGerados / data.sessoes) * 100 : 0;
 
     function fmtNum(n: number) {
         return new Intl.NumberFormat("pt-BR").format(n);
@@ -67,8 +74,9 @@ export function FunnelVisual({ data }: FunnelVisualProps) {
 
     return (
         <div className="space-y-6">
+            {/* Funnel Steps */}
             {steps.map((step, i) => {
-                const widthPct = Math.max((step.value / maxVal) * 100, 2); // min 2% width
+                const widthPct = Math.max((step.value / maxVal) * 100, 2);
                 const prevStep = steps[i - 1];
                 const conversionRate = prevStep && prevStep.value > 0
                     ? ((step.value / prevStep.value) * 100).toFixed(1)
@@ -78,18 +86,15 @@ export function FunnelVisual({ data }: FunnelVisualProps) {
 
                 return (
                     <div key={step.id} className="relative group">
-                        {/* Conversion Indicator */}
                         {conversionRate && (
-                            <div className="absolute -top-4 left-[1.15rem] h-4 w-px bg-border/50 z-0"></div>
+                            <div className="absolute -top-4 left-[1.15rem] h-4 w-px bg-border/50 z-0" />
                         )}
 
                         <div className="flex items-center gap-4 relative z-10">
-                            {/* Icon Box */}
                             <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center border shrink-0 transition-all duration-300", step.color)}>
                                 <Icon className="w-5 h-5" />
                             </div>
 
-                            {/* Bar Area */}
                             <div className="flex-1">
                                 <div className="flex justify-between items-end mb-2">
                                     <span className="text-sm font-medium leading-none text-muted-foreground">{step.label}</span>
@@ -101,10 +106,8 @@ export function FunnelVisual({ data }: FunnelVisualProps) {
                                         )}
                                         <span className="text-sm font-bold leading-none text-foreground">{fmtNum(step.value)}</span>
                                     </div>
-
                                 </div>
 
-                                {/* Visual Bar Container */}
                                 <div className="h-2.5 w-full bg-secondary/50 rounded-full overflow-hidden">
                                     <div
                                         className={cn("h-full rounded-full transition-all duration-1000 ease-out", step.barColor)}
@@ -116,6 +119,48 @@ export function FunnelVisual({ data }: FunnelVisualProps) {
                     </div>
                 );
             })}
+
+            {/* Key Conversion Rates - Visual Emphasis */}
+            <div className="mt-8 pt-6 border-t border-border/40">
+                <div className="grid grid-cols-3 gap-3">
+                    <RateHighlight
+                        label="Adição ao Carrinho"
+                        value={taxaAdicaoCarrinho}
+                        colorClass="text-blue-500"
+                        bgClass="bg-blue-500/10 border-blue-500/20"
+                    />
+                    <RateHighlight
+                        label="Conversão Checkout"
+                        value={taxaConversaoCheckout}
+                        colorClass="text-amber-500"
+                        bgClass="bg-amber-500/10 border-amber-500/20"
+                    />
+                    <RateHighlight
+                        label="Conversão por Sessão"
+                        value={taxaConversaoSessao}
+                        colorClass="text-emerald-500"
+                        bgClass="bg-emerald-500/10 border-emerald-500/20"
+                    />
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function RateHighlight({ label, value, colorClass, bgClass }: {
+    label: string;
+    value: number;
+    colorClass: string;
+    bgClass: string;
+}) {
+    return (
+        <div className={cn("rounded-xl border p-3 text-center transition-all", bgClass)}>
+            <p className={cn("text-2xl font-bold tracking-tight", colorClass)}>
+                {value.toFixed(1)}%
+            </p>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mt-1 leading-tight">
+                {label}
+            </p>
         </div>
     );
 }
