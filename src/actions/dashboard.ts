@@ -158,11 +158,14 @@ export async function getMetricsAnalysis(days: number = 30, from?: string, to?: 
     ticketMedio: number;
     cpa: number;
     roas: number;
+    // Facebook Ads attribution data (for accurate CPA/ROAS)
+    fbConversions: number;
+    fbRevenue: number;
   }> = {};
 
   for (const o of orders) {
     const key = o.orderDate.toISOString().split("T")[0];
-    if (!grouped[key]) grouped[key] = { date: key, faturamento: 0, investimento: 0, compras: 0, ticketMedio: 0, cpa: 0, roas: 0 };
+    if (!grouped[key]) grouped[key] = { date: key, faturamento: 0, investimento: 0, compras: 0, ticketMedio: 0, cpa: 0, roas: 0, fbConversions: 0, fbRevenue: 0 };
     if (o.status === "paid" || o.status === "pending") {
       grouped[key].faturamento += Number(o.totalAmount);
       grouped[key].compras += 1;
@@ -171,18 +174,24 @@ export async function getMetricsAnalysis(days: number = 30, from?: string, to?: 
 
   for (const m of adMetrics) {
     const key = m.date.toISOString().split("T")[0];
-    if (!grouped[key]) grouped[key] = { date: key, faturamento: 0, investimento: 0, compras: 0, ticketMedio: 0, cpa: 0, roas: 0 };
+    if (!grouped[key]) grouped[key] = { date: key, faturamento: 0, investimento: 0, compras: 0, ticketMedio: 0, cpa: 0, roas: 0, fbConversions: 0, fbRevenue: 0 };
     grouped[key].investimento += Number(m.spend);
+    grouped[key].fbConversions += m.conversions;
+    grouped[key].fbRevenue += Number(m.revenue);
   }
 
   // Compute derived metrics
+  // CPA and ROAS use Facebook Ads attribution data (conversions + revenue from FB)
   for (const d of Object.values(grouped)) {
     d.ticketMedio = d.compras > 0 ? d.faturamento / d.compras : 0;
-    d.cpa = d.compras > 0 ? d.investimento / d.compras : 0;
-    d.roas = d.investimento > 0 ? d.faturamento / d.investimento : 0;
+    d.cpa = d.fbConversions > 0 ? d.investimento / d.fbConversions : 0;
+    d.roas = d.investimento > 0 ? d.fbRevenue / d.investimento : 0;
   }
 
-  return Object.values(grouped).sort((a, b) => a.date.localeCompare(b.date));
+  // Strip internal FB fields before returning
+  return Object.values(grouped)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map(({ fbConversions, fbRevenue, ...rest }) => rest);
 }
 
 /**
