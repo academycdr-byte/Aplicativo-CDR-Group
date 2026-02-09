@@ -278,72 +278,88 @@ export async function getFunnelData(days: number = 30, from?: string, to?: strin
 /**
  * % paid orders and % repurchase rate (Shopify-compatible per-day calculation)
  *
- * Shopify formula: For each day, count unique customers and returning customers.
- * A "returning customer" on day X = customer who ordered on day X AND has at least
- * one order BEFORE day X (any time in history, not just before the period).
- * Period rate = SUM(returning per day) / SUM(customers per day) * 100
+ * Uses StoreFunnel data (populated from ShopifyQL during sync) as primary source.
+ * This matches exactly what Shopify shows in Analytics > Returning customer rate.
+ * Falls back to local order-based calculation if StoreFunnel has no customer data.
  */
 export async function getPaidAndRepurchaseRates(days: number = 30, from?: string, to?: string) {
   const ctx = await getSessionWithOrg();
   if (!ctx) return null;
 
   const orgId = ctx.organization.id;
-  const dateFilter = buildDateFilter(getDateRange(days, from, to));
+  const range = getDateRange(days, from, to);
+  const dateFilter = buildDateFilter(range);
 
-  const [totalOrders, paidOrders, ordersInPeriod, allHistoricalOrders] = await Promise.all([
+  // Fetch paid rate data + StoreFunnel customer metrics in parallel
+  const [totalOrders, paidOrders, funnelData, ordersInPeriod] = await Promise.all([
     prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter } }),
-    // Only truly PAID orders (not pending/authorized)
     prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter, status: "paid" } }),
-    // All orders in period with email + date (for per-day grouping)
+    // StoreFunnel has totalCustomers/returningCustomers from ShopifyQL sync
+    prisma.storeFunnel.findMany({
+      where: { organizationId: orgId, date: dateFilter },
+      select: { totalCustomers: true, returningCustomers: true },
+    }),
+    // Orders for unique customer count display
     prisma.order.findMany({
       where: { organizationId: orgId, orderDate: dateFilter, customerEmail: { not: null } },
-      select: { customerEmail: true, orderDate: true },
-    }),
-    // ALL orders ever (full history) to build first-order map
-    prisma.order.findMany({
-      where: { organizationId: orgId, customerEmail: { not: null } },
-      select: { customerEmail: true, orderDate: true },
-      orderBy: { orderDate: "asc" },
+      select: { customerEmail: true },
+      distinct: ["customerEmail"],
     }),
   ]);
 
-  // Build map: email (lowercase) → first order date ever
-  const firstOrderByCustomer = new Map<string, Date>();
-  for (const o of allHistoricalOrders) {
-    const email = o.customerEmail!.toLowerCase();
-    if (!firstOrderByCustomer.has(email)) {
-      firstOrderByCustomer.set(email, o.orderDate);
-    }
-  }
-
-  // Group orders by day → unique customers per day
-  const customersByDay = new Map<string, Set<string>>();
-  for (const o of ordersInPeriod) {
-    const dayKey = o.orderDate.toISOString().split("T")[0];
-    const email = o.customerEmail!.toLowerCase();
-    if (!customersByDay.has(dayKey)) {
-      customersByDay.set(dayKey, new Set());
-    }
-    customersByDay.get(dayKey)!.add(email);
-  }
-
-  // Shopify per-day calculation: sum customers and returning customers across all days
+  // Sum StoreFunnel customer metrics across all days (Shopify formula)
   let totalCustomersSum = 0;
   let returningCustomersSum = 0;
-  for (const [dayKey, emails] of customersByDay) {
-    const dayStart = new Date(dayKey);
-    for (const email of emails) {
-      totalCustomersSum++;
-      const firstOrder = firstOrderByCustomer.get(email);
-      // Returning = first-ever order was BEFORE this specific day
-      if (firstOrder && firstOrder < dayStart) {
-        returningCustomersSum++;
+  const hasFunnelCustomerData = funnelData.some((f) => f.totalCustomers > 0);
+
+  if (hasFunnelCustomerData) {
+    // Primary: use StoreFunnel data from ShopifyQL (exact Shopify numbers)
+    for (const f of funnelData) {
+      totalCustomersSum += f.totalCustomers;
+      returningCustomersSum += f.returningCustomers;
+    }
+  } else {
+    // Fallback: calculate from local order data
+    const allHistoricalOrders = await prisma.order.findMany({
+      where: { organizationId: orgId, customerEmail: { not: null } },
+      select: { customerEmail: true, orderDate: true },
+      orderBy: { orderDate: "asc" },
+    });
+
+    const allOrdersInPeriod = await prisma.order.findMany({
+      where: { organizationId: orgId, orderDate: dateFilter, customerEmail: { not: null } },
+      select: { customerEmail: true, orderDate: true },
+    });
+
+    const firstOrderByCustomer = new Map<string, Date>();
+    for (const o of allHistoricalOrders) {
+      const email = o.customerEmail!.toLowerCase();
+      if (!firstOrderByCustomer.has(email)) {
+        firstOrderByCustomer.set(email, o.orderDate);
+      }
+    }
+
+    const customersByDay = new Map<string, Set<string>>();
+    for (const o of allOrdersInPeriod) {
+      const dayKey = o.orderDate.toISOString().split("T")[0];
+      const email = o.customerEmail!.toLowerCase();
+      if (!customersByDay.has(dayKey)) {
+        customersByDay.set(dayKey, new Set());
+      }
+      customersByDay.get(dayKey)!.add(email);
+    }
+
+    for (const [dayKey, emails] of customersByDay) {
+      const dayStart = new Date(dayKey);
+      for (const email of emails) {
+        totalCustomersSum++;
+        const firstOrder = firstOrderByCustomer.get(email);
+        if (firstOrder && firstOrder < dayStart) {
+          returningCustomersSum++;
+        }
       }
     }
   }
-
-  // Unique customers across the entire period (for display)
-  const allPeriodEmails = new Set(ordersInPeriod.map((o) => o.customerEmail!.toLowerCase()));
 
   return {
     paidRate: totalOrders > 0 ? (paidOrders / totalOrders) * 100 : 0,
@@ -352,7 +368,7 @@ export async function getPaidAndRepurchaseRates(days: number = 30, from?: string
     repurchaseRate: totalCustomersSum > 0 ? (returningCustomersSum / totalCustomersSum) * 100 : 0,
     repeatCustomers: returningCustomersSum,
     totalCustomersInDays: totalCustomersSum,
-    uniqueCustomers: allPeriodEmails.size,
+    uniqueCustomers: ordersInPeriod.length,
   };
 }
 

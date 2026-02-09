@@ -462,41 +462,49 @@ export async function syncShopifyFunnel(organizationId: string) {
       ordersByDate[key] = (ordersByDate[key] || 0) + 1;
     }
 
-    // Build first-order-date map and per-day customer metrics (Shopify-compatible)
-    const firstOrderByCustomer = new Map<string, Date>();
-    for (const o of allHistoricalOrders) {
-      const email = o.customerEmail!.toLowerCase();
-      if (!firstOrderByCustomer.has(email)) {
-        firstOrderByCustomer.set(email, o.orderDate);
-      }
-    }
+    // Fetch customer metrics from Shopify ShopifyQL (exact data, same as Shopify Analytics)
+    // Falls back to local calculation if ShopifyQL fails
+    let customerMetricsByDay: Record<string, { total: number; returning: number }> = {};
 
-    // Group period orders by day → unique customers
-    const customersByDay = new Map<string, Set<string>>();
-    for (const o of orders) {
-      if (!o.customerEmail) continue;
-      const dayKey = o.orderDate.toISOString().split("T")[0];
-      const email = o.customerEmail.toLowerCase();
-      if (!customersByDay.has(dayKey)) {
-        customersByDay.set(dayKey, new Set());
-      }
-      customersByDay.get(dayKey)!.add(email);
-    }
-
-    // Compute per-day: totalCustomers and returningCustomers
-    const customerMetricsByDay: Record<string, { total: number; returning: number }> = {};
-    for (const [dayKey, emails] of customersByDay) {
-      const dayStart = new Date(dayKey);
-      let total = 0;
-      let returning = 0;
-      for (const email of emails) {
-        total++;
-        const firstOrder = firstOrderByCustomer.get(email);
-        if (firstOrder && firstOrder < dayStart) {
-          returning++;
+    const shopifyCustomerMetrics = await fetchShopifyCustomerMetrics(shop, accessToken);
+    if (Object.keys(shopifyCustomerMetrics).length > 0) {
+      customerMetricsByDay = shopifyCustomerMetrics;
+      console.log("[Shopify Funnel] Using ShopifyQL customer metrics (exact Shopify data)");
+    } else {
+      // Fallback: calculate from local order data
+      console.warn("[Shopify Funnel] ShopifyQL customer metrics unavailable, using local calculation");
+      const firstOrderByCustomer = new Map<string, Date>();
+      for (const o of allHistoricalOrders) {
+        const email = o.customerEmail!.toLowerCase();
+        if (!firstOrderByCustomer.has(email)) {
+          firstOrderByCustomer.set(email, o.orderDate);
         }
       }
-      customerMetricsByDay[dayKey] = { total, returning };
+
+      const customersByDay = new Map<string, Set<string>>();
+      for (const o of orders) {
+        if (!o.customerEmail) continue;
+        const dayKey = o.orderDate.toISOString().split("T")[0];
+        const email = o.customerEmail.toLowerCase();
+        if (!customersByDay.has(dayKey)) {
+          customersByDay.set(dayKey, new Set());
+        }
+        customersByDay.get(dayKey)!.add(email);
+      }
+
+      for (const [dayKey, emails] of customersByDay) {
+        const dayStart = new Date(dayKey);
+        let total = 0;
+        let returning = 0;
+        for (const email of emails) {
+          total++;
+          const firstOrder = firstOrderByCustomer.get(email);
+          if (firstOrder && firstOrder < dayStart) {
+            returning++;
+          }
+        }
+        customerMetricsByDay[dayKey] = { total, returning };
+      }
     }
 
     // Strategy 1: Try ShopifyQL FROM sessions (exact analytics data)
@@ -794,6 +802,63 @@ async function fetchSalesSessionData(
     }
   }
 
+  return result;
+}
+
+/**
+ * Fetch returning_customers and customers per day from ShopifyQL `FROM sales`.
+ * This matches exactly what Shopify shows in Analytics > Reports > Returning customer rate.
+ * Returns per-day data: { "2026-02-02": { total: 8, returning: 3 }, ... }
+ */
+async function fetchShopifyCustomerMetrics(
+  shop: string,
+  accessToken: string
+): Promise<Record<string, { total: number; returning: number }>> {
+  const result: Record<string, { total: number; returning: number }> = {};
+
+  const queries = [
+    `FROM sales SHOW returning_customers, customers TIMESERIES day SINCE -30d UNTIL today ORDER BY day ASC LIMIT 1000`,
+    `FROM sales SHOW returning_customers, customers GROUP BY day SINCE -30d UNTIL today ORDER BY day ASC`,
+  ];
+
+  const versions = [SHOPIFY_GRAPHQL_VERSION, SHOPIFY_API_VERSION];
+
+  for (const version of versions) {
+    for (const query of queries) {
+      try {
+        console.log(`[Shopify Funnel] Fetching customer metrics (API ${version})...`);
+        const table = await executeShopifyQLQuery(shop, accessToken, query, version);
+        if (!table) continue;
+
+        const dayIdx = table.columns.findIndex((c) =>
+          c.name === "day" || c.name === "date" || c.dataType === "date"
+        );
+        const returningIdx = table.columns.findIndex((c) => c.name === "returning_customers");
+        const customersIdx = table.columns.findIndex((c) => c.name === "customers");
+
+        if (dayIdx === -1 || customersIdx === -1) continue;
+
+        for (const row of table.rows) {
+          const dateKey = String(row[dayIdx]).split("T")[0];
+          const customers = parseInt(String(row[customersIdx])) || 0;
+          const returning = returningIdx !== -1 ? (parseInt(String(row[returningIdx])) || 0) : 0;
+
+          if (dateKey && dateKey !== "undefined" && customers > 0) {
+            result[dateKey] = { total: customers, returning };
+          }
+        }
+
+        if (Object.keys(result).length > 0) {
+          console.log(`[Shopify Funnel] Customer metrics from ShopifyQL: ${Object.keys(result).length} days`);
+          return result;
+        }
+      } catch (error) {
+        console.warn(`[Shopify Funnel] Customer metrics query failed (API ${version}):`, error);
+      }
+    }
+  }
+
+  console.warn("[Shopify Funnel] All customer metrics queries failed, will use local calculation");
   return result;
 }
 
