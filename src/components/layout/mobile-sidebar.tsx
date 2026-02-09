@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
 import {
@@ -111,8 +112,13 @@ export function MobileSidebar() {
       <SheetContent side="left" className="w-64 p-0 bg-sidebar-bg text-sidebar-text overflow-y-auto">
         <SheetHeader className="px-5 py-5 border-b border-white/5">
           <SheetTitle className="flex items-center gap-3 text-sidebar-text">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-primary-foreground font-bold text-[10px] tracking-wider">
-              CDR
+            <div className="relative w-8 h-8 flex items-center justify-center bg-white/5 rounded-lg border border-white/5">
+              <Image
+                src="/logo-cdr.png"
+                alt="CDR Group"
+                fill
+                className="object-contain p-1"
+              />
             </div>
             <div>
               <p className="font-semibold text-sm leading-tight">CDR Group</p>
