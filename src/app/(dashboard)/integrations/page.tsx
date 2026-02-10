@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Link2, Unlink, RefreshCw, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
-import { getIntegrations, connectApiKeyIntegration, connectShopifyDirect, disconnectIntegration, selectFacebookAdAccount, selectGoogleAnalyticsProperty } from "@/actions/integrations";
+import { getIntegrations, connectApiKeyIntegration, connectShopifyDirect, disconnectIntegration, selectFacebookAdAccount, selectMultipleFacebookAdAccounts, selectGoogleAnalyticsProperty } from "@/actions/integrations";
 import { syncPlatform } from "@/actions/sync";
 import { Platform } from "@prisma/client";
 
@@ -148,6 +148,7 @@ function IntegrationsContent() {
   const [fbAccountDialog, setFbAccountDialog] = useState(false);
   const [fbAccounts, setFbAccounts] = useState<FacebookAdAccount[]>([]);
   const [selectedFbAccount, setSelectedFbAccount] = useState<string>("");
+  const [selectedFbAccounts, setSelectedFbAccounts] = useState<string[]>([]);
   const [fbSearch, setFbSearch] = useState("");
   const [gaPropertyDialog, setGaPropertyDialog] = useState(false);
   const [gaProperties, setGaProperties] = useState<GA4Property[]>([]);
@@ -228,14 +229,16 @@ function IntegrationsContent() {
       getIntegrations().then((data) => {
         const fbIntegration = data.find((i) => i.platform === "FACEBOOK_ADS");
         const accounts = (fbIntegration?.metadata as { adAccounts?: FacebookAdAccount[] })?.adAccounts || [];
+        const existing = (fbIntegration?.metadata as { selectedAccounts?: { id: string }[] })?.selectedAccounts || [];
         if (accounts.length > 0) {
           setFbAccounts(accounts);
           setSelectedFbAccount(accounts[0]?.id || "");
+          setSelectedFbAccounts(existing.map((a) => a.id));
           setFbAccountDialog(true);
         }
         setIntegrations(data);
       });
-      toast.info("Selecione a conta de anuncio que deseja conectar.");
+      toast.info("Selecione as contas de anuncio que deseja conectar.");
     }
   }, [searchParams]);
 
@@ -344,25 +347,43 @@ function IntegrationsContent() {
   }
 
   async function handleSelectFbAccount() {
-    if (!selectedFbAccount) return;
     setLoading(true);
 
-    const result = await selectFacebookAdAccount(selectedFbAccount);
-    if (result.error) {
-      toast.error(result.error);
-    } else {
-      setFbAccountDialog(false);
-      toast.success(`Conta "${result.accountName}" conectada! Sincronizando metricas...`);
-      loadIntegrations();
-      // Auto-sync after selection
-      syncPlatform("FACEBOOK_ADS").then((syncResult) => {
-        if ("error" in syncResult && syncResult.error) {
-          toast.error(`Erro ao sincronizar Facebook Ads: ${syncResult.error}`);
-        } else {
-          toast.success("Metricas do Facebook Ads sincronizadas!");
-          loadIntegrations();
-        }
-      });
+    // Use multi-select if multiple are selected, otherwise single
+    if (selectedFbAccounts.length > 0) {
+      const result = await selectMultipleFacebookAdAccounts(selectedFbAccounts);
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        setFbAccountDialog(false);
+        toast.success(`${result.count} conta(s) conectada(s)! Sincronizando metricas...`);
+        loadIntegrations();
+        syncPlatform("FACEBOOK_ADS").then((syncResult) => {
+          if ("error" in syncResult && syncResult.error) {
+            toast.error(`Erro ao sincronizar Facebook Ads: ${syncResult.error}`);
+          } else {
+            toast.success("Metricas do Facebook Ads sincronizadas!");
+            loadIntegrations();
+          }
+        });
+      }
+    } else if (selectedFbAccount) {
+      const result = await selectFacebookAdAccount(selectedFbAccount);
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        setFbAccountDialog(false);
+        toast.success(`Conta "${result.accountName}" conectada! Sincronizando metricas...`);
+        loadIntegrations();
+        syncPlatform("FACEBOOK_ADS").then((syncResult) => {
+          if ("error" in syncResult && syncResult.error) {
+            toast.error(`Erro ao sincronizar Facebook Ads: ${syncResult.error}`);
+          } else {
+            toast.success("Metricas do Facebook Ads sincronizadas!");
+            loadIntegrations();
+          }
+        });
+      }
     }
     setLoading(false);
   }
@@ -472,9 +493,11 @@ function IntegrationsContent() {
                       if (platform.platform === "FACEBOOK_ADS") {
                         const fbIntegration = integrations.find((i) => i.platform === "FACEBOOK_ADS");
                         const accounts = (fbIntegration?.metadata as { adAccounts?: FacebookAdAccount[] })?.adAccounts || [];
+                        const existing = (fbIntegration?.metadata as { selectedAccounts?: { id: string }[] })?.selectedAccounts || [];
                         if (accounts.length > 0) {
                           setFbAccounts(accounts);
                           setSelectedFbAccount(accounts[0]?.id || "");
+                          setSelectedFbAccounts(existing.map((a) => a.id));
                           setFbAccountDialog(true);
                         }
                       } else if (platform.platform === "GOOGLE_ANALYTICS") {
@@ -631,9 +654,9 @@ function IntegrationsContent() {
       <Dialog open={fbAccountDialog} onOpenChange={(open) => { setFbAccountDialog(open); if (!open) setFbSearch(""); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Selecione a Conta de Anuncio</DialogTitle>
+            <DialogTitle>Selecione as Contas de Anuncio</DialogTitle>
             <DialogDescription>
-              {fbAccounts.length} conta{fbAccounts.length !== 1 ? "s" : ""} encontrada{fbAccounts.length !== 1 ? "s" : ""}. Escolha qual deseja conectar.
+              {fbAccounts.length} conta{fbAccounts.length !== 1 ? "s" : ""} encontrada{fbAccounts.length !== 1 ? "s" : ""}. Selecione uma ou mais contas para conectar.
             </DialogDescription>
           </DialogHeader>
 
@@ -663,20 +686,27 @@ function IntegrationsContent() {
 
               return filtered.map((account) => {
                 const isActive = account.account_status === 1;
+                const isChecked = selectedFbAccounts.includes(account.id);
                 return (
                   <label
                     key={account.id}
-                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${selectedFbAccount === account.id
+                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${isChecked
                       ? "border-primary bg-primary/5"
                       : "border-border hover:bg-muted/50"
                       }`}
                   >
                     <input
-                      type="radio"
-                      name="fb_account"
+                      type="checkbox"
                       value={account.id}
-                      checked={selectedFbAccount === account.id}
-                      onChange={() => setSelectedFbAccount(account.id)}
+                      checked={isChecked}
+                      onChange={() => {
+                        setSelectedFbAccounts((prev) =>
+                          prev.includes(account.id)
+                            ? prev.filter((id) => id !== account.id)
+                            : [...prev, account.id]
+                        );
+                        if (!selectedFbAccount) setSelectedFbAccount(account.id);
+                      }}
                       className="accent-primary"
                     />
                     <div className="flex-1 min-w-0">
@@ -698,8 +728,8 @@ function IntegrationsContent() {
             <Button variant="outline" onClick={() => setFbAccountDialog(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleSelectFbAccount} disabled={loading || !selectedFbAccount}>
-              {loading ? "Conectando..." : "Conectar Conta"}
+            <Button onClick={handleSelectFbAccount} disabled={loading || (selectedFbAccounts.length === 0 && !selectedFbAccount)}>
+              {loading ? "Conectando..." : selectedFbAccounts.length > 1 ? `Conectar ${selectedFbAccounts.length} Contas` : "Conectar Conta"}
             </Button>
           </div>
         </DialogContent>

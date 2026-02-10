@@ -13,6 +13,7 @@ type FilterParams = {
   to?: string;
   search?: string;
   exclude?: string[];
+  accountId?: string;
 };
 
 function buildWhereClause(
@@ -26,7 +27,11 @@ function buildWhereClause(
   };
 
   if (params?.platform && params.platform !== "all") {
-    where.platform = params.platform as any;
+    where.platform = params.platform as Prisma.EnumPlatformFilter;
+  }
+
+  if (params?.accountId && params.accountId !== "all") {
+    where.accountId = params.accountId;
   }
 
   const conditions: Prisma.AdMetricWhereInput[] = [];

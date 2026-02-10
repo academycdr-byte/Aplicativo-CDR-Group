@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { encrypt, decrypt } from "@/lib/encryption";
+import { toBrasiliaDateStr } from "@/lib/date-utils";
 
 const FB_GRAPH_VERSION = "v21.0";
 const FB_REDIRECT_URI = "https://aplicativo-cdr-group.vercel.app/api/integrations/facebook/callback";
@@ -191,6 +192,7 @@ async function saveInsightsToDB(
   organizationId: string,
   thumbnails: Record<string, string>,
   videoUrls: Record<string, string>,
+  accountId?: string,
 ): Promise<number> {
   if (insights.length === 0) return 0;
 
@@ -241,6 +243,7 @@ async function saveInsightsToDB(
             adName: insight.ad_name,
             thumbnailUrl: thumbnails[insight.ad_id] || null,
             videoUrl: videoUrls[insight.ad_id] || null,
+            accountId: accountId || null,
             date: new Date(insight.date_start),
             impressions: parseInt(insight.impressions || "0"),
             reach: parseInt(insight.reach || "0"),
@@ -259,6 +262,7 @@ async function saveInsightsToDB(
             adName: insight.ad_name,
             thumbnailUrl: thumbnails[insight.ad_id] || null,
             videoUrl: videoUrls[insight.ad_id] || null,
+            accountId: accountId || null,
             impressions: parseInt(insight.impressions || "0"),
             reach: parseInt(insight.reach || "0"),
             clicks: parseInt(insight.clicks || "0"),
@@ -311,7 +315,16 @@ export async function syncFacebookAdsMetrics(organizationId: string) {
       }
     }
 
-    const adAccountId = integration.externalAccountId || "";
+    // Support multiple accounts from metadata
+    const metadata = integration.metadata as { selectedAccounts?: { id: string; name: string }[] } | null;
+    const selectedAccounts = metadata?.selectedAccounts || [];
+    const accountIds: string[] = selectedAccounts.length > 0
+      ? selectedAccounts.map((a) => a.id.replace("act_", ""))
+      : integration.externalAccountId ? [integration.externalAccountId] : [];
+
+    if (accountIds.length === 0) {
+      throw new Error("No ad account selected");
+    }
 
     const fields = [
       "date_start",
@@ -327,79 +340,83 @@ export async function syncFacebookAdsMetrics(organizationId: string) {
     let totalSynced = 0;
     const noMedia: Record<string, string> = {};
 
-    // Helper to build Facebook insights URL for a date range
-    const buildUrl = (since: string, until: string) =>
-      `https://graph.facebook.com/${FB_GRAPH_VERSION}/act_${adAccountId}/insights?fields=${fields}&level=ad&time_range=${encodeURIComponent(JSON.stringify({ since, until }))}&time_increment=1&limit=500&access_token=${accessToken}`;
-
+    // Use Brasilia timezone for date calculations
     const daysAgo = (n: number) => {
       const d = new Date(today);
       d.setDate(today.getDate() - n);
-      return d.toISOString().split("T")[0];
+      return toBrasiliaDateStr(d);
     };
 
-    // ===== PHASE 1: Last 7 days - NO thumbnails/videos - fastest possible =====
-    const phase1 = await fetchAllInsights(buildUrl(daysAgo(7), daysAgo(0)));
-    totalSynced += await saveInsightsToDB(phase1, organizationId, noMedia, noMedia);
+    // Sync each selected account
+    for (const adAccountId of accountIds) {
+      // Helper to build Facebook insights URL for a date range
+      const buildUrl = (since: string, until: string) =>
+        `https://graph.facebook.com/${FB_GRAPH_VERSION}/act_${adAccountId}/insights?fields=${fields}&level=ad&time_range=${encodeURIComponent(JSON.stringify({ since, until }))}&time_increment=1&limit=500&access_token=${accessToken}`;
 
-    // ===== PHASE 2: Days 8-30 - save immediately, no media =====
-    const phase2 = await fetchAllInsights(buildUrl(daysAgo(30), daysAgo(7)));
-    totalSynced += await saveInsightsToDB(phase2, organizationId, noMedia, noMedia);
+      // ===== PHASE 1: Last 7 days - NO thumbnails/videos - fastest possible =====
+      const phase1 = await fetchAllInsights(buildUrl(daysAgo(7), daysAgo(0)));
+      totalSynced += await saveInsightsToDB(phase1, organizationId, noMedia, noMedia, adAccountId);
 
-    // ===== PHASE 3: Days 31-90 + fetch thumbnails for all recent ads =====
-    const phase3 = await fetchAllInsights(buildUrl(daysAgo(90), daysAgo(30)));
-    totalSynced += await saveInsightsToDB(phase3, organizationId, noMedia, noMedia);
+      // ===== PHASE 2: Days 8-30 - save immediately, no media =====
+      const phase2 = await fetchAllInsights(buildUrl(daysAgo(30), daysAgo(7)));
+      totalSynced += await saveInsightsToDB(phase2, organizationId, noMedia, noMedia, adAccountId);
 
-    // Now fetch thumbnails/videos for all synced ads and update records in background
-    const allRecentInsights = [...phase1, ...phase2, ...phase3];
-    const allAdIds = [...new Set(allRecentInsights.map((i) => i.ad_id).filter(Boolean))] as string[];
-    const [thumbnails, videoUrls] = await Promise.all([
-      fetchAdThumbnails(allAdIds, accessToken),
-      fetchAdVideoUrls(allAdIds, accessToken),
-    ]);
+      // ===== PHASE 3: Days 31-90 + fetch thumbnails for all recent ads =====
+      const phase3 = await fetchAllInsights(buildUrl(daysAgo(90), daysAgo(30)));
+      totalSynced += await saveInsightsToDB(phase3, organizationId, noMedia, noMedia, adAccountId);
 
-    // Batch-update thumbnails/videos for already-saved records
-    if (Object.keys(thumbnails).length > 0 || Object.keys(videoUrls).length > 0) {
-      const updateBatchSize = 30;
-      for (let i = 0; i < allAdIds.length; i += updateBatchSize) {
-        const batch = allAdIds.slice(i, i + updateBatchSize);
-        await Promise.all(
-          batch
-            .filter((adId) => thumbnails[adId] || videoUrls[adId])
-            .map((adId) =>
-              prisma.adMetric.updateMany({
-                where: { organizationId, platform: "FACEBOOK_ADS", adId },
-                data: {
-                  ...(thumbnails[adId] ? { thumbnailUrl: thumbnails[adId] } : {}),
-                  ...(videoUrls[adId] ? { videoUrl: videoUrls[adId] } : {}),
-                },
-              })
-            )
-        );
+      // Now fetch thumbnails/videos for all synced ads and update records in background
+      const allRecentInsights = [...phase1, ...phase2, ...phase3];
+      const allAdIds = [...new Set(allRecentInsights.map((i) => i.ad_id).filter(Boolean))] as string[];
+      const [thumbnails, videoUrls] = await Promise.all([
+        fetchAdThumbnails(allAdIds, accessToken),
+        fetchAdVideoUrls(allAdIds, accessToken),
+      ]);
+
+      // Batch-update thumbnails/videos for already-saved records
+      if (Object.keys(thumbnails).length > 0 || Object.keys(videoUrls).length > 0) {
+        const updateBatchSize = 30;
+        for (let i = 0; i < allAdIds.length; i += updateBatchSize) {
+          const batch = allAdIds.slice(i, i + updateBatchSize);
+          await Promise.all(
+            batch
+              .filter((adId) => thumbnails[adId] || videoUrls[adId])
+              .map((adId) =>
+                prisma.adMetric.updateMany({
+                  where: { organizationId, platform: "FACEBOOK_ADS", adId },
+                  data: {
+                    ...(thumbnails[adId] ? { thumbnailUrl: thumbnails[adId] } : {}),
+                    ...(videoUrls[adId] ? { videoUrl: videoUrls[adId] } : {}),
+                  },
+                })
+              )
+          );
+        }
       }
-    }
 
-    // ===== PHASE 4: Older data 91-1095 days in parallel chunks =====
-    const olderChunks: { since: string; until: string }[] = [];
-    for (let offset = 90; offset < 1095; offset += 90) {
-      olderChunks.push({
-        since: daysAgo(Math.min(offset + 90, 1095)),
-        until: daysAgo(offset),
-      });
-    }
+      // ===== PHASE 4: Older data 91-1095 days in parallel chunks =====
+      const olderChunks: { since: string; until: string }[] = [];
+      for (let offset = 90; offset < 1095; offset += 90) {
+        olderChunks.push({
+          since: daysAgo(Math.min(offset + 90, 1095)),
+          until: daysAgo(offset),
+        });
+      }
 
-    const concurrency = 3;
-    for (let i = 0; i < olderChunks.length; i += concurrency) {
-      const batch = olderChunks.slice(i, i + concurrency);
-      const batchResults = await Promise.allSettled(
-        batch.map(async (chunk) => {
-          const insights = await fetchAllInsights(buildUrl(chunk.since, chunk.until));
-          return saveInsightsToDB(insights, organizationId, thumbnails, noMedia);
-        })
-      );
+      const concurrency = 3;
+      for (let i = 0; i < olderChunks.length; i += concurrency) {
+        const batch = olderChunks.slice(i, i + concurrency);
+        const batchResults = await Promise.allSettled(
+          batch.map(async (chunk) => {
+            const insights = await fetchAllInsights(buildUrl(chunk.since, chunk.until));
+            return saveInsightsToDB(insights, organizationId, thumbnails, noMedia, adAccountId);
+          })
+        );
 
-      for (const result of batchResults) {
-        if (result.status === "fulfilled") {
-          totalSynced += result.value;
+        for (const result of batchResults) {
+          if (result.status === "fulfilled") {
+            totalSynced += result.value;
+          }
         }
       }
     }

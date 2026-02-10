@@ -222,7 +222,7 @@ export async function selectFacebookAdAccount(accountId: string) {
   }
 
   // Validate that the accountId is in the list of available accounts
-  const metadata = integration.metadata as { adAccounts?: { id: string; name: string }[] } | null;
+  const metadata = integration.metadata as { adAccounts?: { id: string; name: string }[]; selectedAccounts?: { id: string; name: string }[] } | null;
   const accounts = metadata?.adAccounts || [];
   const selected = accounts.find((a) => a.id === accountId);
 
@@ -230,17 +230,103 @@ export async function selectFacebookAdAccount(accountId: string) {
     return { error: "Conta de anuncio nao encontrada." };
   }
 
-  // Update integration with selected account
+  // Update integration with selected account (primary account for backward compat)
   await prisma.integration.update({
     where: { id: integration.id },
     data: {
       status: "CONNECTED",
       externalAccountId: accountId.replace("act_", ""),
       errorMessage: null,
+      metadata: {
+        ...(metadata || {}),
+        selectedAccounts: [{ id: selected.id, name: selected.name }],
+      },
     },
   });
 
   return { success: true, accountName: selected.name };
+}
+
+/**
+ * Select multiple Facebook Ads accounts for an organization.
+ */
+export async function selectMultipleFacebookAdAccounts(accountIds: string[]) {
+  const ctx = await getSessionWithOrg();
+  if (!ctx) return { error: "Nao autenticado." };
+
+  const integration = await prisma.integration.findUnique({
+    where: {
+      organizationId_platform: {
+        organizationId: ctx.organization.id,
+        platform: "FACEBOOK_ADS",
+      },
+    },
+  });
+
+  if (!integration || !integration.accessToken) {
+    return { error: "Facebook Ads nao conectado. Faca login novamente." };
+  }
+
+  const metadata = integration.metadata as { adAccounts?: { id: string; name: string }[]; selectedAccounts?: { id: string; name: string }[] } | null;
+  const allAccounts = metadata?.adAccounts || [];
+
+  const selectedAccounts = accountIds
+    .map((id) => allAccounts.find((a) => a.id === id))
+    .filter((a): a is { id: string; name: string } => a !== undefined);
+
+  if (selectedAccounts.length === 0) {
+    return { error: "Nenhuma conta valida selecionada." };
+  }
+
+  // Primary account = first selected
+  const primaryId = selectedAccounts[0].id.replace("act_", "");
+
+  await prisma.integration.update({
+    where: { id: integration.id },
+    data: {
+      status: "CONNECTED",
+      externalAccountId: primaryId,
+      errorMessage: null,
+      metadata: {
+        ...(metadata || {}),
+        selectedAccounts,
+      },
+    },
+  });
+
+  return { success: true, count: selectedAccounts.length };
+}
+
+/**
+ * Get the list of selected Facebook Ads accounts for the current org.
+ */
+export async function getSelectedFacebookAccounts() {
+  const ctx = await getSessionWithOrg();
+  if (!ctx) return [];
+
+  const integration = await prisma.integration.findUnique({
+    where: {
+      organizationId_platform: {
+        organizationId: ctx.organization.id,
+        platform: "FACEBOOK_ADS",
+      },
+    },
+    select: { metadata: true, externalAccountId: true },
+  });
+
+  if (!integration) return [];
+
+  const metadata = integration.metadata as { selectedAccounts?: { id: string; name: string }[] } | null;
+  if (metadata?.selectedAccounts && metadata.selectedAccounts.length > 0) {
+    return metadata.selectedAccounts;
+  }
+
+  // Fallback to single account
+  if (integration.externalAccountId) {
+    return [{ id: `act_${integration.externalAccountId}`, name: integration.externalAccountId }];
+  }
+
+  return [];
 }
 
 export async function selectGoogleAnalyticsProperty(propertyId: string) {

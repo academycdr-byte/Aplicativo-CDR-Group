@@ -62,6 +62,7 @@ import { loadAllAdsData } from "@/actions/ads";
 import { AdsFilter } from "@/components/ads/ads-filter";
 import { FunnelChart } from "@/components/ads/funnel-chart";
 import { VideoModal } from "@/components/ads/video-modal";
+import { AdAccountFilter } from "@/components/ad-account-filter";
 
 
 // Types
@@ -142,6 +143,7 @@ export default function AdsPage() {
 
   // Filters
   const [platformFilter, setPlatformFilter] = useState("all");
+  const [accountFilter, setAccountFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [excludedTerms, setExcludedTerms] = useState<string[]>([]);
   const [period, setPeriod] = useState<PeriodValue>({ type: "preset", days: 30 });
@@ -184,7 +186,8 @@ export default function AdsPage() {
       from,
       to,
       search: searchQuery || undefined,
-      exclude: excludedTerms
+      exclude: excludedTerms,
+      accountId: accountFilter !== "all" ? accountFilter : undefined,
     };
 
     try {
@@ -201,7 +204,7 @@ export default function AdsPage() {
     }
     setMetricsPage(1);
     setCreativesPage(1);
-  }, [period, platformFilter, searchQuery, excludedTerms]);
+  }, [period, platformFilter, accountFilter, searchQuery, excludedTerms]);
 
   useEffect(() => {
     loadData();
@@ -404,6 +407,7 @@ export default function AdsPage() {
               <SelectItem value="GOOGLE_ADS">Google Ads</SelectItem>
             </SelectContent>
           </Select>
+          <AdAccountFilter value={accountFilter} onChange={setAccountFilter} />
         </div>
       </div>
 
