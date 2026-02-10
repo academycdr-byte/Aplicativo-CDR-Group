@@ -9,7 +9,6 @@ import {
   LayoutDashboard,
   Link2,
   ShoppingBag,
-  TrendingUp,
   Megaphone,
   BarChart3,
   Settings,
@@ -72,8 +71,6 @@ export function Sidebar() {
     ];
 
     const platformNavItems: NavItem[] = [
-      { name: "Pedidos", href: "/orders", icon: ShoppingBag },
-      { name: "Vendas", href: "/sales", icon: TrendingUp },
       { name: "Mais Vendidos", href: "/best-sellers", icon: ShoppingBag },
       { name: "Anuncios", href: "/ads", icon: Megaphone },
       { name: "Financeiro", href: "/financeiro", icon: Wallet },
