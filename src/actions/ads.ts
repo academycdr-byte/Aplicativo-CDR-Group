@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { getSessionWithOrg } from "@/lib/session";
-import { getDateRange, getPreviousDateRange, buildDateFilter } from "@/lib/date-utils";
+import { getDateRange, getPreviousDateRange, buildDateFilter, toDateKeyBrasilia } from "@/lib/date-utils";
 import { Prisma } from "@prisma/client";
 import { getMetricsAnalysis, getOrdersByPlatform } from "@/actions/dashboard";
 
@@ -167,7 +167,7 @@ export async function getAdMetricsByDay(days: number = 30, from?: string, to?: s
   const grouped: Record<string, { date: string; spend: number; impressions: number; clicks: number; conversions: number; revenue: number; addToCart: number; initiateCheckout: number }> = {};
 
   for (const m of metrics) {
-    const dateKey = m.date.toISOString().split("T")[0];
+    const dateKey = toDateKeyBrasilia(m.date);
     if (!grouped[dateKey]) {
       grouped[dateKey] = { date: dateKey, spend: 0, impressions: 0, clicks: 0, conversions: 0, revenue: 0, addToCart: 0, initiateCheckout: 0 };
     }
@@ -372,6 +372,8 @@ async function loadGoogleAnalyticsData(organizationId: string, days: number, fro
   const devicesAgg: Record<string, { sessions: number; activeUsers: number }> = {};
   const geoAgg: Record<string, { sessions: number; activeUsers: number }> = {};
   const pagesAgg: Record<string, { screenPageViews: number; activeUsers: number }> = {};
+  const genderAgg: Record<string, { sessions: number; activeUsers: number }> = {};
+  const ageAgg: Record<string, { sessions: number; activeUsers: number }> = {};
 
   for (const m of metrics) {
     const traffic = m.trafficSources as Record<string, { sessions: number; activeUsers: number }> | null;
@@ -409,6 +411,24 @@ async function loadGoogleAnalyticsData(organizationId: string, days: number, fro
         pagesAgg[key].activeUsers += val.activeUsers || 0;
       }
     }
+
+    const genderData = (m as Record<string, unknown>).gender as Record<string, { sessions: number; activeUsers: number }> | null;
+    if (genderData) {
+      for (const [key, val] of Object.entries(genderData)) {
+        if (!genderAgg[key]) genderAgg[key] = { sessions: 0, activeUsers: 0 };
+        genderAgg[key].sessions += val.sessions || 0;
+        genderAgg[key].activeUsers += val.activeUsers || 0;
+      }
+    }
+
+    const ageData = (m as Record<string, unknown>).age as Record<string, { sessions: number; activeUsers: number }> | null;
+    if (ageData) {
+      for (const [key, val] of Object.entries(ageData)) {
+        if (!ageAgg[key]) ageAgg[key] = { sessions: 0, activeUsers: 0 };
+        ageAgg[key].sessions += val.sessions || 0;
+        ageAgg[key].activeUsers += val.activeUsers || 0;
+      }
+    }
   }
 
   return {
@@ -444,5 +464,11 @@ async function loadGoogleAnalyticsData(organizationId: string, days: number, fro
       .map(([path, val]) => ({ path, ...val }))
       .sort((a, b) => b.screenPageViews - a.screenPageViews)
       .slice(0, 10),
+    gender: Object.entries(genderAgg)
+      .map(([label, val]) => ({ label, ...val }))
+      .sort((a, b) => b.sessions - a.sessions),
+    age: Object.entries(ageAgg)
+      .map(([label, val]) => ({ label, ...val }))
+      .sort((a, b) => b.sessions - a.sessions),
   };
 }

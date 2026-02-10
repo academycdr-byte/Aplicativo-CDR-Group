@@ -218,8 +218,8 @@ export async function syncGoogleAnalyticsMetrics(organizationId: string) {
     const since = "30daysAgo";
     const until = "today";
 
-    // Fetch all 6 reports in parallel
-    const [dailyReport, trafficReport, pagesReport, devicesReport, geoReport, browserReport] =
+    // Fetch all 8 reports in parallel
+    const [dailyReport, trafficReport, pagesReport, devicesReport, geoReport, browserReport, genderReport, ageReport] =
       await Promise.all([
         // 1. Daily aggregate metrics
         runGA4Report(accessToken, propertyId, since, until, [
@@ -263,6 +263,16 @@ export async function syncGoogleAnalyticsMetrics(organizationId: string) {
           ["date", "browser"],
           5000,
         ),
+        // 7. Gender
+        runGA4Report(accessToken, propertyId, since, until,
+          ["sessions", "activeUsers"],
+          ["date", "userGender"],
+        ),
+        // 8. Age
+        runGA4Report(accessToken, propertyId, since, until,
+          ["sessions", "activeUsers"],
+          ["date", "userAgeBracket"],
+        ),
       ]);
 
     // Build lookup maps for breakdowns by date
@@ -301,6 +311,8 @@ export async function syncGoogleAnalyticsMetrics(organizationId: string) {
     const devicesByDate = buildBreakdown(devicesReport.rows, 0, [1], ["sessions", "activeUsers"]);
     const geoByDate = buildBreakdown(geoReport.rows, 0, [1], ["sessions", "activeUsers"]);
     const browsersByDate = buildBreakdown(browserReport.rows, 0, [1], ["sessions"]);
+    const genderByDate = buildBreakdown(genderReport.rows, 0, [1], ["sessions", "activeUsers"]);
+    const ageByDate = buildBreakdown(ageReport.rows, 0, [1], ["sessions", "activeUsers"]);
 
     let synced = 0;
 
@@ -332,6 +344,8 @@ export async function syncGoogleAnalyticsMetrics(organizationId: string) {
         const devices = devicesByDate[dateStr] || {};
         const geography = geoByDate[dateStr] || {};
         const browsers = browsersByDate[dateStr] || {};
+        const gender = genderByDate[dateStr] || {};
+        const age = ageByDate[dateStr] || {};
 
         await prisma.analyticsMetric.upsert({
           where: {
@@ -360,6 +374,8 @@ export async function syncGoogleAnalyticsMetrics(organizationId: string) {
             devices,
             geography,
             browsers,
+            gender,
+            age,
           },
           update: {
             sessions,
@@ -377,6 +393,8 @@ export async function syncGoogleAnalyticsMetrics(organizationId: string) {
             devices,
             geography,
             browsers,
+            gender,
+            age,
           },
         });
         synced++;

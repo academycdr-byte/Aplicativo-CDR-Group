@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { decrypt } from "@/lib/encryption";
+import { toDateKeyBrasilia } from "@/lib/date-utils";
 import crypto from "crypto";
 
 const SHOPIFY_API_VERSION = "2025-01";
@@ -399,14 +400,13 @@ export function mapShopifyStatus(status: string): string {
 }
 
 /**
- * Extract the local date from a Shopify timestamp, preserving the store's timezone.
- * Shopify sends dates like "2026-02-08T22:00:00-03:00". If we just do new Date(),
- * this becomes 2026-02-09T01:00:00Z (wrong day in Brazil). Instead, we extract
- * the date part "2026-02-08" and store it at noon UTC to avoid any edge cases.
+ * Parse a Shopify timestamp preserving the correct UTC instant.
+ * Shopify sends dates with timezone offset like "2026-02-08T22:00:00-03:00".
+ * We store the exact UTC instant so queries using Brasilia-aware date ranges
+ * (from date-utils.ts) correctly match orders to their Brasilia calendar day.
  */
 export function parseShopifyLocalDate(createdAt: string): Date {
-  const localDate = createdAt.split("T")[0]; // "2026-02-08"
-  return new Date(localDate + "T12:00:00Z");
+  return new Date(createdAt);
 }
 
 /**
@@ -459,7 +459,7 @@ export async function syncShopifyFunnel(organizationId: string) {
 
     const ordersByDate: Record<string, number> = {};
     for (const o of orders) {
-      const key = o.orderDate.toISOString().split("T")[0];
+      const key = toDateKeyBrasilia(o.orderDate);
       ordersByDate[key] = (ordersByDate[key] || 0) + 1;
     }
 
@@ -485,7 +485,7 @@ export async function syncShopifyFunnel(organizationId: string) {
       const customersByDay = new Map<string, Set<string>>();
       for (const o of orders) {
         if (!o.customerEmail) continue;
-        const dayKey = o.orderDate.toISOString().split("T")[0];
+        const dayKey = toDateKeyBrasilia(o.orderDate);
         const email = o.customerEmail.toLowerCase();
         if (!customersByDay.has(dayKey)) {
           customersByDay.set(dayKey, new Set());

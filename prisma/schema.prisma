@@ -148,14 +148,19 @@ model ProductCost {
 model FinancialConfig {
   id                  String       @id @default(cuid())
   organizationId      String       @unique
-  
+
   defaultTaxRate      Decimal      @db.Decimal(5, 2) @default(0)
   fixedTransactionFee Decimal      @db.Decimal(10, 2) @default(0)
+  gatewayRate         Decimal      @db.Decimal(5, 2) @default(0)
+  checkoutRate        Decimal      @db.Decimal(5, 2) @default(0)
+  taxBase             String       @default("revenue") // "profit" or "revenue"
+  fixedCosts          Decimal      @db.Decimal(10, 2) @default(0)
+  chargebackRate      Decimal      @db.Decimal(5, 2) @default(0)
 
   updatedAt           DateTime     @updatedAt
 
   organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  
+
   @@map("financial_configs")
 }
 
@@ -359,6 +364,8 @@ model AnalyticsMetric {
   devices        Json?
   geography      Json?
   browsers       Json?
+  gender         Json?
+  age            Json?
 
   createdAt DateTime @default(now())
 
