@@ -6,10 +6,26 @@ import { auth } from "@/auth";
 export async function GET() {
     try {
         const session = await auth();
-        if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" });
+        if (!session?.user?.id) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        // Get user's organization
+        const membership = await prisma.membership.findFirst({
+            where: { userId: session.user.id },
+            select: { organizationId: true, role: true },
+        });
+
+        if (!membership || !["OWNER", "ADMIN"].includes(membership.role)) {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
 
         const integration = await prisma.integration.findFirst({
-            where: { platform: "FACEBOOK_ADS", status: "CONNECTED" },
+            where: {
+                platform: "FACEBOOK_ADS",
+                status: "CONNECTED",
+                organizationId: membership.organizationId,
+            },
         });
 
         if (!integration || !integration.accessToken) {
@@ -31,19 +47,16 @@ export async function GET() {
         if (adIds.length > 0) {
             const ids = adIds.join(",");
 
-            // Test query A: video_id
             const resA = await fetch(`https://graph.facebook.com/v21.0/?ids=${ids}&fields=creative{video_id,object_story_spec{video_data{video_id}}}&access_token=${accessToken}`);
             debugVideos.step1_creative = await resA.json();
 
-            // Extract video IDs
-            const videoIds = [];
-            for (const [adId, data] of Object.entries(debugVideos.step1_creative)) {
+            const videoIds: string[] = [];
+            for (const [, data] of Object.entries(debugVideos.step1_creative)) {
                 const creative = (data as any).creative;
                 if (creative?.video_id) videoIds.push(creative.video_id);
                 if (creative?.object_story_spec?.video_data?.video_id) videoIds.push(creative.object_story_spec.video_data.video_id);
             }
 
-            // Test query B: source
             if (videoIds.length > 0) {
                 const uniqueVideoIds = [...new Set(videoIds)];
                 const resB = await fetch(`https://graph.facebook.com/v21.0/?ids=${uniqueVideoIds.join(",")}&fields=source&access_token=${accessToken}`);
@@ -51,9 +64,12 @@ export async function GET() {
             }
         }
 
-        // 3. Check DB state
+        // 3. Check DB state (scoped to user's org)
         const dbSample = await prisma.adMetric.findMany({
-            where: { platform: "FACEBOOK_ADS" },
+            where: {
+                platform: "FACEBOOK_ADS",
+                organizationId: membership.organizationId,
+            },
             orderBy: { date: "desc" },
             take: 5,
             select: { adId: true, videoUrl: true, thumbnailUrl: true }
@@ -67,6 +83,9 @@ export async function GET() {
         });
 
     } catch (error: any) {
-        return NextResponse.json({ success: false, error: error.message, stack: error.stack });
+        return NextResponse.json(
+            { success: false, error: error.message },
+            { status: 500 }
+        );
     }
 }

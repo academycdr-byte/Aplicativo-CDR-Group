@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendZApiText } from "@/lib/zapi";
 import { buildReportMessage } from "@/lib/report-message";
+import {
+  getBrazilToday,
+  toBrasiliaStartOfDay,
+  toBrasiliaEndOfDay,
+  getDateRange,
+} from "@/lib/date-utils";
 
 export async function GET(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
@@ -51,30 +57,53 @@ export async function GET(request: NextRequest) {
         const config = schedule.config as any;
         const orgId = client.organizationId;
 
-        // Calculate date range based on config period
-        let from = new Date();
-        const to = new Date();
+        // Calculate date range using Brazil timezone
+        let from: Date;
+        let to: Date;
 
         switch (config?.period || "last7") {
-          case "last7":
-            from.setDate(from.getDate() - 7);
+          case "last7": {
+            const range = getDateRange(7);
+            from = range.since;
+            to = range.until;
             break;
-          case "last14":
-            from.setDate(from.getDate() - 14);
+          }
+          case "last14": {
+            const range = getDateRange(14);
+            from = range.since;
+            to = range.until;
             break;
-          case "last30":
-            from.setDate(from.getDate() - 30);
+          }
+          case "last30": {
+            const range = getDateRange(30);
+            from = range.since;
+            to = range.until;
             break;
-          case "weekStart":
-            from.setDate(from.getDate() - from.getDay());
-            from.setHours(0, 0, 0, 0);
+          }
+          case "weekStart": {
+            const todayStr = getBrazilToday();
+            const todayParts = todayStr.split("-").map(Number);
+            const todayDate = new Date(Date.UTC(todayParts[0], todayParts[1] - 1, todayParts[2]));
+            const dayOfWeek = todayDate.getUTCDay();
+            const weekStartDate = new Date(todayDate);
+            weekStartDate.setUTCDate(weekStartDate.getUTCDate() - dayOfWeek);
+            const weekStartStr = weekStartDate.toISOString().split("T")[0];
+            from = toBrasiliaStartOfDay(weekStartStr);
+            to = toBrasiliaEndOfDay(todayStr);
             break;
-          case "monthStart":
-            from.setDate(1);
-            from.setHours(0, 0, 0, 0);
+          }
+          case "monthStart": {
+            const todayStr = getBrazilToday();
+            const monthStartStr = todayStr.slice(0, 8) + "01";
+            from = toBrasiliaStartOfDay(monthStartStr);
+            to = toBrasiliaEndOfDay(todayStr);
             break;
-          default:
-            from.setDate(from.getDate() - 7);
+          }
+          default: {
+            const range = getDateRange(7);
+            from = range.since;
+            to = range.until;
+          }
         }
 
         const dateFilter = { gte: from, lte: to };
@@ -167,7 +196,7 @@ export async function GET(request: NextRequest) {
           },
         });
 
-        // Calculate next run
+        // Calculate next run (in Brazil timezone: UTC-3)
         const nextRun = calculateNextRun(schedule.frequency, schedule.time, schedule.dayOfWeek, schedule.dayOfMonth);
         await prisma.reportSchedule.update({
           where: { id: schedule.id },
@@ -213,25 +242,30 @@ function calculateNextRun(
   dayOfMonth: number | null
 ): Date {
   const [hours, minutes] = (time || "09:00").split(":").map(Number);
-  const next = new Date();
-  next.setHours(hours, minutes, 0, 0);
+  // Schedule times are in Brazil timezone (UTC-3)
+  // Convert to UTC: add 3 hours
+  const utcHours = hours + 3;
+
+  const todayStr = getBrazilToday();
+  const todayParts = todayStr.split("-").map(Number);
+  const next = new Date(Date.UTC(todayParts[0], todayParts[1] - 1, todayParts[2], utcHours, minutes, 0, 0));
 
   switch (frequency) {
     case "DAILY":
-      next.setDate(next.getDate() + 1);
+      next.setUTCDate(next.getUTCDate() + 1);
       break;
     case "WEEKLY":
-      next.setDate(next.getDate() + 7);
+      next.setUTCDate(next.getUTCDate() + 7);
       break;
     case "BIWEEKLY":
-      next.setDate(next.getDate() + 14);
+      next.setUTCDate(next.getUTCDate() + 14);
       break;
     case "MONTHLY":
-      next.setMonth(next.getMonth() + 1);
-      if (dayOfMonth) next.setDate(dayOfMonth);
+      next.setUTCMonth(next.getUTCMonth() + 1);
+      if (dayOfMonth) next.setUTCDate(dayOfMonth);
       break;
     default:
-      next.setDate(next.getDate() + 1);
+      next.setUTCDate(next.getUTCDate() + 1);
   }
 
   return next;

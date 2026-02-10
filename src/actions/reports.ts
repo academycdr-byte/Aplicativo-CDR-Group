@@ -3,6 +3,13 @@
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
+import {
+    getBrazilToday,
+    toBrasiliaStartOfDay,
+    toBrasiliaEndOfDay,
+    getDateRange,
+    buildDateFilter,
+} from "@/lib/date-utils";
 
 // Check if user is admin
 async function requireAdmin() {
@@ -331,50 +338,69 @@ export async function getMetricsForReport(
 ) {
     const { organizationId } = await requireAdmin();
 
+    // Use Brazil timezone for all date calculations
     let from: Date;
-    let to: Date = new Date();
+    let to: Date;
 
     switch (period) {
-        case "last7":
-            from = new Date();
-            from.setDate(from.getDate() - 7);
+        case "last7": {
+            const range = getDateRange(7);
+            from = range.since;
+            to = range.until;
             break;
-        case "last14":
-            from = new Date();
-            from.setDate(from.getDate() - 14);
+        }
+        case "last14": {
+            const range = getDateRange(14);
+            from = range.since;
+            to = range.until;
             break;
-        case "last30":
-            from = new Date();
-            from.setDate(from.getDate() - 30);
+        }
+        case "last30": {
+            const range = getDateRange(30);
+            from = range.since;
+            to = range.until;
             break;
-        case "weekStart":
-            from = new Date();
-            from.setDate(from.getDate() - from.getDay());
-            from.setHours(0, 0, 0, 0);
+        }
+        case "weekStart": {
+            const todayStr = getBrazilToday();
+            const todayParts = todayStr.split("-").map(Number);
+            const todayDate = new Date(Date.UTC(todayParts[0], todayParts[1] - 1, todayParts[2]));
+            const dayOfWeek = todayDate.getUTCDay();
+            const weekStartDate = new Date(todayDate);
+            weekStartDate.setUTCDate(weekStartDate.getUTCDate() - dayOfWeek);
+            const weekStartStr = weekStartDate.toISOString().split("T")[0];
+            from = toBrasiliaStartOfDay(weekStartStr);
+            to = toBrasiliaEndOfDay(todayStr);
             break;
-        case "monthStart":
-            from = new Date();
-            from.setDate(1);
-            from.setHours(0, 0, 0, 0);
+        }
+        case "monthStart": {
+            const todayStr = getBrazilToday();
+            const monthStartStr = todayStr.slice(0, 8) + "01";
+            from = toBrasiliaStartOfDay(monthStartStr);
+            to = toBrasiliaEndOfDay(todayStr);
             break;
-        case "lastMonth":
-            from = new Date();
-            from.setMonth(from.getMonth() - 1);
-            from.setDate(1);
-            from.setHours(0, 0, 0, 0);
-            to = new Date(from);
-            to.setMonth(to.getMonth() + 1);
-            to.setDate(0);
-            to.setHours(23, 59, 59, 999);
+        }
+        case "lastMonth": {
+            const todayStr = getBrazilToday();
+            const todayParts = todayStr.split("-").map(Number);
+            const lastMonthDate = new Date(Date.UTC(todayParts[0], todayParts[1] - 2, 1));
+            const lastMonthStartStr = lastMonthDate.toISOString().split("T")[0];
+            const lastMonthEndDate = new Date(Date.UTC(todayParts[0], todayParts[1] - 1, 0));
+            const lastMonthEndStr = lastMonthEndDate.toISOString().split("T")[0];
+            from = toBrasiliaStartOfDay(lastMonthStartStr);
+            to = toBrasiliaEndOfDay(lastMonthEndStr);
             break;
+        }
         case "custom":
             if (!customFrom || !customTo) throw new Error("Datas personalizadas necessárias");
             from = customFrom;
             to = customTo;
             break;
-        default:
-            from = new Date();
-            from.setDate(from.getDate() - 7);
+        default: {
+            const range = getDateRange(7);
+            from = range.since;
+            to = range.until;
+        }
     }
 
     try {
@@ -436,12 +462,10 @@ export async function getMetricsForReport(
         const cpa = paidOrders > 0 ? spend / paidOrders : 0;
         const ticketMedio = paidOrders > 0 ? revenue / paidOrders : 0;
 
-        // Get previous period for comparison
-        const periodDays = Math.ceil((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
-        const prevFrom = new Date(from);
-        prevFrom.setDate(prevFrom.getDate() - periodDays);
-        const prevTo = new Date(from);
-        prevTo.setDate(prevTo.getDate() - 1);
+        // Get previous period for comparison (timezone-aware)
+        const periodMs = to.getTime() - from.getTime();
+        const prevTo = new Date(from.getTime() - 1);
+        const prevFrom = new Date(from.getTime() - periodMs);
 
         const prevAdMetrics = await prisma.adMetric.aggregate({
             where: {
