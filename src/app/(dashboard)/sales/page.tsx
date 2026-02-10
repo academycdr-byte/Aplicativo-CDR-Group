@@ -147,11 +147,16 @@ export default function SalesPage() {
                   tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
                   tickLine={false}
                   axisLine={false}
-                  tickFormatter={(v) => `R$${v}`}
+                  tickFormatter={(v) => {
+                    if (v >= 1000000) return `R$${(v / 1000000).toFixed(1)}M`;
+                    if (v >= 1000) return `R$${(v / 1000).toFixed(1)}k`;
+                    return `R$${v.toFixed(0)}`;
+                  }}
                 />
                 <Tooltip
+                  contentStyle={{ backgroundColor: "var(--card)", borderColor: "var(--border)", borderRadius: "12px" }}
                   formatter={(value, name) => [
-                    name === "revenue" ? fmt(Number(value)) : Number(value),
+                    name === "revenue" ? fmt(Number(value)) : Number(value).toLocaleString("pt-BR"),
                     name === "revenue" ? "Receita" : "Pedidos",
                   ]}
                   labelFormatter={(label) => {
@@ -202,9 +207,14 @@ export default function SalesPage() {
                     tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
                     tickLine={false}
                     axisLine={false}
-                    tickFormatter={(v) => `R$${v}`}
+                    tickFormatter={(v) => {
+                      if (v >= 1000000) return `R$${(v / 1000000).toFixed(1)}M`;
+                      if (v >= 1000) return `R$${(v / 1000).toFixed(1)}k`;
+                      return `R$${v.toFixed(0)}`;
+                    }}
                   />
                   <Tooltip
+                    contentStyle={{ backgroundColor: "var(--card)", borderColor: "var(--border)", borderRadius: "12px" }}
                     formatter={(value) => [fmt(Number(value)), "Receita"]}
                     cursor={{ fill: "var(--primary)", fillOpacity: 0.08 }}
                   />
@@ -247,7 +257,11 @@ export default function SalesPage() {
                     axisLine={false}
                     width={100}
                   />
-                  <Tooltip cursor={{ fill: "var(--primary)", fillOpacity: 0.08 }} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: "var(--card)", borderColor: "var(--border)", borderRadius: "12px" }}
+                    formatter={(value) => [Number(value).toLocaleString("pt-BR"), "Pedidos"]}
+                    cursor={{ fill: "var(--primary)", fillOpacity: 0.08 }}
+                  />
                   <Bar dataKey="count" radius={[0, 6, 6, 0]}>
                     {statusData.map((_, i) => (
                       <Cell key={i} fill={COLORS[i % COLORS.length]} />

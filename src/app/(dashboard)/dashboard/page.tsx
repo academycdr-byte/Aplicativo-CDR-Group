@@ -411,7 +411,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <RateCard
             title="Taxa de Pagamento"
-            value={`${(rates?.paidRate || 0).toFixed(1)}%`}
+            value={`${(rates?.paidRate || 0).toFixed(2)}%`}
             subtext={`${rates?.paidOrders || 0} pagos`}
             progress={rates?.paidRate || 0}
             colorClass="bg-primary"
@@ -420,7 +420,7 @@ export default function DashboardPage() {
 
           <RateCard
             title="Taxa de Clientes Recorrentes"
-            value={`${(rates?.repurchaseRate || 0).toFixed(1)}%`}
+            value={`${(rates?.repurchaseRate || 0).toFixed(2)}%`}
             subtext={`${rates?.repeatCustomers || 0} recorrentes de ${rates?.totalCustomersInDays || 0}`}
             progress={rates?.repurchaseRate || 0}
             colorClass="bg-purple-500"
@@ -470,7 +470,14 @@ function KPICard({ label, value, change, icon: Icon, trend }: {
   );
 }
 
-function RateCard({ title, value, subtext, progress, colorClass, icon: Icon }: any) {
+function RateCard({ title, value, subtext, progress, colorClass, icon: Icon }: {
+  title: string;
+  value: string;
+  subtext: string;
+  progress: number;
+  colorClass: string;
+  icon: React.ComponentType<{ className?: string }>;
+}) {
   return (
     <Card className="shadow-sm flex flex-col justify-between p-6">
       <div className="flex items-center justify-between mb-4">

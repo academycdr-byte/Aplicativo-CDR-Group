@@ -152,49 +152,49 @@ export default function FinancePage() {
                             value={fmt(metrics.productCosts)}
                             icon={ShoppingCart}
                             iconClass="bg-amber-500/10 text-amber-500"
-                            subText={`${cogsPct.toFixed(1)}% da receita`}
+                            subText={`${cogsPct.toFixed(2)}% da receita`}
                         />
                         <FinancialCard
                             title="Ads (Tráfego)"
                             value={fmt(metrics.adSpend)}
                             icon={TrendingUp}
                             iconClass="bg-red-500/10 text-red-500"
-                            subText={`${adsPct.toFixed(1)}% da receita`}
+                            subText={`${adsPct.toFixed(2)}% da receita`}
                         />
                         <FinancialCard
                             title="Gateway"
                             value={fmt(metrics.gatewayFee)}
                             icon={CreditCard}
                             iconClass="bg-blue-500/10 text-blue-500"
-                            subText={`${gatewayPct.toFixed(1)}% da receita`}
+                            subText={`${gatewayPct.toFixed(2)}% da receita`}
                         />
                         <FinancialCard
                             title="Checkout"
                             value={fmt(metrics.checkoutFee)}
                             icon={Receipt}
                             iconClass="bg-indigo-500/10 text-indigo-500"
-                            subText={`${checkoutPct.toFixed(1)}% da receita`}
+                            subText={`${checkoutPct.toFixed(2)}% da receita`}
                         />
                         <FinancialCard
                             title="Impostos"
                             value={fmt(metrics.taxFee)}
                             icon={Landmark}
                             iconClass="bg-purple-500/10 text-purple-500"
-                            subText={`${taxPct.toFixed(1)}% da receita`}
+                            subText={`${taxPct.toFixed(2)}% da receita`}
                         />
                         <FinancialCard
                             title="Custos Fixos"
                             value={fmt(metrics.fixedCosts)}
                             icon={ArrowDownRight}
                             iconClass="bg-orange-500/10 text-orange-500"
-                            subText={`${fixedPct.toFixed(1)}% da receita`}
+                            subText={`${fixedPct.toFixed(2)}% da receita`}
                         />
                         <FinancialCard
                             title="Chargebacks"
                             value={fmt(metrics.chargebackCost)}
                             icon={AlertTriangle}
                             iconClass="bg-rose-500/10 text-rose-500"
-                            subText={`${chargebackPct.toFixed(1)}% da receita`}
+                            subText={`${chargebackPct.toFixed(2)}% da receita`}
                         />
                     </div>
 
