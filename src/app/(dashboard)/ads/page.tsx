@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import Link from "next/link";
 import Image from "next/image";
 import {
   Card,
@@ -32,12 +31,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DollarSign,
-  Eye,
   MousePointer,
   TrendingUp,
   ChevronLeft,
   ChevronRight,
-  Users,
   ImageIcon,
   ArrowUpDown,
   ArrowUpRight,
@@ -133,6 +130,37 @@ const platformLabels: Record<string, string> = {
   FACEBOOK_ADS: "Facebook Ads",
   GOOGLE_ADS: "Google Ads",
 };
+
+function AdThumbnail({ src, alt, fill, width, height, className, sizes }: {
+  src: string;
+  alt: string;
+  fill?: boolean;
+  width?: number;
+  height?: number;
+  className?: string;
+  sizes?: string;
+}) {
+  const [error, setError] = useState(false);
+  if (error || !src) {
+    return (
+      <div className={`flex items-center justify-center bg-muted/30 ${fill ? "absolute inset-0" : ""}`} style={!fill ? { width, height } : undefined}>
+        <ImageIcon className="w-5 h-5 text-muted-foreground/50" />
+      </div>
+    );
+  }
+  return (
+    <Image
+      src={src}
+      alt={alt}
+      fill={fill}
+      width={!fill ? width : undefined}
+      height={!fill ? height : undefined}
+      className={className}
+      sizes={sizes}
+      onError={() => setError(true)}
+    />
+  );
+}
 
 export default function AdsPage() {
   const [totals, setTotals] = useState<AdTotals | null>(null);
@@ -238,8 +266,8 @@ export default function AdsPage() {
       ticket: m.conversions > 0 ? m.revenue / m.conversions : 0,
     }));
     return withDerived.sort((a, b) => {
-      const aVal = (a as any)[metricsSortKey] ?? 0;
-      const bVal = (b as any)[metricsSortKey] ?? 0;
+      const aVal = Number((a as unknown as Record<string, unknown>)[metricsSortKey]) || 0;
+      const bVal = Number((b as unknown as Record<string, unknown>)[metricsSortKey]) || 0;
       return metricsSortDir === "desc" ? bVal - aVal : aVal - bVal;
     });
   }, [metrics, metricsSortKey, metricsSortDir]);
@@ -287,8 +315,8 @@ export default function AdsPage() {
     }
 
     return withDerived.sort((a, b) => {
-      const aVal = (a as any)[creativesSortKey] ?? 0;
-      const bVal = (b as any)[creativesSortKey] ?? 0;
+      const aVal = Number((a as unknown as Record<string, unknown>)[creativesSortKey]) || 0;
+      const bVal = Number((b as unknown as Record<string, unknown>)[creativesSortKey]) || 0;
       return creativesSortDir === "desc" ? bVal - aVal : aVal - bVal;
     });
   }, [creatives, creativesSortKey, creativesSortDir, uniqueCreatives]);
@@ -329,8 +357,18 @@ export default function AdsPage() {
     suffix = "",
     subText,
     variant = "default"
-  }: any) {
-    const variation = prevTotals ? getVariation(value, prevValue) : 0;
+  }: {
+    title: string;
+    value: number | string;
+    prevValue: number;
+    icon: React.ComponentType<{ className?: string }>;
+    prefix?: string;
+    suffix?: string;
+    subText?: string;
+    variant?: "default" | "destructive" | "success" | "blue" | "purple" | "amber";
+  }) {
+    const numValue = typeof value === "string" ? parseFloat(value) || 0 : value;
+    const variation = prevTotals ? getVariation(numValue, prevValue) : 0;
     const isPositive = variation > 0;
     const isNegative = variation < 0; // Explicitly check negative
 
@@ -418,10 +456,8 @@ export default function AdsPage() {
       />
 
       {/* KPI Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 2xl:grid-cols-8 gap-4">
-        <KPICard title="Gasto" value={t.spend} prevValue={p.spend} icon={DollarSign} prefix="R$" variant="destructive" />
-        <KPICard title="Impressões" value={t.impressions} prevValue={p.impressions} icon={Eye} variant="blue" />
-        <KPICard title="Alcance" value={t.reach} prevValue={p.reach} icon={Users} variant="purple" />
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+        <KPICard title="Investimento" value={t.spend} prevValue={p.spend} icon={DollarSign} prefix="R$" variant="destructive" />
         <KPICard title="Cliques" value={t.clicks} prevValue={p.clicks} icon={MousePointer} variant="amber" />
         <KPICard title="Conversões" value={t.conversions} prevValue={p.conversions} icon={TrendingUp} variant="success" />
         <KPICard title="ROAS" value={roas.toFixed(2)} prevValue={prevRoas} icon={BarChart2} suffix="x" variant="default" />
@@ -484,7 +520,7 @@ export default function AdsPage() {
               <Card className="h-full flex flex-col border border-border shadow-none rounded-lg">
                 <CardHeader className="flex flex-row items-center justify-between border-b border-border/50 px-5 py-4">
                   <CardTitle className="text-base font-semibold">Evolução Temporal</CardTitle>
-                  <Select value={chartMetric} onValueChange={(v: any) => setChartMetric(v)}>
+                  <Select value={chartMetric} onValueChange={(v) => setChartMetric(v as typeof chartMetric)}>
                     <SelectTrigger className="w-[180px] h-8 text-xs">
                       <SelectValue />
                     </SelectTrigger>
@@ -602,7 +638,7 @@ export default function AdsPage() {
                       <span className="w-6 text-center text-muted-foreground text-sm font-medium mr-2">{idx + 1}</span>
                       <div className="w-10 h-10 bg-muted rounded relative overflow-hidden shrink-0 mr-3 border border-border">
                         {c.thumbnailUrl ? (
-                          <Image src={c.thumbnailUrl} alt="" fill className="object-cover" />
+                          <AdThumbnail src={c.thumbnailUrl} alt="" fill className="object-cover" sizes="40px" />
                         ) : <ImageIcon className="w-5 h-5 absolute inset-0 m-auto text-muted-foreground/50" />}
                       </div>
                       <div className="flex-1 min-w-0 mr-2">
@@ -654,11 +690,11 @@ export default function AdsPage() {
                 <TableBody>
                   {sortedMetrics
                     .slice((metricsPage - 1) * metricsPerPage, metricsPage * metricsPerPage)
-                    .map((m: any) => (
+                    .map((m) => (
                       <TableRow key={m.id} className={`hover:bg-muted/30 border-b border-border/50 ${m.roas >= 3 ? "bg-emerald-500/5 hover:bg-emerald-500/10" : ""}`}>
                         <TableCell>
                           <div className="flex items-center gap-3">
-                            {m.thumbnailUrl && <Image src={m.thumbnailUrl} alt="" width={32} height={32} className="rounded object-cover" />}
+                            {m.thumbnailUrl && <AdThumbnail src={m.thumbnailUrl} alt="" width={32} height={32} className="rounded object-cover" />}
                             <div className="min-w-0 max-w-[250px]">
                               <p className="text-sm font-medium truncate" title={m.adName || ""}>{m.adName || "Anúncio"}</p>
                               <p className="text-xs text-muted-foreground truncate">{m.campaignName}</p>
@@ -749,7 +785,7 @@ export default function AdsPage() {
                   {/* Thumbnail */}
                   <div className="relative aspect-video bg-muted flex items-center justify-center overflow-hidden">
                     {c.thumbnailUrl ? (
-                      <Image src={c.thumbnailUrl} alt="" fill className="object-cover transition-transform" />
+                      <AdThumbnail src={c.thumbnailUrl} alt="" fill className="object-cover transition-transform" sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw" />
                     ) : <ImageIcon className="w-8 h-8 opacity-20" />}
 
                     {/* Overlay Play Icon if we assume it's a video or just generally for "Detail View" affordance */}
