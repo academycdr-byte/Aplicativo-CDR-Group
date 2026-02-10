@@ -108,6 +108,7 @@ export default function DashboardPage() {
   const [syncing, setSyncing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeMetrics, setActiveMetrics] = useState<Set<string>>(new Set(["faturamento", "investimento"]));
+  const [profitData, setProfitData] = useState<{ dailyProfits: { date: string; profit: number; revenue: number; costs: number }[]; totalProfit: number }>({ dailyProfits: [], totalProfit: 0 });
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -125,6 +126,7 @@ export default function DashboardPage() {
       setRecentOrders(data.orders);
       setFunnel(data.funnel);
       setRates(data.rates);
+      if (data.profitData) setProfitData(data.profitData);
 
       if (data.failedCount > 0) {
         toast.error(`Erro ao carregar ${data.failedCount} seção(ões) do dashboard`);
@@ -175,11 +177,6 @@ export default function DashboardPage() {
   function fmtNum(v: number) {
     return new Intl.NumberFormat("pt-BR").format(v);
   }
-
-  const calcProfit = (s: DashboardStats | null) => {
-    if (!s) return 0;
-    return s.revenue - s.adSpend;
-  };
 
   const getMonthLabel = () => {
     const date = new Date();
@@ -371,8 +368,8 @@ export default function DashboardPage() {
           <CardContent className="p-0">
             <div className="p-4 pt-0">
               <EstimatedProfitCalendar
-                data={metricsData}
-                totalProfit={calcProfit(stats)}
+                data={profitData.dailyProfits}
+                totalProfit={profitData.totalProfit}
                 currentMonthLabel={getMonthLabel()}
               />
             </div>
@@ -453,7 +450,7 @@ function KPICard({ label, value, change, icon: Icon, trend }: {
           </div>
           {change && (
             <Badge variant="outline" className={cn(
-              "font-mono text-[10px] px-1.5 py-0 h-5 border-transparent bg-secondary/50",
+              "font-mono text-sm px-2 py-0.5 h-6 border-transparent bg-secondary/50 font-semibold",
               isPositive && "text-emerald-500 bg-emerald-500/10",
               isNegative && "text-red-500 bg-red-500/10"
             )}>

@@ -474,6 +474,148 @@ export async function getRecentOrders(limit: number = 5) {
 }
 
 /**
+ * Daily profit calculation synced with Financeiro tab logic.
+ * Uses the same financial config (gateway, checkout, tax, fixed costs, chargebacks, CMV).
+ * Returns daily profit data for the calendar and a total profit for the period.
+ */
+export async function getDailyProfit(days: number = 30, from?: string, to?: string) {
+  const ctx = await getSessionWithOrg();
+  if (!ctx) return { dailyProfits: [], totalProfit: 0 };
+
+  const orgId = ctx.organization.id;
+  const dateFilter = buildDateFilter(getDateRange(days, from, to));
+  const range = getDateRange(days, from, to);
+
+  // Load financial config
+  const config = await prisma.financialConfig.findUnique({
+    where: { organizationId: orgId },
+  }) || {
+    defaultTaxRate: 0, fixedTransactionFee: 0, gatewayRate: 0,
+    checkoutRate: 0, taxBase: "revenue", fixedCosts: 0,
+    chargebackRate: 0, cmvMethod: "sku", averageCostPerOrder: 0,
+  };
+
+  const taxRate = Number(config.defaultTaxRate) / 100;
+  const fixedFeePerTx = Number(config.fixedTransactionFee);
+  const gwRate = Number(config.gatewayRate) / 100;
+  const ckRate = Number(config.checkoutRate) / 100;
+  const taxBase = String(config.taxBase || "revenue");
+  const monthlyFixedCosts = Number(config.fixedCosts);
+  const cbRate = Number(config.chargebackRate) / 100;
+  const cmvMethod = String(config.cmvMethod || "sku");
+
+  // Fetch paid orders in period
+  const orders = await prisma.order.findMany({
+    where: { organizationId: orgId, orderDate: dateFilter, status: { in: ["paid", "partially_refunded"] } },
+    select: { orderDate: true, totalAmount: true, rawData: true },
+    orderBy: { orderDate: "asc" },
+  });
+
+  // Fetch ad spend
+  const adMetrics = await prisma.adMetric.findMany({
+    where: { organizationId: orgId, date: dateFilter },
+    select: { date: true, spend: true },
+    orderBy: { date: "asc" },
+  });
+
+  // Build cost map for SKU method
+  let costMap = new Map<string, number>();
+  if (cmvMethod === "sku") {
+    const productCosts = await prisma.productCost.findMany({ where: { organizationId: orgId } });
+    productCosts.forEach(pc => costMap.set(pc.sku.toLowerCase().trim(), Number(pc.costPrice)));
+  }
+
+  // Build supplier payments map for supplier_payments method
+  let supplierPaymentsByDay = new Map<string, number>();
+  if (cmvMethod === "supplier_payments") {
+    const payments = await prisma.supplierPayment.findMany({
+      where: { organizationId: orgId, paymentDate: dateFilter },
+      select: { paymentDate: true, amount: true },
+    });
+    for (const p of payments) {
+      const key = toDateKeyBrasilia(p.paymentDate);
+      supplierPaymentsByDay.set(key, (supplierPaymentsByDay.get(key) || 0) + Number(p.amount));
+    }
+  }
+
+  // Group orders by day
+  const dailyData: Record<string, { revenue: number; orderCount: number; cogs: number; adSpend: number }> = {};
+
+  for (const order of orders) {
+    const key = toDateKeyBrasilia(order.orderDate);
+    if (!dailyData[key]) dailyData[key] = { revenue: 0, orderCount: 0, cogs: 0, adSpend: 0 };
+    const amount = Number(order.totalAmount);
+    dailyData[key].revenue += amount;
+    dailyData[key].orderCount += 1;
+
+    // SKU-based COGS
+    if (cmvMethod === "sku") {
+      const data = order.rawData as Record<string, unknown> | null;
+      let items: Record<string, unknown>[] = [];
+      if (data) {
+        if (Array.isArray(data.line_items)) items = data.line_items;
+        else if (Array.isArray(data.items)) items = data.items;
+        else if (data.products && Array.isArray(data.products)) items = data.products as Record<string, unknown>[];
+      }
+      for (const item of items) {
+        const qty = Number(item.quantity || 1);
+        const sku = (item.sku || item.product_id || item.title || "").toString().toLowerCase().trim();
+        const cost = costMap.get(sku);
+        if (cost !== undefined) dailyData[key].cogs += cost * qty;
+      }
+    }
+  }
+
+  // Add ad spend by day
+  for (const m of adMetrics) {
+    const key = toDateKeyBrasilia(m.date);
+    if (!dailyData[key]) dailyData[key] = { revenue: 0, orderCount: 0, cogs: 0, adSpend: 0 };
+    dailyData[key].adSpend += Number(m.spend);
+  }
+
+  // Calculate number of days in period for daily fixed cost proration
+  const fromDate = range.since;
+  const toDate = range.until;
+  const totalDaysInPeriod = Math.max(1, Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+  const dailyFixedCost = monthlyFixedCosts / 30; // prorate monthly to daily
+
+  // Compute daily profit
+  const dailyProfits: { date: string; profit: number; revenue: number; costs: number }[] = [];
+  let totalProfit = 0;
+
+  for (const [date, d] of Object.entries(dailyData)) {
+    // CMV based on method
+    let cogs = d.cogs; // default for SKU
+    if (cmvMethod === "average") {
+      cogs = Number(config.averageCostPerOrder) * d.orderCount;
+    } else if (cmvMethod === "supplier_payments") {
+      cogs = supplierPaymentsByDay.get(date) || 0;
+    }
+
+    const ticketMedio = d.orderCount > 0 ? d.revenue / d.orderCount : 0;
+    const gatewayFee = d.revenue * gwRate;
+    const checkoutFee = d.revenue * ckRate;
+    const transactionFees = fixedFeePerTx * d.orderCount;
+    const chargebackCost = ticketMedio * cbRate * d.orderCount;
+
+    const grossProfit = d.revenue - cogs - d.adSpend - gatewayFee - checkoutFee - transactionFees - dailyFixedCost - chargebackCost;
+    const taxFee = taxBase === "profit"
+      ? Math.max(0, grossProfit) * taxRate
+      : d.revenue * taxRate;
+
+    const totalCosts = cogs + d.adSpend + gatewayFee + checkoutFee + taxFee + transactionFees + dailyFixedCost + chargebackCost;
+    const profit = d.revenue - totalCosts;
+
+    dailyProfits.push({ date, profit, revenue: d.revenue, costs: totalCosts });
+    totalProfit += profit;
+  }
+
+  dailyProfits.sort((a, b) => a.date.localeCompare(b.date));
+
+  return { dailyProfits, totalProfit };
+}
+
+/**
  * Consolidated dashboard data loader.
  * Makes a SINGLE server action call (1 HTTP round-trip) instead of 7 separate calls.
  * React cache() on getSessionWithOrg ensures auth is checked only once.
@@ -490,6 +632,7 @@ export async function loadAllDashboardData(days: number = 30, from?: string, to?
     getFunnelData(days, from, to),
     getPaidAndRepurchaseRates(days, from, to),
     getCustomerTrends(days, from, to),
+    getDailyProfit(days, from, to),
   ]);
 
   return {
@@ -500,6 +643,7 @@ export async function loadAllDashboardData(days: number = 30, from?: string, to?
     funnel: results[4].status === "fulfilled" ? results[4].value : null,
     rates: results[5].status === "fulfilled" ? results[5].value : null,
     trends: results[6].status === "fulfilled" ? results[6].value : [],
+    profitData: results[7].status === "fulfilled" ? results[7].value : { dailyProfits: [], totalProfit: 0 },
     failedCount: results.filter((r) => r.status === "rejected").length,
   };
 }
