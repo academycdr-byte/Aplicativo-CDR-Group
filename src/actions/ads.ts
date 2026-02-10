@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { getSessionWithOrg } from "@/lib/session";
-import { getDateRange, getPreviousDateRange, buildDateFilter, toDateKeyBrasilia } from "@/lib/date-utils";
+import { getDateRange, getPreviousDateRange, buildDateFilter, toDateKeyDateOnly } from "@/lib/date-utils";
 import { Prisma } from "@prisma/client";
 import { getMetricsAnalysis, getOrdersByPlatform } from "@/actions/dashboard";
 
@@ -172,7 +172,7 @@ export async function getAdMetricsByDay(days: number = 30, from?: string, to?: s
   const grouped: Record<string, { date: string; spend: number; impressions: number; clicks: number; conversions: number; revenue: number; addToCart: number; initiateCheckout: number }> = {};
 
   for (const m of metrics) {
-    const dateKey = toDateKeyBrasilia(m.date);
+    const dateKey = toDateKeyDateOnly(m.date);
     if (!grouped[dateKey]) {
       grouped[dateKey] = { date: dateKey, spend: 0, impressions: 0, clicks: 0, conversions: 0, revenue: 0, addToCart: 0, initiateCheckout: 0 };
     }

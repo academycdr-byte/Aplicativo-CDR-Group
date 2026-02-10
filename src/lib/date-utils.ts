@@ -62,6 +62,17 @@ export function toDateKeyBrasilia(date: Date | string): string {
 }
 
 /**
+ * Extract YYYY-MM-DD key from a @db.Date column value.
+ * Prisma returns @db.Date as midnight UTC (e.g. 2026-02-10T00:00:00Z).
+ * Using toDateKeyBrasilia would incorrectly shift it back one day (UTC-3).
+ * This function extracts the date directly from the UTC representation.
+ */
+export function toDateKeyDateOnly(date: Date | string): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  return d.toISOString().split("T")[0];
+}
+
+/**
  * Format a Date for API calls, converting a Brasilia local date to ISO string.
  * Useful when sending date filters to external APIs (Shopify, Nuvemshop, etc.).
  */

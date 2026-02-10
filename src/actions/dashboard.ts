@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { getSessionWithOrg } from "@/lib/session";
-import { getDateRange, getPreviousDateRange, buildDateFilter, toDateKeyBrasilia } from "@/lib/date-utils";
+import { getDateRange, getPreviousDateRange, buildDateFilter, toDateKeyBrasilia, toDateKeyDateOnly } from "@/lib/date-utils";
 
 export async function getDashboardData(days: number = 30, from?: string, to?: string) {
   const ctx = await getSessionWithOrg();
@@ -173,7 +173,7 @@ export async function getMetricsAnalysis(days: number = 30, from?: string, to?: 
   }
 
   for (const m of adMetrics) {
-    const key = toDateKeyBrasilia(m.date);
+    const key = toDateKeyDateOnly(m.date);
     if (!grouped[key]) grouped[key] = { date: key, faturamento: 0, investimento: 0, compras: 0, ticketMedio: 0, cpa: 0, roas: 0, fbConversions: 0, fbRevenue: 0 };
     grouped[key].investimento += Number(m.spend);
     grouped[key].fbConversions += m.conversions;
@@ -568,7 +568,7 @@ export async function getDailyProfit(days: number = 30, from?: string, to?: stri
 
   // Add ad spend by day
   for (const m of adMetrics) {
-    const key = toDateKeyBrasilia(m.date);
+    const key = toDateKeyDateOnly(m.date);
     if (!dailyData[key]) dailyData[key] = { revenue: 0, orderCount: 0, cogs: 0, adSpend: 0 };
     dailyData[key].adSpend += Number(m.spend);
   }
