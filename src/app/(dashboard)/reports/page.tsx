@@ -115,7 +115,7 @@ type Schedule = {
   time: string;
   dayOfWeek: number | null;
   dayOfMonth: number | null;
-  config: any;
+  config: Record<string, unknown>;
   isActive: boolean;
   nextRun: Date | null;
   client: Client;
@@ -126,7 +126,7 @@ type LogEntry = {
   clientId: string;
   type: string;
   status: string;
-  metrics: any;
+  metrics: Record<string, unknown>;
   sentAt: Date;
   error: string | null;
   client: Client;
@@ -424,8 +424,8 @@ function CreateReportTab({ clients, onRefresh }: { clients: Client[]; onRefresh:
       // TODO: Actual WhatsApp send via API route
       toast.success("Relatório enviado com sucesso!");
       onRefresh();
-    } catch (error: any) {
-      toast.error(error.message || "Erro ao enviar relatório");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Erro ao enviar relatório");
     } finally {
       setSending(false);
     }
@@ -974,8 +974,8 @@ function ClientFormDialog({
       }
       onClose();
       onRefresh();
-    } catch (error: any) {
-      toast.error(error.message || "Erro ao salvar cliente");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Erro ao salvar cliente");
     } finally {
       setLoading(false);
     }
@@ -1184,9 +1184,9 @@ function WhatsAppTab({ status: initialStatus, onRefresh }: { status: string; onR
           toast.error("Verifique a configuração da Evolution API na Vercel.");
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Generate QR exception:", error);
-      toast.error("Erro ao gerar QR Code: " + error.message);
+      toast.error("Erro ao gerar QR Code: " + (error instanceof Error ? error.message : "Erro desconhecido"));
     } finally {
       setLoading(false);
     }
@@ -1207,7 +1207,7 @@ function WhatsAppTab({ status: initialStatus, onRefresh }: { status: string; onR
         setQrCode(null);
         toast.success("WhatsApp já está conectado!");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao atualizar QR Code");
     } finally {
       setLoading(false);
@@ -1234,7 +1234,7 @@ function WhatsAppTab({ status: initialStatus, onRefresh }: { status: string; onR
         toast.success("WhatsApp desconectado com sucesso!");
         onRefresh();
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao desconectar");
     } finally {
       setLoading(false);
@@ -1646,7 +1646,7 @@ function HistoryTab({
                   </TableCell>
                   <TableCell>
                     <span className="text-xs text-muted-foreground">
-                      {log.metrics?.selectedMetrics?.length || 0} métricas
+                      {(log.metrics as { selectedMetrics?: string[] } | null)?.selectedMetrics?.length || 0} métricas
                     </span>
                   </TableCell>
                   <TableCell className="text-right">
