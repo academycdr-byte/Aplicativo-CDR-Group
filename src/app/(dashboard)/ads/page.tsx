@@ -203,8 +203,12 @@ export default function AdsPage() {
   // Creative Filtering
   const [uniqueCreatives, setUniqueCreatives] = useState(false);
 
+  // Loading
+  const [loading, setLoading] = useState(true);
+
   // Load Data
   const loadData = useCallback(async () => {
+    setLoading(true);
     const { days, from, to } = periodToParams(period);
     const platform = platformFilter === "all" ? undefined : platformFilter;
 
@@ -229,6 +233,8 @@ export default function AdsPage() {
       setCreatives(data.creatives);
     } catch (error) {
       console.error("Failed to load ads data", error);
+    } finally {
+      setLoading(false);
     }
     setMetricsPage(1);
     setCreativesPage(1);
@@ -455,6 +461,26 @@ export default function AdsPage() {
         onExcludeChange={setExcludedTerms}
       />
 
+      {loading ? (
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <Card key={i} className="h-28">
+                <CardContent className="pt-5">
+                  <div className="animate-pulse space-y-3">
+                    <div className="h-4 w-20 bg-muted/40 rounded" />
+                    <div className="h-8 w-28 bg-muted/40 rounded" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          <Card className="h-80">
+            <div className="animate-pulse h-full w-full bg-muted/10 rounded-lg" />
+          </Card>
+        </div>
+      ) : (
+      <>
       {/* KPI Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
         <KPICard title="Investimento" value={t.spend} prevValue={p.spend} icon={DollarSign} prefix="R$" variant="destructive" />
@@ -860,6 +886,9 @@ export default function AdsPage() {
             </div>
           )}
         </div>
+      )}
+
+      </>
       )}
 
       {/* Modals */}

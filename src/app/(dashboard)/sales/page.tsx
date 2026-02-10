@@ -43,8 +43,10 @@ export default function SalesPage() {
   const [dailyData, setDailyData] = useState<DaySale[]>([]);
   const [statusData, setStatusData] = useState<StatusData[]>([]);
   const [period, setPeriod] = useState<PeriodValue>({ type: "preset", days: 30 });
+  const [loading, setLoading] = useState(true);
 
   const loadData = useCallback(async () => {
+    setLoading(true);
     try {
       const { days, from, to } = periodToParams(period);
       const results = await Promise.allSettled([
@@ -57,6 +59,8 @@ export default function SalesPage() {
       if (results[2].status === "fulfilled") setStatusData(results[2].value);
     } catch (error) {
       console.error("Failed to load sales data", error);
+    } finally {
+      setLoading(false);
     }
   }, [period]);
 
@@ -80,6 +84,26 @@ export default function SalesPage() {
         <PeriodSelector value={period} onChange={setPeriod} />
       </div>
 
+      {loading ? (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {[1, 2, 3].map((i) => (
+              <Card key={i} className="h-28">
+                <CardContent className="pt-5">
+                  <div className="animate-pulse space-y-3">
+                    <div className="h-4 w-24 bg-muted/40 rounded" />
+                    <div className="h-8 w-32 bg-muted/40 rounded" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          <Card className="h-80">
+            <div className="animate-pulse h-full w-full bg-muted/10 rounded-lg" />
+          </Card>
+        </div>
+      ) : (
+      <>
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card className="transition-shadow hover:shadow-md">
@@ -277,6 +301,8 @@ export default function SalesPage() {
           </CardContent>
         </Card>
       </div>
+      </>
+      )}
     </div>
   );
 }

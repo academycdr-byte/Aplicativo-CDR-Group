@@ -64,6 +64,7 @@ export default function OrdersPage() {
   const [searchInput, setSearchInput] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [loading, setLoading] = useState(true);
   const limit = 25;
 
   useEffect(() => {
@@ -71,6 +72,7 @@ export default function OrdersPage() {
   }, [page, platformFilter, statusFilter, search, dateFrom, dateTo]);
 
   async function loadOrders() {
+    setLoading(true);
     const data = await getOrders({
       platform: platformFilter === "all" ? undefined : platformFilter,
       status: statusFilter === "all" ? undefined : statusFilter,
@@ -82,6 +84,7 @@ export default function OrdersPage() {
     });
     setOrders(data.orders);
     setTotal(data.total);
+    setLoading(false);
   }
 
   function handleSearch(e: React.FormEvent) {
@@ -212,7 +215,20 @@ export default function OrdersPage() {
       </Card>
 
       <Card className="border border-border shadow-none rounded-lg overflow-hidden">
-        {orders.length === 0 ? (
+        {loading ? (
+          <div className="p-6 space-y-4">
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+              <div key={i} className="animate-pulse flex items-center gap-4">
+                <div className="h-4 w-20 bg-muted/40 rounded" />
+                <div className="h-4 w-32 bg-muted/40 rounded flex-1" />
+                <div className="h-4 w-16 bg-muted/40 rounded" />
+                <div className="h-4 w-24 bg-muted/40 rounded" />
+                <div className="h-5 w-14 bg-muted/40 rounded-full" />
+                <div className="h-4 w-20 bg-muted/40 rounded" />
+              </div>
+            ))}
+          </div>
+        ) : orders.length === 0 ? (
           <div className="px-6 py-20 text-center flex flex-col items-center justify-center">
             <div className="w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mb-4">
               <ShoppingBag className="w-10 h-10 text-muted-foreground/50" />

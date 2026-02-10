@@ -89,12 +89,9 @@ export default function AnalyticsPage() {
 
     // Ad metrics data states
     const [kpis, setKpis] = useState({ cpa: 0, cpc: 0, ctr: 0, cpm: 0 });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const [dailyData, setDailyData] = useState<any[]>([]);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const [creatives, setCreatives] = useState<any[]>([]);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const [platformData, setPlatformData] = useState<any[]>([]);
+    const [dailyData, setDailyData] = useState<{ date: string; faturamento: number; investimento: number; compras: number; ticketMedio: number; cpa: number; roas: number }[]>([]);
+    const [creatives, setCreatives] = useState<{ adId: string; adName: string | null; thumbnailUrl: string | null; spend: number; revenue: number; roas: number; clicks: number; impressions: number }[]>([]);
+    const [platformData, setPlatformData] = useState<{ platform: string; orders: number; revenue: number }[]>([]);
     const [platformComparison, setPlatformComparison] = useState<PlatformComparisonEntry[]>([]);
     const [paidVsOrganic, setPaidVsOrganic] = useState<PaidOrganicEntry[]>([]);
 
@@ -174,11 +171,35 @@ export default function AnalyticsPage() {
     }
 
     function fmtPercent(val: number) {
-        return `${(val * 100).toFixed(1)}%`;
+        return `${(val * 100).toFixed(2)}%`;
     }
 
     if (loading) {
-        return <div className="p-8 flex items-center justify-center text-muted-foreground">Carregando analytics...</div>;
+        return (
+            <div className="space-y-6 animate-in fade-in duration-500">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <h2 className="text-2xl font-bold tracking-tight">Analytics</h2>
+                        <p className="text-muted-foreground text-sm mt-0.5">Visão detalhada de performance, criativos e website.</p>
+                    </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {[1, 2, 3, 4].map((i) => (
+                        <Card key={i} className="h-28">
+                            <CardContent className="pt-5">
+                                <div className="animate-pulse space-y-3">
+                                    <div className="h-4 w-20 bg-muted/40 rounded" />
+                                    <div className="h-8 w-28 bg-muted/40 rounded" />
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ))}
+                </div>
+                <Card className="h-80">
+                    <div className="animate-pulse h-full w-full bg-muted/10 rounded-lg" />
+                </Card>
+            </div>
+        );
     }
 
     const totalPaidOrganic = paidVsOrganic.reduce((s, d) => s + d.value, 0) || 1;
@@ -190,7 +211,7 @@ export default function AnalyticsPage() {
                 <div>
                     <h2 className="text-2xl font-bold tracking-tight">Analytics</h2>
                     <p className="text-muted-foreground text-sm mt-0.5">
-                        Visao detalhada de performance, criativos e website.
+                        Visão detalhada de performance, criativos e website.
                     </p>
                 </div>
                 <PeriodSelector value={period} onChange={setPeriod} />

@@ -50,25 +50,22 @@ export function MobileSidebar() {
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   ];
 
-  const platformNavItems = [
+  const platformNavItems: NavItem[] = [
     { name: "Pedidos", href: "/orders", icon: ShoppingBag },
     { name: "Vendas", href: "/sales", icon: TrendingUp },
     { name: "Mais Vendidos", href: "/best-sellers", icon: ShoppingBag },
     { name: "Anuncios", href: "/ads", icon: Megaphone },
     { name: "Financeiro", href: "/financeiro", icon: Wallet },
     { name: "Analytics", href: "/analytics", icon: BarChart3 },
+    ...(isAdmin ? [{ name: "Relatórios", href: "/reports", icon: FileText }] : []),
   ];
-
-  if (session?.user?.email?.toLowerCase() === "academy.cdr@gmail.com") {
-    platformNavItems.push({ name: "Relatórios", href: "/reports", icon: FileText } as any);
-  }
 
   const managementNavItems = [
     { name: "Integrações", href: "/integrations", icon: Link2, internalOnly: true },
     { name: "Configurações", href: "/settings", icon: Settings },
   ];
 
-  const filterNav = (items: any[]) => {
+  const filterNav = (items: NavItem[]) => {
     return items.filter(item => {
       if (item.adminOnly) return isAdmin;
       if (item.internalOnly) return isInternal;

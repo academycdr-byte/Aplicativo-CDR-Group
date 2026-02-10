@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { decrypt } from "@/lib/encryption";
+import { parseOrderDate, toDateKeyBrasilia } from "@/lib/date-utils";
 
 export async function syncCartpandaOrders(organizationId: string) {
   const integration = await prisma.integration.findUnique({
@@ -39,6 +40,16 @@ export async function syncCartpandaOrders(organizationId: string) {
     let synced = 0;
 
     for (const order of orders) {
+      const items = order.items || [];
+      const lineItems = items.map((item: Record<string, unknown>) => ({
+        product_id: item.product_id || item.id,
+        variant_id: item.variant_id,
+        name: item.name || item.title,
+        quantity: item.quantity,
+        price: item.price,
+        sku: item.sku,
+      }));
+
       await prisma.order.upsert({
         where: {
           organizationId_platform_externalOrderId: {
@@ -56,17 +67,18 @@ export async function syncCartpandaOrders(organizationId: string) {
           customerEmail: order.customer?.email || null,
           totalAmount: parseFloat(order.total || "0"),
           currency: order.currency || "BRL",
-          itemCount: order.items?.length || 0,
-          orderDate: new Date(order.created_at),
-          rawData: order,
+          itemCount: items.length,
+          orderDate: parseOrderDate(order.created_at),
+          rawData: { ...order, line_items: lineItems },
         },
         update: {
           status: mapCartpandaStatus(order.status),
           totalAmount: parseFloat(order.total || "0"),
           customerName: order.customer?.name || null,
           customerEmail: order.customer?.email || null,
-          itemCount: order.items?.length || 0,
-          rawData: order,
+          itemCount: items.length,
+          orderDate: parseOrderDate(order.created_at),
+          rawData: { ...order, line_items: lineItems },
         },
       });
       synced++;
@@ -103,6 +115,7 @@ export async function syncCartpandaOrders(organizationId: string) {
 function mapCartpandaStatus(status: string): string {
   const map: Record<string, string> = {
     paid: "paid",
+    approved: "paid",
     pending: "pending",
     cancelled: "cancelled",
     refunded: "refunded",
@@ -110,4 +123,71 @@ function mapCartpandaStatus(status: string): string {
     delivered: "delivered",
   };
   return map[status?.toLowerCase()] || status;
+}
+
+/**
+ * Sync funnel metrics from Cartpanda.
+ * Cartpanda does not offer session/cart analytics via API,
+ * so we derive funnel data from order counts per day.
+ */
+export async function syncCartpandaFunnel(organizationId: string) {
+  const integration = await prisma.integration.findUnique({
+    where: { organizationId_platform: { organizationId, platform: "CARTPANDA" } },
+  });
+
+  if (!integration || integration.status !== "CONNECTED") {
+    return { error: "Cartpanda not connected" };
+  }
+
+  try {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const orders = await prisma.order.findMany({
+      where: {
+        organizationId,
+        platform: "CARTPANDA",
+        orderDate: { gte: thirtyDaysAgo },
+      },
+      select: { orderDate: true, customerEmail: true },
+    });
+
+    const ordersByDate: Record<string, number> = {};
+    for (const o of orders) {
+      const key = toDateKeyBrasilia(o.orderDate);
+      ordersByDate[key] = (ordersByDate[key] || 0) + 1;
+    }
+
+    let synced = 0;
+    for (const [dateKey, dayOrders] of Object.entries(ordersByDate)) {
+      await prisma.storeFunnel.upsert({
+        where: {
+          organizationId_platform_date: {
+            organizationId,
+            platform: "CARTPANDA",
+            date: new Date(dateKey),
+          },
+        },
+        create: {
+          organizationId,
+          platform: "CARTPANDA",
+          date: new Date(dateKey),
+          sessions: 0,
+          addToCart: 0,
+          checkoutsInitiated: 0,
+          ordersGenerated: dayOrders,
+        },
+        update: {
+          ordersGenerated: dayOrders,
+        },
+      });
+      synced++;
+    }
+
+    return { success: true, synced };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : "Unknown error";
+    console.error("[Cartpanda Funnel] Error:", errorMsg);
+    return { error: errorMsg };
+  }
 }

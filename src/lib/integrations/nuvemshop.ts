@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { encrypt, decrypt } from "@/lib/encryption";
+import { parseOrderDate, toDateKeyBrasilia } from "@/lib/date-utils";
 
 export async function syncNuvemshopOrders(organizationId: string) {
   const integration = await prisma.integration.findUnique({
@@ -23,53 +24,82 @@ export async function syncNuvemshopOrders(organizationId: string) {
     const accessToken = decrypt(integration.accessToken);
     const storeId = integration.externalStoreId || "";
 
-    const response = await fetch(
-      `https://api.nuvemshop.com.br/v1/${storeId}/orders?per_page=200`,
-      {
-        headers: {
-          Authentication: `bearer ${accessToken}`,
-          "User-Agent": "CDR Group Hub (cdrgroup.com)",
-          "Content-Type": "application/json",
-        },
-      }
-    );
+    // Fetch all orders with pagination
+    let allOrders: Record<string, unknown>[] = [];
+    let page = 1;
+    let hasMore = true;
 
-    if (!response.ok) {
-      throw new Error(`Nuvemshop API error: ${response.status}`);
+    while (hasMore) {
+      const response = await fetch(
+        `https://api.nuvemshop.com.br/v1/${storeId}/orders?per_page=200&page=${page}`,
+        {
+          headers: {
+            Authentication: `bearer ${accessToken}`,
+            "User-Agent": "CDR Group Hub (cdrgroup.com)",
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Nuvemshop API error: ${response.status}`);
+      }
+
+      const orders = await response.json();
+      if (!Array.isArray(orders) || orders.length === 0) {
+        hasMore = false;
+        break;
+      }
+
+      allOrders = allOrders.concat(orders);
+      hasMore = orders.length === 200;
+      page++;
     }
 
-    const orders = await response.json();
     let synced = 0;
 
-    for (const order of orders) {
+    for (const order of allOrders) {
+      const raw = order as Record<string, unknown>;
+      const customer = raw.customer as Record<string, unknown> | null;
+      const products = raw.products as Array<Record<string, unknown>> | undefined;
+      const lineItems = (products || []).map((p) => ({
+        product_id: String(p.product_id ?? ""),
+        variant_id: String(p.variant_id ?? ""),
+        name: String(p.name ?? ""),
+        quantity: Number(p.quantity ?? 0),
+        price: String(p.price ?? "0"),
+        sku: String(p.sku ?? ""),
+      }));
+
       await prisma.order.upsert({
         where: {
           organizationId_platform_externalOrderId: {
             organizationId,
             platform: "NUVEMSHOP",
-            externalOrderId: String(order.id),
+            externalOrderId: String(raw.id),
           },
         },
         create: {
           organizationId,
           platform: "NUVEMSHOP",
-          externalOrderId: String(order.id),
-          status: mapNuvemshopStatus(order.payment_status),
-          customerName: order.customer?.name || null,
-          customerEmail: order.customer?.email || null,
-          totalAmount: parseFloat(order.total || "0"),
-          currency: order.currency || "BRL",
-          itemCount: order.products?.length || 0,
-          orderDate: new Date(order.created_at),
-          rawData: order,
+          externalOrderId: String(raw.id),
+          status: mapNuvemshopStatus(String(raw.payment_status || "")),
+          customerName: customer?.name as string || null,
+          customerEmail: customer?.email as string || null,
+          totalAmount: parseFloat(String(raw.total || "0")),
+          currency: (raw.currency as string) || "BRL",
+          itemCount: products?.length || 0,
+          orderDate: parseOrderDate(String(raw.created_at)),
+          rawData: { ...raw, line_items: lineItems },
         },
         update: {
-          status: mapNuvemshopStatus(order.payment_status),
-          totalAmount: parseFloat(order.total || "0"),
-          customerName: order.customer?.name || null,
-          customerEmail: order.customer?.email || null,
-          itemCount: order.products?.length || 0,
-          rawData: order,
+          status: mapNuvemshopStatus(String(raw.payment_status || "")),
+          totalAmount: parseFloat(String(raw.total || "0")),
+          customerName: customer?.name as string || null,
+          customerEmail: customer?.email as string || null,
+          itemCount: products?.length || 0,
+          orderDate: parseOrderDate(String(raw.created_at)),
+          rawData: { ...raw, line_items: lineItems },
         },
       });
       synced++;
@@ -160,7 +190,7 @@ export async function syncNuvemshopFunnel(organizationId: string) {
 
     const ordersByDate: Record<string, number> = {};
     for (const o of orders) {
-      const key = o.orderDate.toISOString().split("T")[0];
+      const key = toDateKeyBrasilia(o.orderDate);
       ordersByDate[key] = (ordersByDate[key] || 0) + 1;
     }
 
@@ -176,7 +206,7 @@ export async function syncNuvemshopFunnel(organizationId: string) {
     const customersByDay = new Map<string, Set<string>>();
     for (const o of orders) {
       if (!o.customerEmail) continue;
-      const dayKey = o.orderDate.toISOString().split("T")[0];
+      const dayKey = toDateKeyBrasilia(o.orderDate);
       const email = o.customerEmail.toLowerCase();
       if (!customersByDay.has(dayKey)) {
         customersByDay.set(dayKey, new Set());
@@ -296,7 +326,7 @@ async function fetchNuvemshopAbandonedCheckouts(
       }
 
       for (const checkout of checkouts) {
-        const dateKey = new Date(checkout.created_at).toISOString().split("T")[0];
+        const dateKey = toDateKeyBrasilia(new Date(checkout.created_at));
         result[dateKey] = (result[dateKey] || 0) + 1;
       }
 

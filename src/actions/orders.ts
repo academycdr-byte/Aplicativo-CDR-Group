@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { getSessionWithOrg } from "@/lib/session";
+import { toBrasiliaStartOfDay, toBrasiliaEndOfDay } from "@/lib/date-utils";
 
 export async function getOrders(params?: {
   platform?: string;
@@ -41,12 +42,8 @@ export async function getOrders(params?: {
 
   if (params?.dateFrom || params?.dateTo) {
     const dateFilter: Record<string, Date> = {};
-    if (params?.dateFrom) dateFilter.gte = new Date(params.dateFrom);
-    if (params?.dateTo) {
-      const to = new Date(params.dateTo);
-      to.setHours(23, 59, 59, 999);
-      dateFilter.lte = to;
-    }
+    if (params?.dateFrom) dateFilter.gte = toBrasiliaStartOfDay(params.dateFrom);
+    if (params?.dateTo) dateFilter.lte = toBrasiliaEndOfDay(params.dateTo);
     where.orderDate = dateFilter;
   }
 

@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { getSessionWithOrg } from "@/lib/session";
-import { getDateRange, buildDateFilter } from "@/lib/date-utils";
+import { getDateRange, buildDateFilter, toDateKeyBrasilia } from "@/lib/date-utils";
 
 export async function getSalesData(days: number = 30, from?: string, to?: string) {
   const ctx = await getSessionWithOrg();
@@ -70,7 +70,7 @@ export async function getSalesByDay(days: number = 30, from?: string, to?: strin
   const grouped: Record<string, { date: string; revenue: number; orders: number }> = {};
 
   for (const order of orders) {
-    const dateKey = order.orderDate.toISOString().split("T")[0];
+    const dateKey = toDateKeyBrasilia(order.orderDate);
     if (!grouped[dateKey]) {
       grouped[dateKey] = { date: dateKey, revenue: 0, orders: 0 };
     }

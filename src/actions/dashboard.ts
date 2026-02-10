@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { getSessionWithOrg } from "@/lib/session";
-import { getDateRange, getPreviousDateRange, buildDateFilter } from "@/lib/date-utils";
+import { getDateRange, getPreviousDateRange, buildDateFilter, toDateKeyBrasilia } from "@/lib/date-utils";
 
 export async function getDashboardData(days: number = 30, from?: string, to?: string) {
   const ctx = await getSessionWithOrg();
@@ -30,11 +30,11 @@ export async function getDashboardData(days: number = 30, from?: string, to?: st
       where: { organizationId: orgId, orderDate: prevDateFilter },
     }),
     prisma.order.aggregate({
-      where: { organizationId: orgId, orderDate: dateFilter, status: { in: ["paid", "pending"] } },
+      where: { organizationId: orgId, orderDate: dateFilter, status: "paid" },
       _sum: { totalAmount: true },
     }),
     prisma.order.aggregate({
-      where: { organizationId: orgId, orderDate: prevDateFilter, status: { in: ["paid", "pending"] } },
+      where: { organizationId: orgId, orderDate: prevDateFilter, status: "paid" },
       _sum: { totalAmount: true },
     }),
     prisma.adMetric.aggregate({
@@ -84,7 +84,7 @@ export async function getRevenueByDay(days: number = 30, from?: string, to?: str
     where: {
       organizationId: ctx.organization.id,
       orderDate: dateFilter,
-      status: { in: ["paid", "pending"] },
+      status: "paid",
     },
     select: { orderDate: true, totalAmount: true },
     orderBy: { orderDate: "asc" },
@@ -93,7 +93,7 @@ export async function getRevenueByDay(days: number = 30, from?: string, to?: str
   const grouped: Record<string, number> = {};
 
   for (const order of orders) {
-    const dateKey = order.orderDate.toISOString().split("T")[0];
+    const dateKey = toDateKeyBrasilia(order.orderDate);
     grouped[dateKey] = (grouped[dateKey] || 0) + Number(order.totalAmount);
   }
 
@@ -164,16 +164,16 @@ export async function getMetricsAnalysis(days: number = 30, from?: string, to?: 
   }> = {};
 
   for (const o of orders) {
-    const key = o.orderDate.toISOString().split("T")[0];
+    const key = toDateKeyBrasilia(o.orderDate);
     if (!grouped[key]) grouped[key] = { date: key, faturamento: 0, investimento: 0, compras: 0, ticketMedio: 0, cpa: 0, roas: 0, fbConversions: 0, fbRevenue: 0 };
-    if (o.status === "paid" || o.status === "pending") {
+    if (o.status === "paid") {
       grouped[key].faturamento += Number(o.totalAmount);
       grouped[key].compras += 1;
     }
   }
 
   for (const m of adMetrics) {
-    const key = m.date.toISOString().split("T")[0];
+    const key = toDateKeyBrasilia(m.date);
     if (!grouped[key]) grouped[key] = { date: key, faturamento: 0, investimento: 0, compras: 0, ticketMedio: 0, cpa: 0, roas: 0, fbConversions: 0, fbRevenue: 0 };
     grouped[key].investimento += Number(m.spend);
     grouped[key].fbConversions += m.conversions;
@@ -341,7 +341,7 @@ export async function getPaidAndRepurchaseRates(days: number = 30, from?: string
 
     const customersByDay = new Map<string, Set<string>>();
     for (const o of ordersInPeriod) {
-      const dayKey = o.orderDate.toISOString().split("T")[0];
+      const dayKey = toDateKeyBrasilia(o.orderDate);
       const email = o.customerEmail!.toLowerCase();
       if (!customersByDay.has(dayKey)) {
         customersByDay.set(dayKey, new Set());
