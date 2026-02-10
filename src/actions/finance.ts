@@ -189,7 +189,7 @@ export async function getFinancialMetrics({
     const gatewayFee = revenue * gatewayRate;
     const checkoutFee = revenue * checkoutRate;
     const transactionFees = fixedFeePerTx * orderCount;
-    const chargebackCost = ticketMedio * chargebackRate;
+    const chargebackCost = ticketMedio * chargebackRate * orderCount;
 
     // Tax depends on taxBase
     const grossProfit = revenue - cogs - adSpend - gatewayFee - checkoutFee - transactionFees - fixedCosts - chargebackCost;
