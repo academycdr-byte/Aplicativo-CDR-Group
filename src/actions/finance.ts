@@ -37,6 +37,14 @@ export type FinancialConfigInput = {
     taxBase: string;
     fixedCosts: number;
     chargebackRate: number;
+    cmvMethod: string;
+    averageCostPerOrder: number;
+};
+
+export type SupplierPaymentInput = {
+    amount: number;
+    description?: string;
+    paymentDate: Date;
 };
 
 /**
@@ -51,7 +59,7 @@ export type FinancialConfigInput = {
  *   - Custos Fixos (valor absoluto)
  *   - Chargebacks (ticketMedio * chargebackRate%)
  *   - Transaction Fee (fixedFee * orderCount)
- *   = Lucro Líquido
+ *   = Lucro Liquido
  */
 export async function getFinancialMetrics({
     from,
@@ -75,6 +83,8 @@ export async function getFinancialMetrics({
         taxBase: "revenue",
         fixedCosts: 0,
         chargebackRate: 0,
+        cmvMethod: "sku",
+        averageCostPerOrder: 0,
     };
 
     const taxRate = Number(config.defaultTaxRate) / 100;
@@ -84,13 +94,14 @@ export async function getFinancialMetrics({
     const taxBase = String(config.taxBase || "revenue");
     const fixedCosts = Number(config.fixedCosts);
     const chargebackRate = Number(config.chargebackRate) / 100;
+    const cmvMethod = String(config.cmvMethod || "sku");
 
-    // Fetch Orders in Period
+    // Fetch Orders in Period - only paid orders (matches Sales page filter)
     const orders = await db.order.findMany({
         where: {
             organizationId,
             orderDate: { gte: from, lte: to },
-            status: { notIn: ["cancelled", "refunded"] },
+            status: { in: ["paid", "partially_refunded"] },
         },
         select: {
             id: true,
@@ -110,44 +121,62 @@ export async function getFinancialMetrics({
         _sum: { spend: true },
     });
 
-    // Fetch Product Costs
-    const productCosts = await db.productCost.findMany({
-        where: { organizationId },
-    });
-
-    const costMap = new Map<string, number>();
-    productCosts.forEach(pc => {
-        costMap.set(pc.sku.toLowerCase().trim(), Number(pc.costPrice));
-    });
-
-    // Calculate Metrics
+    // Calculate Revenue
     let revenue = 0;
+    for (const order of orders) {
+        revenue += Number(order.totalAmount);
+    }
+
+    // Calculate COGS based on cmvMethod
     let cogs = 0;
 
-    for (const order of orders) {
-        const amount = Number(order.totalAmount);
-        revenue += amount;
+    if (cmvMethod === "average") {
+        // Option A: Average cost per order * number of orders
+        cogs = Number(config.averageCostPerOrder) * orders.length;
 
-        // Calculate COGS from line items
-        const data = order.rawData as Record<string, unknown> | null;
-        let items: Record<string, unknown>[] = [];
+    } else if (cmvMethod === "supplier_payments") {
+        // Option B: Sum of supplier payments in the period
+        const payments = await db.supplierPayment.aggregate({
+            where: {
+                organizationId,
+                paymentDate: { gte: from, lte: to },
+            },
+            _sum: { amount: true },
+        });
+        cogs = Number(payments._sum.amount || 0);
 
-        if (data) {
-            if (Array.isArray(data.line_items)) {
-                items = data.line_items;
-            } else if (Array.isArray(data.items)) {
-                items = data.items;
-            } else if (data.products && Array.isArray(data.products)) {
-                items = data.products as Record<string, unknown>[];
+    } else {
+        // Default "sku": matching by SKU from product costs table
+        const productCosts = await db.productCost.findMany({
+            where: { organizationId },
+        });
+
+        const costMap = new Map<string, number>();
+        productCosts.forEach(pc => {
+            costMap.set(pc.sku.toLowerCase().trim(), Number(pc.costPrice));
+        });
+
+        for (const order of orders) {
+            const data = order.rawData as Record<string, unknown> | null;
+            let items: Record<string, unknown>[] = [];
+
+            if (data) {
+                if (Array.isArray(data.line_items)) {
+                    items = data.line_items;
+                } else if (Array.isArray(data.items)) {
+                    items = data.items;
+                } else if (data.products && Array.isArray(data.products)) {
+                    items = data.products as Record<string, unknown>[];
+                }
             }
-        }
 
-        for (const item of items) {
-            const quantity = Number(item.quantity || 1);
-            const sku = (item.sku || item.product_id || item.title || "").toString().toLowerCase().trim();
-            const cost = costMap.get(sku);
-            if (cost !== undefined) {
-                cogs += cost * quantity;
+            for (const item of items) {
+                const quantity = Number(item.quantity || 1);
+                const sku = (item.sku || item.product_id || item.title || "").toString().toLowerCase().trim();
+                const cost = costMap.get(sku);
+                if (cost !== undefined) {
+                    cogs += cost * quantity;
+                }
             }
         }
     }
@@ -271,6 +300,8 @@ export async function saveFinancialConfig(input: FinancialConfigInput) {
             taxBase: input.taxBase,
             fixedCosts: input.fixedCosts,
             chargebackRate: input.chargebackRate,
+            cmvMethod: input.cmvMethod,
+            averageCostPerOrder: input.averageCostPerOrder,
         },
         update: {
             defaultTaxRate: input.defaultTaxRate,
@@ -280,7 +311,66 @@ export async function saveFinancialConfig(input: FinancialConfigInput) {
             taxBase: input.taxBase,
             fixedCosts: input.fixedCosts,
             chargebackRate: input.chargebackRate,
+            cmvMethod: input.cmvMethod,
+            averageCostPerOrder: input.averageCostPerOrder,
         }
+    });
+
+    revalidatePath("/financeiro");
+    return { success: true };
+}
+
+// ─── SUPPLIER PAYMENTS ────────────────────────────
+
+/**
+ * Save a supplier payment
+ */
+export async function saveSupplierPayment(input: SupplierPaymentInput) {
+    const ctx = await getSessionWithOrg();
+    if (!ctx) throw new Error("Nao autenticado");
+
+    if (isNaN(input.amount) || input.amount <= 0) {
+        throw new Error("Valor deve ser maior que zero");
+    }
+
+    await db.supplierPayment.create({
+        data: {
+            organizationId: ctx.organization.id,
+            amount: input.amount,
+            description: input.description,
+            paymentDate: input.paymentDate,
+        },
+    });
+
+    revalidatePath("/financeiro");
+    return { success: true };
+}
+
+/**
+ * Get supplier payments for a given period
+ */
+export async function getSupplierPayments(from: Date, to: Date) {
+    const ctx = await getSessionWithOrg();
+    if (!ctx) return [];
+
+    return db.supplierPayment.findMany({
+        where: {
+            organizationId: ctx.organization.id,
+            paymentDate: { gte: from, lte: to },
+        },
+        orderBy: { paymentDate: "desc" },
+    });
+}
+
+/**
+ * Delete a supplier payment
+ */
+export async function deleteSupplierPayment(id: string) {
+    const ctx = await getSessionWithOrg();
+    if (!ctx) throw new Error("Nao autenticado");
+
+    await db.supplierPayment.delete({
+        where: { id },
     });
 
     revalidatePath("/financeiro");

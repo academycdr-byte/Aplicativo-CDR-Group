@@ -20,9 +20,11 @@ import {
     getFinancialMetrics,
     getProductCosts,
     getFinancialConfig,
+    getSupplierPayments,
     type FinancialMetrics,
 } from "@/actions/finance";
 import { ProductCostTable } from "@/components/finance/product-cost-table";
+import { SupplierPaymentTable } from "@/components/finance/supplier-payment-table";
 import { FinancialConfigDialog } from "@/components/finance/financial-config-dialog";
 import { cn } from "@/lib/utils";
 
@@ -47,6 +49,8 @@ export default function FinancePage() {
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [costs, setCosts] = useState<any[]>([]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [supplierPayments, setSupplierPayments] = useState<any[]>([]);
     const [config, setConfig] = useState({
         defaultTaxRate: 0,
         fixedTransactionFee: 0,
@@ -55,6 +59,8 @@ export default function FinancePage() {
         taxBase: "revenue",
         fixedCosts: 0,
         chargebackRate: 0,
+        cmvMethod: "sku",
+        averageCostPerOrder: 0,
     });
 
     const loadData = useCallback(async () => {
@@ -75,6 +81,7 @@ export default function FinancePage() {
                 getFinancialMetrics({ from: fromDate, to: toDate }),
                 getProductCosts(),
                 getFinancialConfig(),
+                getSupplierPayments(fromDate, toDate),
             ]);
 
             if (results[0].status === "fulfilled") setMetrics(results[0].value);
@@ -89,8 +96,11 @@ export default function FinancePage() {
                     taxBase: String(c.taxBase),
                     fixedCosts: Number(c.fixedCosts),
                     chargebackRate: Number(c.chargebackRate),
+                    cmvMethod: String(c.cmvMethod || "sku"),
+                    averageCostPerOrder: Number(c.averageCostPerOrder),
                 });
             }
+            if (results[3].status === "fulfilled") setSupplierPayments(results[3].value);
         } catch (error) {
             console.error("Failed to load financial data", error);
         } finally {
@@ -123,11 +133,11 @@ export default function FinancePage() {
                 <div>
                     <h2 className="text-2xl font-bold tracking-tight">Financeiro</h2>
                     <p className="text-muted-foreground text-sm mt-0.5">
-                        Gestão de lucro líquido e unit economics.
+                        Gestao de lucro liquido e unit economics.
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <FinancialConfigDialog config={config} />
+                    <FinancialConfigDialog config={config} onSave={loadData} />
                     <PeriodSelector value={period} onChange={setPeriod} />
                 </div>
             </div>
@@ -174,7 +184,7 @@ export default function FinancePage() {
                             subText={`${cogsPct.toFixed(2)}% da receita`}
                         />
                         <FinancialCard
-                            title="Ads (Tráfego)"
+                            title="Ads (Trafego)"
                             value={fmt(metrics.adSpend)}
                             icon={TrendingUp}
                             iconClass="bg-red-500/10 text-red-500"
@@ -220,7 +230,7 @@ export default function FinancePage() {
                     {/* Bottom row: Net Profit + Margin */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <FinancialCard
-                            title="Lucro Líquido"
+                            title="Lucro Liquido"
                             value={fmt(metrics.netProfit)}
                             icon={PieChart}
                             className={metrics.netProfit >= 0 ? "border-emerald-500/20 bg-emerald-500/5" : "border-red-500/20 bg-red-500/5"}
@@ -228,7 +238,7 @@ export default function FinancePage() {
                             valueClass={metrics.netProfit >= 0 ? "text-emerald-600" : "text-red-600"}
                         />
                         <FinancialCard
-                            title="Margem Líquida"
+                            title="Margem Liquida"
                             value={`${metrics.margin.toFixed(2)}%`}
                             icon={Percent}
                             className={metrics.margin >= 0 ? "" : ""}
@@ -236,7 +246,7 @@ export default function FinancePage() {
                             valueClass={metrics.margin >= 0 ? "text-emerald-600" : "text-red-600"}
                         />
                         <FinancialCard
-                            title="Ticket Médio"
+                            title="Ticket Medio"
                             value={fmt(metrics.ticketMedio)}
                             icon={DollarSign}
                             iconClass="bg-sky-500/10 text-sky-500"
@@ -246,7 +256,7 @@ export default function FinancePage() {
 
                     {/* Profit Breakdown Bar */}
                     <Card className="border border-border shadow-none rounded-lg p-6">
-                        <h3 className="text-sm font-medium text-muted-foreground mb-4">Composição da Receita</h3>
+                        <h3 className="text-sm font-medium text-muted-foreground mb-4">Composicao da Receita</h3>
                         <div className="w-full h-8 flex rounded-md overflow-hidden bg-secondary">
                             {cogsPct > 0 && (
                                 <div style={{ width: `${cogsPct}%` }} className="bg-amber-400 h-full flex items-center justify-center text-[10px] font-bold text-white">
@@ -286,7 +296,7 @@ export default function FinancePage() {
                         </div>
                         <div className="flex flex-wrap gap-3 mt-3 text-xs text-muted-foreground justify-center">
                             <div className="flex items-center gap-1"><div className="w-3 h-3 bg-amber-400 rounded-sm" />Produto</div>
-                            <div className="flex items-center gap-1"><div className="w-3 h-3 bg-red-400 rounded-sm" />Anúncios</div>
+                            <div className="flex items-center gap-1"><div className="w-3 h-3 bg-red-400 rounded-sm" />Anuncios</div>
                             <div className="flex items-center gap-1"><div className="w-3 h-3 bg-blue-400 rounded-sm" />Gateway</div>
                             <div className="flex items-center gap-1"><div className="w-3 h-3 bg-indigo-400 rounded-sm" />Checkout</div>
                             <div className="flex items-center gap-1"><div className="w-3 h-3 bg-purple-400 rounded-sm" />Impostos</div>
@@ -295,9 +305,42 @@ export default function FinancePage() {
                         </div>
                     </Card>
 
-                    {/* Product Cost Management */}
+                    {/* CMV Management Section - conditional based on cmvMethod */}
                     <Card className="border border-border shadow-none rounded-lg p-6">
-                        <ProductCostTable costs={costs} />
+                        {config.cmvMethod === "supplier_payments" ? (
+                            <SupplierPaymentTable
+                                payments={supplierPayments}
+                                onUpdate={loadData}
+                            />
+                        ) : config.cmvMethod === "average" ? (
+                            <div className="space-y-2">
+                                <h3 className="text-lg font-medium">Custos (CMV) - Custo Medio</h3>
+                                <p className="text-sm text-muted-foreground">
+                                    Metodo ativo: <span className="font-medium text-foreground">Custo Medio por Pedido</span>
+                                </p>
+                                <div className="flex items-center gap-4 p-4 rounded-lg border border-blue-500/20 bg-blue-500/5">
+                                    <div>
+                                        <p className="text-xs text-muted-foreground">Custo medio por pedido</p>
+                                        <p className="text-xl font-bold">{fmt(config.averageCostPerOrder)}</p>
+                                    </div>
+                                    <div className="text-2xl text-muted-foreground">&times;</div>
+                                    <div>
+                                        <p className="text-xs text-muted-foreground">Pedidos no periodo</p>
+                                        <p className="text-xl font-bold">{metrics.orderCount}</p>
+                                    </div>
+                                    <div className="text-2xl text-muted-foreground">=</div>
+                                    <div>
+                                        <p className="text-xs text-muted-foreground">CMV total</p>
+                                        <p className="text-xl font-bold text-amber-600">{fmt(metrics.productCosts)}</p>
+                                    </div>
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                    Para alterar o valor medio, acesse &quot;Configurar Taxas&quot; acima.
+                                </p>
+                            </div>
+                        ) : (
+                            <ProductCostTable costs={costs} />
+                        )}
                     </Card>
                 </>
             )}

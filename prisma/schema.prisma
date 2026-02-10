@@ -122,8 +122,9 @@ model Organization {
   whatsAppSession WhatsAppSession?
   
   // Financials
-  productCosts    ProductCost[]
-  financialConfig FinancialConfig?
+  productCosts     ProductCost[]
+  financialConfig  FinancialConfig?
+  supplierPayments SupplierPayment[]
 
   @@map("organizations")
 }
@@ -157,11 +158,30 @@ model FinancialConfig {
   fixedCosts          Decimal      @db.Decimal(10, 2) @default(0)
   chargebackRate      Decimal      @db.Decimal(5, 2) @default(0)
 
+  // CMV method: "sku" | "average" | "supplier_payments"
+  cmvMethod           String       @default("sku")
+  averageCostPerOrder Decimal      @db.Decimal(10, 2) @default(0)
+
   updatedAt           DateTime     @updatedAt
 
   organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@map("financial_configs")
+}
+
+model SupplierPayment {
+  id             String       @id @default(cuid())
+  organizationId String
+  amount         Decimal      @db.Decimal(10, 2)
+  description    String?
+  paymentDate    DateTime
+
+  createdAt      DateTime     @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, paymentDate])
+  @@map("supplier_payments")
 }
 
 model Membership {
