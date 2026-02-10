@@ -1,6 +1,7 @@
 "use server";
 
 import { getSessionWithOrg } from "@/lib/session";
+import { prisma } from "@/lib/prisma";
 import { syncAllPlatforms } from "@/lib/integrations/sync";
 import { syncShopifyOrders } from "@/lib/integrations/shopify";
 import { syncCartpandaOrders } from "@/lib/integrations/cartpanda";
@@ -45,4 +46,31 @@ export async function syncPlatform(platform: string) {
     default:
       return { error: `Unknown platform: ${platform}` };
   }
+}
+
+const STALE_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
+
+export async function smartSync(): Promise<{ triggered: boolean }> {
+  const ctx = await getSessionWithOrg();
+  if (!ctx) return { triggered: false };
+
+  const integrations = await prisma.integration.findMany({
+    where: { organizationId: ctx.organization.id, status: "CONNECTED" },
+    select: { lastSyncAt: true, syncStatus: true },
+  });
+
+  if (integrations.length === 0) return { triggered: false };
+  if (integrations.some((i) => i.syncStatus === "SYNCING")) return { triggered: false };
+
+  const now = Date.now();
+  const hasStale = integrations.some(
+    (i) => !i.lastSyncAt || now - i.lastSyncAt.getTime() > STALE_THRESHOLD_MS
+  );
+  if (!hasStale) return { triggered: false };
+
+  syncAllPlatforms(ctx.organization.id).catch((error) => {
+    console.error("[smartSync] Background sync failed:", error);
+  });
+
+  return { triggered: true };
 }

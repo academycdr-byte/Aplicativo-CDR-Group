@@ -176,8 +176,7 @@ export default function AdsPage() {
   const [excludedTerms, setExcludedTerms] = useState<string[]>([]);
   const [period, setPeriod] = useState<PeriodValue>({ type: "preset", days: 30 });
 
-  // View State
-  const [view, setView] = useState<"overview" | "creatives">("overview");
+  // Pagination State
   const [metricsPage, setMetricsPage] = useState(1);
   const [creativesPage, setCreativesPage] = useState(1);
   const metricsPerPage = 20;
@@ -263,20 +262,42 @@ export default function AdsPage() {
     }
   }
 
+  // Dedup state for detailed table
+  const [uniqueMetrics, setUniqueMetrics] = useState(false);
+
   const sortedMetrics = useMemo(() => {
-    const withDerived = metrics.map((m) => ({
+    let withDerived = metrics.map((m) => ({
       ...m,
       ctr: m.impressions > 0 ? (m.clicks / m.impressions) * 100 : 0,
       roas: m.spend > 0 ? m.revenue / m.spend : 0,
       cpa: m.conversions > 0 ? m.spend / m.conversions : 0,
       ticket: m.conversions > 0 ? m.revenue / m.conversions : 0,
     }));
+
+    if (uniqueMetrics) {
+      const bestMap = new Map<string, typeof withDerived[0]>();
+      for (const m of withDerived) {
+        const key = (m.adName || "Sem Nome").trim().toLowerCase();
+        const existing = bestMap.get(key);
+        if (!existing) {
+          bestMap.set(key, m);
+        } else if (
+          m.roas > existing.roas ||
+          (m.roas === existing.roas && m.conversions > existing.conversions) ||
+          (m.roas === existing.roas && m.conversions === existing.conversions && m.spend > existing.spend)
+        ) {
+          bestMap.set(key, m);
+        }
+      }
+      withDerived = Array.from(bestMap.values());
+    }
+
     return withDerived.sort((a, b) => {
       const aVal = Number((a as unknown as Record<string, unknown>)[metricsSortKey]) || 0;
       const bVal = Number((b as unknown as Record<string, unknown>)[metricsSortKey]) || 0;
       return metricsSortDir === "desc" ? bVal - aVal : aVal - bVal;
     });
-  }, [metrics, metricsSortKey, metricsSortDir]);
+  }, [metrics, metricsSortKey, metricsSortDir, uniqueMetrics]);
 
   const sortedCreatives = useMemo(() => {
     let withDerived = creatives.map((c) => ({
@@ -491,402 +512,380 @@ export default function AdsPage() {
         <KPICard title="Ticket Médio" value={ticket} prevValue={prevTicket} icon={ShoppingCart} prefix="R$" variant="success" />
       </div>
 
-      {/* View Toggle */}
-      <div className="flex gap-2 border-b pb-1">
-        <Button
-          variant={view === "overview" ? "default" : "ghost"}
-          size="sm"
-          onClick={() => setView("overview")}
-          className="rounded-none border-b-2 border-transparent px-4 pb-2 pt-2 data-[state=active]:border-primary"
-          data-state={view === "overview" ? "active" : ""}
-        >
-          <BarChart2 className="w-4 h-4 mr-2" />
-          Visão Geral
-        </Button>
-        <Button
-          variant={view === "creatives" ? "default" : "ghost"}
-          size="sm"
-          onClick={() => setView("creatives")}
-          className="rounded-none border-b-2 border-transparent px-4 pb-2 pt-2 data-[state=active]:border-primary"
-          data-state={view === "creatives" ? "active" : ""}
-        >
-          <ImageIcon className="w-4 h-4 mr-2" />
-          Criativos ({creatives.length})
-        </Button>
-      </div>
-
-      {view === "overview" && (
-        <div className="space-y-6">
-
-          {/* Section: Funnel & Chart */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Funnel - Left Side (or Top on mobile) */}
-            <div className="lg:col-span-4 max-h-[400px]">
-              <Card className="h-full border border-border shadow-none rounded-lg">
-                <CardHeader className="border-b border-border/50 px-5 py-4">
-                  <CardTitle className="text-base font-semibold">Funil de Vendas</CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <FunnelChart
-                    data={{
-                      impressions: t.impressions,
-                      clicks: t.clicks,
-                      addToCart: t.addToCart,
-                      initiateCheckout: t.initiateCheckout,
-                      purchases: t.conversions
-                    }}
-                    className="h-full"
-                  />
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Main Chart - Right Side */}
-            <div className="lg:col-span-8">
-              <Card className="h-full flex flex-col border border-border shadow-none rounded-lg">
-                <CardHeader className="flex flex-row items-center justify-between border-b border-border/50 px-5 py-4">
-                  <CardTitle className="text-base font-semibold">Evolução Temporal</CardTitle>
-                  <Select value={chartMetric} onValueChange={(v) => setChartMetric(v as typeof chartMetric)}>
-                    <SelectTrigger className="w-[180px] h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="spend_revenue">Gasto vs Receita</SelectItem>
-                      <SelectItem value="roas">ROAS</SelectItem>
-                      <SelectItem value="cpa">CPA</SelectItem>
-                      <SelectItem value="ctr">CTR</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </CardHeader>
-                <CardContent className="flex-1 min-h-[300px] p-5">
-                  {dayData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={300}>
-                      <LineChart data={dayData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} opacity={0.3} />
-                        <XAxis
-                          dataKey="date"
-                          tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
-                          tickLine={false}
-                          axisLine={false}
-                          tickFormatter={(v) => {
-                            const d = new Date(v + "T00:00:00");
-                            return `${d.getDate()}/${d.getMonth() + 1}`;
-                          }}
-                          minTickGap={30}
-                        />
-                        <YAxis
-                          tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
-                          tickLine={false}
-                          axisLine={false}
-                          tickFormatter={(v) => {
-                            if (chartMetric === "roas") return `${v}x`;
-                            if (chartMetric === "ctr") return `${v}%`;
-                            return `R$${v < 1000 ? v : `${(v / 1000).toFixed(0)}k`}`;
-                          }}
-                        />
-                        <Tooltip
-                          contentStyle={{ backgroundColor: "var(--card)", borderColor: "var(--border)", borderRadius: "12px" }}
-                          labelFormatter={(d) => new Date(d + "T00:00:00").toLocaleDateString("pt-BR")}
-                          formatter={(val, name) => {
-                            const v = Number(val) || 0;
-                            if (name === "Gasto") return [fmt(v), name];
-                            if (name === "Receita") return [fmt(v), name];
-                            if (name === "ROAS") return [`${v.toFixed(2)}x`, name];
-                            if (name === "CPA") return [fmt(v), name];
-                            if (name === "CTR") return [`${v.toFixed(2)}%`, name];
-                            return [v, name];
-                          }}
-                        />
-                        <Legend />
-
-                        {chartMetric === "spend_revenue" && (
-                          <>
-                            <Line type="monotone" dataKey="spend" name="Gasto" stroke="var(--destructive)" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
-                            <Line type="monotone" dataKey="revenue" name="Receita" stroke="var(--primary)" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
-                          </>
-                        )}
-                        {chartMetric === "roas" && (
-                          <Line
-                            type="monotone"
-                            dataKey={(d) => d.spend > 0 ? d.revenue / d.spend : 0}
-                            name="ROAS"
-                            stroke="var(--primary)"
-                            strokeWidth={2}
-                            dot={false}
-                          />
-                        )}
-                        {chartMetric === "cpa" && (
-                          <Line
-                            type="monotone"
-                            dataKey={(d) => d.conversions > 0 ? d.spend / d.conversions : 0}
-                            name="CPA"
-                            stroke="var(--destructive)"
-                            strokeWidth={2}
-                            dot={false}
-                          />
-                        )}
-                        {chartMetric === "ctr" && (
-                          <Line
-                            type="monotone"
-                            dataKey={(d) => d.impressions > 0 ? (d.clicks / d.impressions) * 100 : 0}
-                            name="CTR"
-                            stroke="var(--primary)"
-                            strokeWidth={2}
-                            dot={false}
-                          />
-                        )}
-                      </LineChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="h-full flex items-center justify-center text-muted-foreground">
-                      Sem dados para o período.
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-
-          {/* Top Performers Section */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card className="border border-border shadow-none rounded-lg">
-              <CardHeader className="flex flex-row items-center justify-between border-b border-border/50 px-5 py-4">
-                <CardTitle className="text-base font-semibold">Top 5 Anúncios (ROAS)</CardTitle>
-                <div className="flex items-center space-x-2">
-                  <Label htmlFor="worst-mode" className="text-xs">Ver Piores</Label>
-                  <Switch id="worst-mode" checked={showWorstPerformers} onCheckedChange={setShowWorstPerformers} />
-                </div>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="space-y-0 divide-y divide-border/50">
-                  {(showWorstPerformers ? topCreatives.worst : topCreatives.best).map((c, idx) => (
-                    <div key={c.adId} className="flex items-center p-3 hover:bg-muted/30 transition-colors">
-                      <span className="w-6 text-center text-muted-foreground text-sm font-medium mr-2">{idx + 1}</span>
-                      <div className="w-10 h-10 bg-muted rounded relative overflow-hidden shrink-0 mr-3 border border-border">
-                        {c.thumbnailUrl ? (
-                          <AdThumbnail src={c.thumbnailUrl} alt="" fill className="object-cover" sizes="40px" />
-                        ) : <ImageIcon className="w-5 h-5 absolute inset-0 m-auto text-muted-foreground/50" />}
-                      </div>
-                      <div className="flex-1 min-w-0 mr-2">
-                        <p className="text-sm font-medium truncate text-foreground">{c.adName || "Sem nome"}</p>
-                        <div className="flex gap-2 text-xs text-muted-foreground">
-                          <span>{fmt(c.spend)} gastos</span>
-                          <span>•</span>
-                          <span>{c.conversions} conv.</span>
-                        </div>
-                      </div>
-                      <div className="text-right whitespace-nowrap">
-                        <p className={`text-sm font-bold ${c.roas >= 3 ? "text-emerald-500" : c.roas < 1 ? "text-red-500" : "text-amber-500"}`}>
-                          {c.roas.toFixed(2)}x
-                        </p>
-                        <p className="text-xs text-muted-foreground">ROAS</p>
-                      </div>
-                    </div>
-                  ))}
-                  {(showWorstPerformers ? topCreatives.worst : topCreatives.best).length === 0 && (
-                    <div className="p-6 text-center text-muted-foreground text-sm">
-                      Nenhum anúncio com gasto relevante encontrado.
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Detailed Table */}
-          <Card className="border border-border shadow-none rounded-lg">
-            <CardHeader className="flex flex-row items-center justify-between border-b border-border/50 px-5 py-4">
-              <CardTitle className="text-base font-semibold">Detalhamento Completo</CardTitle>
+      {/* Section: Funnel & Chart */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Funnel - Left Side (or Top on mobile) */}
+        <div className="lg:col-span-4 max-h-[400px]">
+          <Card className="h-full border border-border shadow-none rounded-lg">
+            <CardHeader className="border-b border-border/50 px-5 py-4">
+              <CardTitle className="text-base font-semibold">Funil de Vendas</CardTitle>
             </CardHeader>
-            <CardContent className="p-0 overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent border-b border-border/50">
-                    <TableHead className="w-[300px]">Anúncio</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("spend", metricsSortKey, metricsSortDir, setMetricsSortKey, setMetricsSortDir)}>Gasto <ArrowUpDown className="inline w-3 h-3 ml-1" /></TableHead>
-                    <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("impressions", metricsSortKey, metricsSortDir, setMetricsSortKey, setMetricsSortDir)}>Impr.</TableHead>
-                    <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("clicks", metricsSortKey, metricsSortDir, setMetricsSortKey, setMetricsSortDir)}>Cliques</TableHead>
-                    <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("ctr", metricsSortKey, metricsSortDir, setMetricsSortKey, setMetricsSortDir)}>CTR</TableHead>
-                    <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("cpa", metricsSortKey, metricsSortDir, setMetricsSortKey, setMetricsSortDir)}>CPA</TableHead>
-                    <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("roas", metricsSortKey, metricsSortDir, setMetricsSortKey, setMetricsSortDir)}>ROAS</TableHead>
-                    <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("revenue", metricsSortKey, metricsSortDir, setMetricsSortKey, setMetricsSortDir)}>Receita</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sortedMetrics
-                    .slice((metricsPage - 1) * metricsPerPage, metricsPage * metricsPerPage)
-                    .map((m) => (
-                      <TableRow key={m.id} className={`hover:bg-muted/30 border-b border-border/50 ${m.roas >= 3 ? "bg-emerald-500/5 hover:bg-emerald-500/10" : ""}`}>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            {m.thumbnailUrl && <AdThumbnail src={m.thumbnailUrl} alt="" width={32} height={32} className="rounded object-cover" />}
-                            <div className="min-w-0 max-w-[250px]">
-                              <p className="text-sm font-medium truncate" title={m.adName || ""}>{m.adName || "Anúncio"}</p>
-                              <p className="text-xs text-muted-foreground truncate">{m.campaignName}</p>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell><Badge variant="outline" className="text-[10px]">{platformLabels[m.platform] || "Meta"}</Badge></TableCell>
-                        <TableCell className="text-right">{fmt(m.spend)}</TableCell>
-                        <TableCell className="text-right">{fmtNum(m.impressions)}</TableCell>
-                        <TableCell className="text-right">{fmtNum(m.clicks)}</TableCell>
-                        <TableCell className="text-right">{m.ctr.toFixed(2)}%</TableCell>
-                        <TableCell className="text-right">{m.cpa > 0 ? fmt(m.cpa) : "-"}</TableCell>
-                        <TableCell className="text-right font-medium text-foreground">{m.roas > 0 ? m.roas.toFixed(2) + "x" : "-"}</TableCell>
-                        <TableCell className="text-right">{fmt(m.revenue)}</TableCell>
-                      </TableRow>
-                    ))}
-                </TableBody>
-              </Table>
+            <CardContent className="p-0">
+              <FunnelChart
+                data={{
+                  impressions: t.impressions,
+                  clicks: t.clicks,
+                  addToCart: t.addToCart,
+                  initiateCheckout: t.initiateCheckout,
+                  purchases: t.conversions
+                }}
+                className="h-full"
+              />
+            </CardContent>
+          </Card>
+        </div>
 
-              {/* Pagination */}
-              {sortedMetrics.length > metricsPerPage && (
-                <div className="flex items-center justify-between px-4 py-4 border-t border-border/50">
-                  <p className="text-xs text-muted-foreground">
-                    Página {metricsPage} de {Math.ceil(sortedMetrics.length / metricsPerPage)}
-                  </p>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setMetricsPage(p => Math.max(1, p - 1))} disabled={metricsPage === 1}><ChevronLeft className="w-4 h-4" /></Button>
-                    <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setMetricsPage(p => Math.min(Math.ceil(sortedMetrics.length / metricsPerPage), p + 1))} disabled={metricsPage >= Math.ceil(sortedMetrics.length / metricsPerPage)}><ChevronRight className="w-4 h-4" /></Button>
-                  </div>
+        {/* Main Chart - Right Side */}
+        <div className="lg:col-span-8">
+          <Card className="h-full flex flex-col border border-border shadow-none rounded-lg">
+            <CardHeader className="flex flex-row items-center justify-between border-b border-border/50 px-5 py-4">
+              <CardTitle className="text-base font-semibold">Evolução Temporal</CardTitle>
+              <Select value={chartMetric} onValueChange={(v) => setChartMetric(v as typeof chartMetric)}>
+                <SelectTrigger className="w-[180px] h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="spend_revenue">Gasto vs Receita</SelectItem>
+                  <SelectItem value="roas">ROAS</SelectItem>
+                  <SelectItem value="cpa">CPA</SelectItem>
+                  <SelectItem value="ctr">CTR</SelectItem>
+                </SelectContent>
+              </Select>
+            </CardHeader>
+            <CardContent className="flex-1 min-h-[300px] p-5">
+              {dayData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={dayData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} opacity={0.3} />
+                    <XAxis
+                      dataKey="date"
+                      tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(v) => {
+                        const d = new Date(v + "T00:00:00");
+                        return `${d.getDate()}/${d.getMonth() + 1}`;
+                      }}
+                      minTickGap={30}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(v) => {
+                        if (chartMetric === "roas") return `${v}x`;
+                        if (chartMetric === "ctr") return `${v}%`;
+                        return `R$${v < 1000 ? v : `${(v / 1000).toFixed(0)}k`}`;
+                      }}
+                    />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: "var(--card)", borderColor: "var(--border)", borderRadius: "12px" }}
+                      labelFormatter={(d) => new Date(d + "T00:00:00").toLocaleDateString("pt-BR")}
+                      formatter={(val, name) => {
+                        const v = Number(val) || 0;
+                        if (name === "Gasto") return [fmt(v), name];
+                        if (name === "Receita") return [fmt(v), name];
+                        if (name === "ROAS") return [`${v.toFixed(2)}x`, name];
+                        if (name === "CPA") return [fmt(v), name];
+                        if (name === "CTR") return [`${v.toFixed(2)}%`, name];
+                        return [v, name];
+                      }}
+                    />
+                    <Legend />
+
+                    {chartMetric === "spend_revenue" && (
+                      <>
+                        <Line type="monotone" dataKey="spend" name="Gasto" stroke="var(--destructive)" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                        <Line type="monotone" dataKey="revenue" name="Receita" stroke="var(--primary)" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                      </>
+                    )}
+                    {chartMetric === "roas" && (
+                      <Line
+                        type="monotone"
+                        dataKey={(d) => d.spend > 0 ? d.revenue / d.spend : 0}
+                        name="ROAS"
+                        stroke="var(--primary)"
+                        strokeWidth={2}
+                        dot={false}
+                      />
+                    )}
+                    {chartMetric === "cpa" && (
+                      <Line
+                        type="monotone"
+                        dataKey={(d) => d.conversions > 0 ? d.spend / d.conversions : 0}
+                        name="CPA"
+                        stroke="var(--destructive)"
+                        strokeWidth={2}
+                        dot={false}
+                      />
+                    )}
+                    {chartMetric === "ctr" && (
+                      <Line
+                        type="monotone"
+                        dataKey={(d) => d.impressions > 0 ? (d.clicks / d.impressions) * 100 : 0}
+                        name="CTR"
+                        stroke="var(--primary)"
+                        strokeWidth={2}
+                        dot={false}
+                      />
+                    )}
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-muted-foreground">
+                  Sem dados para o período.
                 </div>
               )}
             </CardContent>
           </Card>
-
         </div>
-      )}
+      </div>
 
-      {view === "creatives" && (
-        <div className="space-y-6">
-          {/* Search is at the top of the page, globally applied */}
+      {/* Creatives Gallery Section */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 pt-2">
+          <ImageIcon className="w-5 h-5 text-muted-foreground" />
+          <h3 className="text-lg font-semibold tracking-tight">Galeria de Criativos</h3>
+          <span className="text-sm text-muted-foreground">({sortedCreatives.length})</span>
+        </div>
 
-          {/* Creatives Toolbar */}
-          <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-            <p className="text-sm text-muted-foreground">Exibindo {sortedCreatives.length} criativos</p>
+        {/* Creatives Toolbar */}
+        <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+          <p className="text-sm text-muted-foreground">Exibindo {sortedCreatives.length} criativos</p>
 
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-2">
-                <Switch
-                  id="unique-mode"
-                  checked={uniqueCreatives}
-                  onCheckedChange={setUniqueCreatives}
-                />
-                <Label htmlFor="unique-mode" className="text-sm cursor-pointer">Ocultar duplicatas</Label>
-              </div>
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2">
+              <Switch
+                id="unique-mode"
+                checked={uniqueCreatives}
+                onCheckedChange={setUniqueCreatives}
+              />
+              <Label htmlFor="unique-mode" className="text-sm cursor-pointer">Ocultar duplicatas</Label>
+            </div>
 
-              <div className="flex items-center gap-2">
-                <ListFilter className="w-4 h-4 text-muted-foreground" />
-                <Select value={creativesSortKey} onValueChange={setCreativesSortKey}>
-                  <SelectTrigger className="w-[180px] h-8 text-xs">
-                    <SelectValue placeholder="Ordenar por" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="spend">Maior Gasto</SelectItem>
-                    <SelectItem value="roas">Maior ROAS</SelectItem>
-                    <SelectItem value="revenue">Maior Receita</SelectItem>
-                    <SelectItem value="ctr">Maior CTR</SelectItem>
-                    <SelectItem value="conversions">Mais Conversões</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="flex items-center gap-2">
+              <ListFilter className="w-4 h-4 text-muted-foreground" />
+              <Select value={creativesSortKey} onValueChange={setCreativesSortKey}>
+                <SelectTrigger className="w-[180px] h-8 text-xs">
+                  <SelectValue placeholder="Ordenar por" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="spend">Maior Gasto</SelectItem>
+                  <SelectItem value="roas">Maior ROAS</SelectItem>
+                  <SelectItem value="revenue">Maior Receita</SelectItem>
+                  <SelectItem value="ctr">Maior CTR</SelectItem>
+                  <SelectItem value="conversions">Mais Conversões</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
+        </div>
 
-          {/* Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {sortedCreatives
-              .slice((creativesPage - 1) * creativesPerPage, creativesPage * creativesPerPage)
-              .map((c) => (
-                <Card
-                  key={c.adId}
-                  className={`group overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-sm border border-border shadow-none rounded-lg border-l-4 ${c.roas >= 3 ? "border-l-emerald-500" : c.roas >= 1 ? "border-l-amber-500" : "border-l-red-500"
-                    }`}
-                  onClick={() => {
-                    setSelectedCreative(c);
-                    setIsModalOpen(true);
-                  }}
-                >
-                  {/* Thumbnail */}
-                  <div className="relative aspect-video bg-muted flex items-center justify-center overflow-hidden">
-                    {c.thumbnailUrl ? (
-                      <AdThumbnail src={c.thumbnailUrl} alt="" fill className="object-cover transition-transform" sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw" />
-                    ) : <ImageIcon className="w-8 h-8 opacity-20" />}
+        {/* Creative Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {sortedCreatives
+            .slice((creativesPage - 1) * creativesPerPage, creativesPage * creativesPerPage)
+            .map((c) => (
+              <Card
+                key={c.adId}
+                className={`group overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-sm border border-border shadow-none rounded-lg border-l-4 ${c.roas >= 3 ? "border-l-emerald-500" : c.roas >= 1 ? "border-l-amber-500" : "border-l-red-500"
+                  }`}
+                onClick={() => {
+                  setSelectedCreative(c);
+                  setIsModalOpen(true);
+                }}
+              >
+                {/* Thumbnail */}
+                <div className="relative aspect-video bg-muted flex items-center justify-center overflow-hidden">
+                  {c.thumbnailUrl ? (
+                    <AdThumbnail src={c.thumbnailUrl} alt="" fill className="object-cover transition-transform" sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw" />
+                  ) : <ImageIcon className="w-8 h-8 opacity-20" />}
 
-                    {/* Overlay Play Icon if we assume it's a video or just generally for "Detail View" affordance */}
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
-                      <div className="w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm">
-                        <Play className="w-5 h-5 ml-1 fill-current" />
-                      </div>
-                    </div>
-
-                    <div className="absolute top-2 right-2">
-                      <Badge variant="secondary" className="backdrop-blur-md bg-black/40 text-white border-none text-[10px] h-5">
-                        {platformLabels[c.platform] || "Ads"}
-                      </Badge>
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm">
+                      <Play className="w-5 h-5 ml-1 fill-current" />
                     </div>
                   </div>
 
-                  <CardContent className="p-4 space-y-3">
-                    <div className="min-w-0">
-                      <p className="font-semibold text-sm truncate" title={c.adName || ""}>{c.adName || "Sem Título"}</p>
-                      <p className="text-xs text-muted-foreground truncate">{c.campaignName}</p>
+                  <div className="absolute top-2 right-2">
+                    <Badge variant="secondary" className="backdrop-blur-md bg-black/40 text-white border-none text-[10px] h-5">
+                      {platformLabels[c.platform] || "Ads"}
+                    </Badge>
+                  </div>
+                </div>
+
+                <CardContent className="p-4 space-y-3">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-sm truncate" title={c.adName || ""}>{c.adName || "Sem Título"}</p>
+                    <p className="text-xs text-muted-foreground truncate">{c.campaignName}</p>
+                  </div>
+
+                  {/* Primary Metrics */}
+                  <div className="flex items-end justify-between border-b border-border/50 pb-2 mb-2">
+                    <div>
+                      <p className="text-[10px] text-muted-foreground uppercase">Gasto</p>
+                      <p className="font-semibold">{fmt(c.spend)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] text-muted-foreground uppercase">ROAS</p>
+                      <p className={`font-bold text-lg ${c.roas >= 3 ? "text-emerald-500" : c.roas > 1 ? "text-amber-500" : "text-red-500"}`}>
+                        {c.roas.toFixed(2)}x
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Secondary Metrics Grid */}
+                  <div className="grid grid-cols-3 gap-y-2 text-xs">
+                    <div>
+                      <p className="text-muted-foreground">Impr.</p>
+                      <p className="font-medium">{fmtNum(c.impressions)}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Cliques</p>
+                      <p className="font-medium">{fmtNum(c.clicks)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-muted-foreground">CTR</p>
+                      <p className="font-medium">{c.ctr.toFixed(2)}%</p>
                     </div>
 
-                    {/* Primary Metrics */}
-                    <div className="flex items-end justify-between border-b border-border/50 pb-2 mb-2">
-                      <div>
-                        <p className="text-[10px] text-muted-foreground uppercase">Gasto</p>
-                        <p className="font-semibold">{fmt(c.spend)}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-[10px] text-muted-foreground uppercase">ROAS</p>
-                        <p className={`font-bold text-lg ${c.roas >= 3 ? "text-emerald-500" : c.roas > 1 ? "text-amber-500" : "text-red-500"}`}>
-                          {c.roas.toFixed(2)}x
-                        </p>
-                      </div>
+                    <div className="col-span-3 pt-1 flex justify-between border-t border-border/50 mt-1">
+                      <span className="text-muted-foreground">Receita: <span className="text-foreground">{fmt(c.revenue)}</span></span>
+                      <span className="text-muted-foreground">Conv: <span className="text-foreground">{c.conversions}</span></span>
                     </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+        </div>
 
-                    {/* Secondary Metrics Grid */}
-                    <div className="grid grid-cols-3 gap-y-2 text-xs">
-                      <div>
-                        <p className="text-muted-foreground">Impr.</p>
-                        <p className="font-medium">{fmtNum(c.impressions)}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Cliques</p>
-                        <p className="font-medium">{fmtNum(c.clicks)}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-muted-foreground">CTR</p>
-                        <p className="font-medium">{c.ctr.toFixed(2)}%</p>
-                      </div>
-
-                      <div className="col-span-3 pt-1 flex justify-between border-t border-border/50 mt-1">
-                        <span className="text-muted-foreground">Receita: <span className="text-foreground">{fmt(c.revenue)}</span></span>
-                        <span className="text-muted-foreground">Conv: <span className="text-foreground">{c.conversions}</span></span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+        {/* Creatives Pagination */}
+        {sortedCreatives.length > creativesPerPage && (
+          <div className="flex items-center justify-between px-0 py-4">
+            <p className="text-xs text-muted-foreground">
+              Página {creativesPage} de {Math.ceil(sortedCreatives.length / creativesPerPage)}
+            </p>
+            <div className="flex gap-2">
+              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCreativesPage(p => Math.max(1, p - 1))} disabled={creativesPage === 1}><ChevronLeft className="w-4 h-4" /></Button>
+              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCreativesPage(p => Math.min(Math.ceil(sortedCreatives.length / creativesPerPage), p + 1))} disabled={creativesPage >= Math.ceil(sortedCreatives.length / creativesPerPage)}><ChevronRight className="w-4 h-4" /></Button>
+            </div>
           </div>
+        )}
+      </div>
 
-          {/* Pagination for Creatives Grid */}
-          {sortedCreatives.length > creativesPerPage && (
-            <div className="flex items-center justify-between px-0 py-4">
+      {/* Top Performers Section */}
+      <Card className="border border-border shadow-none rounded-lg">
+        <CardHeader className="flex flex-row items-center justify-between border-b border-border/50 px-5 py-4">
+          <CardTitle className="text-base font-semibold">Top 5 Anúncios (ROAS)</CardTitle>
+          <div className="flex items-center space-x-2">
+            <Label htmlFor="worst-mode" className="text-xs">Ver Piores</Label>
+            <Switch id="worst-mode" checked={showWorstPerformers} onCheckedChange={setShowWorstPerformers} />
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="space-y-0 divide-y divide-border/50">
+            {(showWorstPerformers ? topCreatives.worst : topCreatives.best).map((c, idx) => (
+              <div key={c.adId} className="flex items-center p-3 hover:bg-muted/30 transition-colors">
+                <span className="w-6 text-center text-muted-foreground text-sm font-medium mr-2">{idx + 1}</span>
+                <div className="w-10 h-10 bg-muted rounded relative overflow-hidden shrink-0 mr-3 border border-border">
+                  {c.thumbnailUrl ? (
+                    <AdThumbnail src={c.thumbnailUrl} alt="" fill className="object-cover" sizes="40px" />
+                  ) : <ImageIcon className="w-5 h-5 absolute inset-0 m-auto text-muted-foreground/50" />}
+                </div>
+                <div className="flex-1 min-w-0 mr-2">
+                  <p className="text-sm font-medium truncate text-foreground">{c.adName || "Sem nome"}</p>
+                  <div className="flex gap-2 text-xs text-muted-foreground">
+                    <span>{fmt(c.spend)} gastos</span>
+                    <span>•</span>
+                    <span>{c.conversions} conv.</span>
+                  </div>
+                </div>
+                <div className="text-right whitespace-nowrap">
+                  <p className={`text-sm font-bold ${c.roas >= 3 ? "text-emerald-500" : c.roas < 1 ? "text-red-500" : "text-amber-500"}`}>
+                    {c.roas.toFixed(2)}x
+                  </p>
+                  <p className="text-xs text-muted-foreground">ROAS</p>
+                </div>
+              </div>
+            ))}
+            {(showWorstPerformers ? topCreatives.worst : topCreatives.best).length === 0 && (
+              <div className="p-6 text-center text-muted-foreground text-sm">
+                Nenhum anúncio com gasto relevante encontrado.
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Detailed Table */}
+      <Card className="border border-border shadow-none rounded-lg">
+        <CardHeader className="flex flex-row items-center justify-between border-b border-border/50 px-5 py-4">
+          <CardTitle className="text-base font-semibold">Detalhamento Completo</CardTitle>
+          <div className="flex items-center gap-2">
+            <Switch
+              id="unique-metrics"
+              checked={uniqueMetrics}
+              onCheckedChange={setUniqueMetrics}
+            />
+            <Label htmlFor="unique-metrics" className="text-sm cursor-pointer">Ocultar duplicatas</Label>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0 overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent border-b border-border/50">
+                <TableHead className="w-[300px]">Anúncio</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("spend", metricsSortKey, metricsSortDir, setMetricsSortKey, setMetricsSortDir)}>Gasto <ArrowUpDown className="inline w-3 h-3 ml-1" /></TableHead>
+                <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("impressions", metricsSortKey, metricsSortDir, setMetricsSortKey, setMetricsSortDir)}>Impr.</TableHead>
+                <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("clicks", metricsSortKey, metricsSortDir, setMetricsSortKey, setMetricsSortDir)}>Cliques</TableHead>
+                <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("ctr", metricsSortKey, metricsSortDir, setMetricsSortKey, setMetricsSortDir)}>CTR</TableHead>
+                <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("cpa", metricsSortKey, metricsSortDir, setMetricsSortKey, setMetricsSortDir)}>CPA</TableHead>
+                <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("roas", metricsSortKey, metricsSortDir, setMetricsSortKey, setMetricsSortDir)}>ROAS</TableHead>
+                <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("revenue", metricsSortKey, metricsSortDir, setMetricsSortKey, setMetricsSortDir)}>Receita</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sortedMetrics
+                .slice((metricsPage - 1) * metricsPerPage, metricsPage * metricsPerPage)
+                .map((m) => (
+                  <TableRow key={m.id} className={`hover:bg-muted/30 border-b border-border/50 ${m.roas >= 3 ? "bg-emerald-500/5 hover:bg-emerald-500/10" : ""}`}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        {m.thumbnailUrl && <AdThumbnail src={m.thumbnailUrl} alt="" width={32} height={32} className="rounded object-cover" />}
+                        <div className="min-w-0 max-w-[250px]">
+                          <p className="text-sm font-medium truncate" title={m.adName || ""}>{m.adName || "Anúncio"}</p>
+                          <p className="text-xs text-muted-foreground truncate">{m.campaignName}</p>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell><Badge variant="outline" className="text-[10px]">{platformLabels[m.platform] || "Meta"}</Badge></TableCell>
+                    <TableCell className="text-right">{fmt(m.spend)}</TableCell>
+                    <TableCell className="text-right">{fmtNum(m.impressions)}</TableCell>
+                    <TableCell className="text-right">{fmtNum(m.clicks)}</TableCell>
+                    <TableCell className="text-right">{m.ctr.toFixed(2)}%</TableCell>
+                    <TableCell className="text-right">{m.cpa > 0 ? fmt(m.cpa) : "-"}</TableCell>
+                    <TableCell className="text-right font-medium text-foreground">{m.roas > 0 ? m.roas.toFixed(2) + "x" : "-"}</TableCell>
+                    <TableCell className="text-right">{fmt(m.revenue)}</TableCell>
+                  </TableRow>
+                ))}
+            </TableBody>
+          </Table>
+
+          {/* Pagination */}
+          {sortedMetrics.length > metricsPerPage && (
+            <div className="flex items-center justify-between px-4 py-4 border-t border-border/50">
               <p className="text-xs text-muted-foreground">
-                Página {creativesPage} de {Math.ceil(sortedCreatives.length / creativesPerPage)}
+                Página {metricsPage} de {Math.ceil(sortedMetrics.length / metricsPerPage)}
               </p>
               <div className="flex gap-2">
-                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCreativesPage(p => Math.max(1, p - 1))} disabled={creativesPage === 1}><ChevronLeft className="w-4 h-4" /></Button>
-                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCreativesPage(p => Math.min(Math.ceil(sortedCreatives.length / creativesPerPage), p + 1))} disabled={creativesPage >= Math.ceil(sortedCreatives.length / creativesPerPage)}><ChevronRight className="w-4 h-4" /></Button>
+                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setMetricsPage(p => Math.max(1, p - 1))} disabled={metricsPage === 1}><ChevronLeft className="w-4 h-4" /></Button>
+                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setMetricsPage(p => Math.min(Math.ceil(sortedMetrics.length / metricsPerPage), p + 1))} disabled={metricsPage >= Math.ceil(sortedMetrics.length / metricsPerPage)}><ChevronRight className="w-4 h-4" /></Button>
               </div>
             </div>
           )}
-        </div>
-      )}
+        </CardContent>
+      </Card>
 
       </>
       )}
