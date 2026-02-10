@@ -10,7 +10,6 @@ import {
   History,
   Plus,
   Search,
-  Filter,
   MoreHorizontal,
   Edit,
   Trash2,
@@ -80,7 +79,6 @@ import {
   createReportClient,
   updateReportClient,
   deleteReportClient,
-  getWhatsAppSession,
   getReportSchedules,
   createReportSchedule,
   updateReportSchedule,
@@ -132,6 +130,12 @@ type LogEntry = {
   client: Client;
 };
 
+type WhatsAppGroup = {
+  id: string;
+  name: string;
+  participants: number;
+};
+
 // ─── HELPER FUNCTIONS ──────────────────────────────
 
 const planLabels: Record<string, string> = {
@@ -152,16 +156,6 @@ const frequencyLabels: Record<string, string> = {
   WEEKLY: "Semanal",
   BIWEEKLY: "Quinzenal",
   MONTHLY: "Mensal",
-};
-
-const periodLabels: Record<string, string> = {
-  last7: "Últimos 7 dias",
-  last14: "Últimos 14 dias",
-  last30: "Últimos 30 dias",
-  weekStart: "Início da semana até hoje",
-  monthStart: "Início do mês até hoje",
-  lastMonth: "Mês anterior",
-  custom: "Personalizado",
 };
 
 function formatPhone(phone: string): string {
@@ -193,7 +187,7 @@ export default function ReportsPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [whatsappStatus, setWhatsappStatus] = useState<string>("DISCONNECTED");
+  const [whatsappStatus, setWhatsappStatus] = useState<string>("CHECKING");
   const [loading, setLoading] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
 
@@ -213,16 +207,24 @@ export default function ReportsPage() {
         return;
       }
 
-      const [clientsData, schedulesData, logsData, session] = await Promise.all([
+      const [clientsData, schedulesData, logsData] = await Promise.all([
         getReportClients(),
         getReportSchedules(),
         getReportLogs(),
-        getWhatsAppSession(),
       ]);
       setClients(clientsData as Client[]);
       setSchedules(schedulesData as Schedule[]);
       setLogs(logsData as LogEntry[]);
-      setWhatsappStatus(session?.status || "DISCONNECTED");
+
+      // Check WhatsApp status via Z-API directly (not DB)
+      try {
+        const res = await fetch("/api/whatsapp");
+        const data = await res.json();
+        const isConnected = data.status === "open" || data.status === "CONNECTED";
+        setWhatsappStatus(isConnected ? "CONNECTED" : "DISCONNECTED");
+      } catch {
+        setWhatsappStatus("DISCONNECTED");
+      }
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : "Erro ao carregar dados";
       toast.error(msg);
@@ -261,7 +263,11 @@ export default function ReportsPage() {
             className={whatsappStatus === "CONNECTED" ? "bg-green-500 hover:bg-green-600" : ""}
           >
             <Phone className="w-3 h-3 mr-1" />
-            {whatsappStatus === "CONNECTED" ? "WhatsApp Conectado" : "WhatsApp Desconectado"}
+            {whatsappStatus === "CHECKING"
+              ? "Verificando..."
+              : whatsappStatus === "CONNECTED"
+                ? "WhatsApp Conectado"
+                : "WhatsApp Desconectado"}
           </Badge>
         </div>
       </div>
@@ -330,22 +336,25 @@ function CreateReportTab({ clients, onRefresh }: { clients: Client[]; onRefresh:
   const [testPhone, setTestPhone] = useState("");
   const [showTestDialog, setShowTestDialog] = useState(false);
   const [sendingTest, setSendingTest] = useState(false);
+  const [showScheduleDialog, setShowScheduleDialog] = useState(false);
 
-  // Metrics
+  // Metrics (order: faturamento, investimento, roas, cpa, ticketMedio)
   const [metrics, setMetrics] = useState({
     faturamento: true,
-    roas: true,
     investimento: true,
-    pedidos: true,
+    roas: true,
     cpa: false,
     ticketMedio: false,
   });
 
-  // Funnel
+  // Funnel (now includes pedidos options)
   const [funnel, setFunnel] = useState({
     sessions: true,
     addToCart: true,
     checkout: false,
+    pedidosGerados: true,
+    pedidosPagos: true,
+    taxaPagamento: false,
     taxaConversao: false,
   });
 
@@ -393,7 +402,7 @@ function CreateReportTab({ clients, onRefresh }: { clients: Client[]; onRefresh:
       );
 
       setPreviewMessage(message);
-    } catch (error) {
+    } catch {
       setPreviewMessage("Erro ao gerar pré-visualização.");
     } finally {
       setLoadingPreview(false);
@@ -406,6 +415,12 @@ function CreateReportTab({ clients, onRefresh }: { clients: Client[]; onRefresh:
       return;
     }
 
+    const client = clients.find((c) => c.id === selectedClient);
+    if (!client) {
+      toast.error("Cliente não encontrado");
+      return;
+    }
+
     setSending(true);
     try {
       const selectedMetrics = [
@@ -414,15 +429,32 @@ function CreateReportTab({ clients, onRefresh }: { clients: Client[]; onRefresh:
       ];
 
       // Create log entry
-      await createReportLog({
+      const log = await createReportLog({
         clientId: selectedClient,
         type: "MANUAL",
         status: "PENDING",
         metrics: { period, selectedMetrics, comparePeriods, rankingCreatives },
       });
 
-      // TODO: Actual WhatsApp send via API route
-      toast.success("Relatório enviado com sucesso!");
+      // Send via WhatsApp
+      const target = client.groupId || client.phone;
+      const res = await fetch("/api/whatsapp/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone: client.phone,
+          groupId: client.groupId || undefined,
+          message: previewMessage,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        toast.success("Relatório enviado com sucesso!");
+      } else {
+        toast.error(data.error || "Erro ao enviar relatório");
+      }
+
       onRefresh();
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : "Erro ao enviar relatório");
@@ -433,17 +465,17 @@ function CreateReportTab({ clients, onRefresh }: { clients: Client[]; onRefresh:
 
   function selectAll(type: "metrics" | "funnel") {
     if (type === "metrics") {
-      setMetrics({ faturamento: true, roas: true, investimento: true, pedidos: true, cpa: true, ticketMedio: true });
+      setMetrics({ faturamento: true, investimento: true, roas: true, cpa: true, ticketMedio: true });
     } else {
-      setFunnel({ sessions: true, addToCart: true, checkout: true, taxaConversao: true });
+      setFunnel({ sessions: true, addToCart: true, checkout: true, pedidosGerados: true, pedidosPagos: true, taxaPagamento: true, taxaConversao: true });
     }
   }
 
   function clearAll(type: "metrics" | "funnel") {
     if (type === "metrics") {
-      setMetrics({ faturamento: false, roas: false, investimento: false, pedidos: false, cpa: false, ticketMedio: false });
+      setMetrics({ faturamento: false, investimento: false, roas: false, cpa: false, ticketMedio: false });
     } else {
-      setFunnel({ sessions: false, addToCart: false, checkout: false, taxaConversao: false });
+      setFunnel({ sessions: false, addToCart: false, checkout: false, pedidosGerados: false, pedidosPagos: false, taxaPagamento: false, taxaConversao: false });
     }
   }
 
@@ -513,13 +545,14 @@ function CreateReportTab({ clients, onRefresh }: { clients: Client[]; onRefresh:
                   .map((client) => (
                     <SelectItem key={client.id} value={client.id}>
                       {client.name}
+                      {client.groupId ? " (grupo)" : ""}
                     </SelectItem>
                   ))}
               </SelectContent>
             </Select>
           </div>
 
-          {/* Metrics */}
+          {/* Metrics (no more Pedidos here - moved to Funnel) */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <Label>Métricas Principais</Label>
@@ -534,12 +567,11 @@ function CreateReportTab({ clients, onRefresh }: { clients: Client[]; onRefresh:
             </div>
             <div className="grid grid-cols-2 gap-3">
               {[
-                { key: "faturamento", label: "💰 Faturamento", emoji: "💰" },
-                { key: "roas", label: "📊 ROAS", emoji: "📊" },
-                { key: "investimento", label: "💸 Investimento", emoji: "💸" },
-                { key: "pedidos", label: "📦 Pedidos", emoji: "📦" },
-                { key: "cpa", label: "🎯 CPA", emoji: "🎯" },
-                { key: "ticketMedio", label: "🛒 Ticket Médio", emoji: "🛒" },
+                { key: "faturamento", label: "💰 Faturamento" },
+                { key: "investimento", label: "💸 Investimento" },
+                { key: "roas", label: "📊 ROAS" },
+                { key: "cpa", label: "🎯 CPA" },
+                { key: "ticketMedio", label: "🛒 Ticket Médio" },
               ].map((m) => (
                 <label
                   key={m.key}
@@ -558,7 +590,7 @@ function CreateReportTab({ clients, onRefresh }: { clients: Client[]; onRefresh:
             </div>
           </div>
 
-          {/* Funnel */}
+          {/* Funnel (with pedidos gerados, pagos, % pagamento) */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <Label>Funil de Vendas</Label>
@@ -575,7 +607,10 @@ function CreateReportTab({ clients, onRefresh }: { clients: Client[]; onRefresh:
               {[
                 { key: "sessions", label: "👀 Sessões" },
                 { key: "addToCart", label: "🛒 Carrinho" },
-                { key: "checkout", label: "✅ Checkout" },
+                { key: "checkout", label: "✅ Acessos Checkout" },
+                { key: "pedidosGerados", label: "📦 Pedidos Gerados" },
+                { key: "pedidosPagos", label: "💚 Pedidos Pagos" },
+                { key: "taxaPagamento", label: "✅ % Pgto Aprovado" },
                 { key: "taxaConversao", label: "📈 Taxa Conversão" },
               ].map((m) => (
                 <label
@@ -721,14 +756,197 @@ function CreateReportTab({ clients, onRefresh }: { clients: Client[]; onRefresh:
                 </DialogFooter>
               </DialogContent>
             </Dialog>
-            <Button variant="outline">
-              <Calendar className="w-4 h-4 mr-2" />
-              Agendar
-            </Button>
+            <Dialog open={showScheduleDialog} onOpenChange={setShowScheduleDialog}>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <Calendar className="w-4 h-4 mr-2" />
+                  Agendar
+                </Button>
+              </DialogTrigger>
+              <ScheduleFormDialog
+                clients={clients}
+                selectedClient={selectedClient}
+                period={period}
+                metrics={metrics}
+                funnel={funnel}
+                comparePeriods={comparePeriods}
+                rankingCreatives={rankingCreatives}
+                customHeader={customHeader}
+                onClose={() => setShowScheduleDialog(false)}
+                onRefresh={onRefresh}
+              />
+            </Dialog>
           </div>
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+// ─── SCHEDULE FORM DIALOG ───────────────────────────
+
+function ScheduleFormDialog({
+  clients,
+  selectedClient,
+  period,
+  metrics,
+  funnel,
+  comparePeriods,
+  rankingCreatives,
+  customHeader,
+  onClose,
+  onRefresh,
+}: {
+  clients: Client[];
+  selectedClient: string;
+  period: string;
+  metrics: Record<string, boolean>;
+  funnel: Record<string, boolean>;
+  comparePeriods: boolean;
+  rankingCreatives: boolean;
+  customHeader: string;
+  onClose: () => void;
+  onRefresh: () => void;
+}) {
+  const [clientId, setClientId] = useState(selectedClient);
+  const [frequency, setFrequency] = useState<"DAILY" | "WEEKLY" | "BIWEEKLY" | "MONTHLY">("DAILY");
+  const [time, setTime] = useState("09:00");
+  const [dayOfWeek, setDayOfWeek] = useState<number>(1);
+  const [dayOfMonth, setDayOfMonth] = useState<number>(1);
+  const [loading, setLoading] = useState(false);
+
+  async function handleCreate() {
+    if (!clientId) {
+      toast.error("Selecione um cliente");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const selectedMetrics = [
+        ...Object.entries(metrics).filter(([, v]) => v).map(([k]) => k),
+        ...Object.entries(funnel).filter(([, v]) => v).map(([k]) => k),
+      ];
+
+      await createReportSchedule({
+        clientId,
+        frequency,
+        time,
+        dayOfWeek: frequency === "WEEKLY" || frequency === "BIWEEKLY" ? dayOfWeek : undefined,
+        dayOfMonth: frequency === "MONTHLY" ? dayOfMonth : undefined,
+        config: {
+          period,
+          metrics: selectedMetrics,
+          comparePeriods,
+          rankingCreatives,
+          customHeader: customHeader || undefined,
+        },
+      });
+
+      toast.success("Agendamento criado com sucesso!");
+      onClose();
+      onRefresh();
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Erro ao criar agendamento");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <DialogContent className="sm:max-w-lg">
+      <DialogHeader>
+        <DialogTitle>Agendar Envio Recorrente</DialogTitle>
+        <DialogDescription>
+          Configure um envio automático com as métricas selecionadas.
+        </DialogDescription>
+      </DialogHeader>
+      <div className="space-y-4 py-4">
+        <div className="space-y-2">
+          <Label>Cliente</Label>
+          <Select value={clientId} onValueChange={setClientId}>
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione um cliente" />
+            </SelectTrigger>
+            <SelectContent>
+              {clients
+                .filter((c) => c.status === "ACTIVE")
+                .map((client) => (
+                  <SelectItem key={client.id} value={client.id}>
+                    {client.name}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Frequência</Label>
+            <Select value={frequency} onValueChange={(v) => setFrequency(v as any)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="DAILY">Diário</SelectItem>
+                <SelectItem value="WEEKLY">Semanal</SelectItem>
+                <SelectItem value="BIWEEKLY">Quinzenal</SelectItem>
+                <SelectItem value="MONTHLY">Mensal</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Horário</Label>
+            <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+          </div>
+        </div>
+
+        {(frequency === "WEEKLY" || frequency === "BIWEEKLY") && (
+          <div className="space-y-2">
+            <Label>Dia da Semana</Label>
+            <Select value={String(dayOfWeek)} onValueChange={(v) => setDayOfWeek(Number(v))}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="0">Domingo</SelectItem>
+                <SelectItem value="1">Segunda-feira</SelectItem>
+                <SelectItem value="2">Terça-feira</SelectItem>
+                <SelectItem value="3">Quarta-feira</SelectItem>
+                <SelectItem value="4">Quinta-feira</SelectItem>
+                <SelectItem value="5">Sexta-feira</SelectItem>
+                <SelectItem value="6">Sábado</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {frequency === "MONTHLY" && (
+          <div className="space-y-2">
+            <Label>Dia do Mês</Label>
+            <Input
+              type="number"
+              min={1}
+              max={28}
+              value={dayOfMonth}
+              onChange={(e) => setDayOfMonth(Number(e.target.value))}
+            />
+          </div>
+        )}
+
+        <div className="bg-muted/50 p-3 rounded-lg text-sm text-muted-foreground">
+          As métricas e período selecionados na tela de envio serão usados como configuração do agendamento.
+        </div>
+      </div>
+      <DialogFooter>
+        <Button variant="outline" onClick={onClose}>
+          Cancelar
+        </Button>
+        <Button onClick={handleCreate} disabled={loading || !clientId}>
+          {loading ? "Criando..." : "Criar Agendamento"}
+        </Button>
+      </DialogFooter>
+    </DialogContent>
   );
 }
 
@@ -836,7 +1054,12 @@ function ClientsTab({ clients, onRefresh }: { clients: Client[]; onRefresh: () =
                       <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
                         <Building2 className="w-4 h-4 text-primary" />
                       </div>
-                      <span className="font-medium">{client.name}</span>
+                      <div>
+                        <span className="font-medium">{client.name}</span>
+                        {client.groupName && (
+                          <p className="text-xs text-muted-foreground">{client.groupName}</p>
+                        )}
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell>{client.responsible}</TableCell>
@@ -939,6 +1162,8 @@ function ClientFormDialog({
   onRefresh: () => void;
 }) {
   const [loading, setLoading] = useState(false);
+  const [loadingGroups, setLoadingGroups] = useState(false);
+  const [groups, setGroups] = useState<WhatsAppGroup[]>([]);
   const [form, setForm] = useState({
     name: client?.name || "",
     responsible: client?.responsible || "",
@@ -952,6 +1177,23 @@ function ClientFormDialog({
     groupId: client?.groupId || "",
     notes: client?.notes || "",
   });
+
+  async function fetchGroups() {
+    setLoadingGroups(true);
+    try {
+      const res = await fetch("/api/whatsapp/groups");
+      const data = await res.json();
+      if (data.success && data.groups) {
+        setGroups(data.groups);
+      } else {
+        toast.error(data.error || "Erro ao buscar grupos");
+      }
+    } catch {
+      toast.error("Erro ao buscar grupos do WhatsApp");
+    } finally {
+      setLoadingGroups(false);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -1064,14 +1306,62 @@ function ClientFormDialog({
           </div>
         </div>
 
+        {/* Group selection with Z-API fetch */}
         <div className="space-y-2">
-          <Label htmlFor="groupName">Grupo WhatsApp Vinculado</Label>
-          <Input
-            id="groupName"
-            value={form.groupName}
-            onChange={(e) => setForm({ ...form, groupName: e.target.value })}
-            placeholder="Nome do grupo"
-          />
+          <div className="flex items-center justify-between">
+            <Label>Grupo WhatsApp Vinculado</Label>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={fetchGroups}
+              disabled={loadingGroups}
+            >
+              {loadingGroups ? (
+                <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+              ) : (
+                <RefreshCw className="w-3 h-3 mr-1" />
+              )}
+              Buscar Grupos
+            </Button>
+          </div>
+          {groups.length > 0 ? (
+            <Select
+              value={form.groupId}
+              onValueChange={(v) => {
+                const group = groups.find((g) => g.id === v);
+                setForm({
+                  ...form,
+                  groupId: v,
+                  groupName: group?.name || "",
+                });
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione um grupo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Nenhum (enviar direto)</SelectItem>
+                {groups.map((g) => (
+                  <SelectItem key={g.id} value={g.id}>
+                    {g.name} ({g.participants} participantes)
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <Input
+              value={form.groupName}
+              onChange={(e) => setForm({ ...form, groupName: e.target.value })}
+              placeholder="Clique em 'Buscar Grupos' para selecionar"
+            />
+          )}
+          {form.groupId && (
+            <p className="text-xs text-muted-foreground">
+              ID: {form.groupId}
+            </p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -1146,7 +1436,6 @@ function WhatsAppTab({ status: initialStatus, onRefresh }: { status: string; onR
     setLoading(true);
     setQrCode(null);
     try {
-      // Use "init" action which handles both creaetion and connection
       const res = await fetch("/api/whatsapp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1161,12 +1450,10 @@ function WhatsAppTab({ status: initialStatus, onRefresh }: { status: string; onR
           setStatus("CONNECTING");
           toast.success("QR Code gerado! Escaneie com seu WhatsApp.");
 
-          // Start polling for connection status
           if (pollingInterval) clearInterval(pollingInterval);
           const interval = setInterval(checkStatus, 3000);
           setPollingInterval(interval);
 
-          // Stop polling after 2 minutes
           setTimeout(() => {
             if (interval) clearInterval(interval);
             setPollingInterval(null);
@@ -1179,10 +1466,6 @@ function WhatsAppTab({ status: initialStatus, onRefresh }: { status: string; onR
       } else {
         console.error("Generate QR error:", data);
         toast.error(data.error || "Erro ao gerar QR Code");
-
-        if (data.error?.includes("Evolution API")) {
-          toast.error("Verifique a configuração da Evolution API na Vercel.");
-        }
       }
     } catch (error: unknown) {
       console.error("Generate QR exception:", error);
@@ -1207,7 +1490,7 @@ function WhatsAppTab({ status: initialStatus, onRefresh }: { status: string; onR
         setQrCode(null);
         toast.success("WhatsApp já está conectado!");
       }
-    } catch (error: unknown) {
+    } catch {
       toast.error("Erro ao atualizar QR Code");
     } finally {
       setLoading(false);
@@ -1234,7 +1517,7 @@ function WhatsAppTab({ status: initialStatus, onRefresh }: { status: string; onR
         toast.success("WhatsApp desconectado com sucesso!");
         onRefresh();
       }
-    } catch (error: unknown) {
+    } catch {
       toast.error("Erro ao desconectar");
     } finally {
       setLoading(false);
@@ -1309,7 +1592,7 @@ function WhatsAppTab({ status: initialStatus, onRefresh }: { status: string; onR
                   <div className="text-center space-y-4 p-4">
                     <MessageSquare className="w-12 h-12 mx-auto text-muted-foreground" />
                     <p className="text-sm text-muted-foreground">
-                      Clique em "Gerar QR Code" para conectar
+                      Clique em &quot;Gerar QR Code&quot; para conectar
                     </p>
                   </div>
                 )}
@@ -1322,7 +1605,7 @@ function WhatsAppTab({ status: initialStatus, onRefresh }: { status: string; onR
                 </p>
                 {qrCode && (
                   <p className="text-xs text-yellow-500">
-                    O QR Code expira em 2 minutos. Se expirar, clique em "Atualizar".
+                    O QR Code expira em 2 minutos. Se expirar, clique em &quot;Atualizar&quot;.
                   </p>
                 )}
               </div>
@@ -1361,69 +1644,6 @@ function WhatsAppTab({ status: initialStatus, onRefresh }: { status: string; onR
           )}
         </CardContent>
       </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">📋 Configuração do Servidor WhatsApp</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4 text-sm text-muted-foreground">
-          <p>
-            Para que a geração do QR Code funcione, você precisa configurar a <strong>Evolution API</strong> no seu servidor.
-          </p>
-
-          <div className="bg-muted/50 p-4 rounded-lg space-y-3">
-            <p className="font-medium text-foreground">Passo a passo:</p>
-            <ol className="list-decimal list-inside space-y-2 ml-2">
-              <li>
-                Instale a Evolution API usando Docker:
-                <pre className="bg-muted p-2 rounded mt-1 overflow-x-auto">
-                  {`docker run -d --name evolution-api \\
-  -p 8080:8080 \\
-  -e AUTHENTICATION_API_KEY=sua_chave_aqui \\
-  atendai/evolution-api`}
-                </pre>
-              </li>
-              <li>
-                Adicione as variáveis de ambiente na Vercel:
-                <pre className="bg-muted p-2 rounded mt-1">
-                  {`EVOLUTION_API_URL=https://seu-servidor.com
-EVOLUTION_API_KEY=sua_chave_aqui`}
-                </pre>
-              </li>
-              <li>
-                Faça redeploy do projeto na Vercel
-              </li>
-            </ol>
-          </div>
-
-          <p>
-            <strong>Opções de hospedagem:</strong>
-          </p>
-          <ul className="list-disc list-inside space-y-2 ml-2">
-            <li><strong>Railway.app:</strong> Deploy fácil com plano gratuito</li>
-            <li><strong>Render.com:</strong> Alternativa gratuita com Docker</li>
-            <li><strong>VPS:</strong> DigitalOcean, Vultr, ou similar (~$5/mês)</li>
-            <li><strong>Contabo:</strong> VPS barato para produção (~€4/mês)</li>
-          </ul>
-
-          <div className="flex gap-2 pt-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => window.open("https://doc.evolution-api.com", "_blank")}
-            >
-              📖 Documentação
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => window.open("https://github.com/EvolutionAPI/evolution-api", "_blank")}
-            >
-              GitHub
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
@@ -1440,6 +1660,8 @@ function SchedulesTab({
   clients: Client[];
   onRefresh: () => void;
 }) {
+  const [showNewDialog, setShowNewDialog] = useState(false);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -1449,10 +1671,26 @@ function SchedulesTab({
             Configure envios automáticos recorrentes para seus clientes.
           </p>
         </div>
-        <Button onClick={() => toast.info("Funcionalidade em desenvolvimento")}>
-          <Plus className="w-4 h-4 mr-2" />
-          Novo Agendamento
-        </Button>
+        <Dialog open={showNewDialog} onOpenChange={setShowNewDialog}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="w-4 h-4 mr-2" />
+              Novo Agendamento
+            </Button>
+          </DialogTrigger>
+          <ScheduleFormDialog
+            clients={clients}
+            selectedClient=""
+            period="last7"
+            metrics={{ faturamento: true, investimento: true, roas: true, cpa: false, ticketMedio: false }}
+            funnel={{ sessions: true, addToCart: true, checkout: false, pedidosGerados: true, pedidosPagos: true, taxaPagamento: false, taxaConversao: false }}
+            comparePeriods={false}
+            rankingCreatives={false}
+            customHeader=""
+            onClose={() => setShowNewDialog(false)}
+            onRefresh={onRefresh}
+          />
+        </Dialog>
       </div>
 
       <Card>
@@ -1490,10 +1728,6 @@ function SchedulesTab({
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
-                          <Edit className="w-4 h-4 mr-2" />
-                          Editar
-                        </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={async () => {
                             await updateReportSchedule(schedule.id, { isActive: !schedule.isActive });
@@ -1673,5 +1907,3 @@ function HistoryTab({
     </div>
   );
 }
-
-// force redeploy fix 2

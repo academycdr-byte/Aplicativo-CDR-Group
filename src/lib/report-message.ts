@@ -34,12 +34,11 @@ export function buildReportMessage(
     message += `📊 *Relatório ${clientName}*\n`;
     message += `📅 Período: ${formatDate(period.from)} a ${formatDate(period.to)}\n\n`;
 
-    // Main Metrics
+    // Main Metrics (order: faturamento, investimento, roas, cpa, ticketMedio)
     const metricLabels: Record<string, { emoji: string; label: string; format: (v: number) => string }> = {
         faturamento: { emoji: "💰", label: "Faturamento", format: formatCurrency },
-        roas: { emoji: "📊", label: "ROAS", format: (v) => `${v.toFixed(2)}x` },
         investimento: { emoji: "💸", label: "Investimento", format: formatCurrency },
-        pedidos: { emoji: "📦", label: "Pedidos", format: formatNumber },
+        roas: { emoji: "📊", label: "ROAS", format: (v) => `${v.toFixed(2)}x` },
         cpa: { emoji: "🎯", label: "CPA", format: formatCurrency },
         ticketMedio: { emoji: "🛒", label: "Ticket Médio", format: formatCurrency },
     };
@@ -52,9 +51,8 @@ export function buildReportMessage(
     }
 
     // Funnel
-    const hasFunnelMetric = options.selectedMetrics.some((m) =>
-        ["sessions", "addToCart", "checkout", "taxaConversao"].includes(m)
-    );
+    const funnelKeys = ["sessions", "addToCart", "checkout", "pedidosGerados", "pedidosPagos", "taxaPagamento", "taxaConversao"];
+    const hasFunnelMetric = options.selectedMetrics.some((m) => funnelKeys.includes(m));
 
     if (hasFunnelMetric) {
         message += "\n🔗 *Funil de Vendas:*\n";
@@ -65,11 +63,25 @@ export function buildReportMessage(
             message += `🛒 Carrinho: ${formatNumber(funnel.addToCart)}\n`;
         }
         if (options.selectedMetrics.includes("checkout")) {
-            message += `✅ Checkout: ${formatNumber(funnel.checkout)}\n`;
+            message += `✅ Acessos Checkout: ${formatNumber(funnel.checkout)}\n`;
         }
-        if (options.selectedMetrics.includes("taxaConversao") && funnel.sessions > 0) {
-            const taxa = ((funnel.conversions || metrics.pedidos) / funnel.sessions) * 100;
-            message += `📈 Taxa Conversão: ${taxa.toFixed(2)}%\n`;
+        if (options.selectedMetrics.includes("pedidosGerados")) {
+            message += `📦 Pedidos Gerados: ${formatNumber(funnel.pedidosGerados)}\n`;
+        }
+        if (options.selectedMetrics.includes("pedidosPagos")) {
+            message += `💚 Pedidos Pagos: ${formatNumber(funnel.pedidosPagos)}\n`;
+        }
+        if (options.selectedMetrics.includes("taxaPagamento")) {
+            const taxa = funnel.taxaPagamento || 0;
+            message += `✅ % Pagamento Aprovado: ${taxa.toFixed(1)}%\n`;
+        }
+        if (options.selectedMetrics.includes("taxaConversao")) {
+            const sessions = funnel.sessions || 0;
+            const pedidos = funnel.pedidosPagos || funnel.pedidosGerados || 0;
+            if (sessions > 0) {
+                const taxa = (pedidos / sessions) * 100;
+                message += `📈 Taxa Conversão: ${taxa.toFixed(2)}%\n`;
+            }
         }
     }
 
@@ -86,8 +98,11 @@ export function buildReportMessage(
         if (options.selectedMetrics.includes("roas")) {
             message += `📊 ROAS: ${sign(comparison.roas)}${comparison.roas.toFixed(2)}x ${arrow(comparison.roas)}\n`;
         }
-        if (options.selectedMetrics.includes("pedidos")) {
-            message += `📦 Pedidos: ${sign(comparison.pedidos)}${comparison.pedidos} ${arrow(comparison.pedidos)}\n`;
+        if (options.selectedMetrics.includes("pedidosGerados")) {
+            message += `📦 Pedidos Gerados: ${sign(comparison.pedidosGerados)}${comparison.pedidosGerados} ${arrow(comparison.pedidosGerados)}\n`;
+        }
+        if (options.selectedMetrics.includes("pedidosPagos")) {
+            message += `💚 Pedidos Pagos: ${sign(comparison.pedidosPagos)}${comparison.pedidosPagos} ${arrow(comparison.pedidosPagos)}\n`;
         }
     }
 
@@ -101,7 +116,7 @@ export function buildReportMessage(
     }
 
     // Footer
-    message += "\n_Enviado automaticamente pelo CDR Group_";
+    message += "\n_Enviado automaticamente pela CDR Group_";
 
     return message;
 }

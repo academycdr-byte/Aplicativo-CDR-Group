@@ -378,26 +378,27 @@ export async function getMetricsForReport(
     }
 
     try {
+        const dateFilter = { gte: from, lte: to };
+
         // Get Ad Metrics
         const adMetrics = await prisma.adMetric.aggregate({
-            where: {
-                organizationId,
-                date: { gte: from, lte: to },
-            },
+            where: { organizationId, date: dateFilter },
             _sum: {
                 spend: true,
                 revenue: true,
                 conversions: true,
+                clicks: true,
                 addToCart: true,
                 initiateCheckout: true,
             },
         });
 
-        // Get Store Funnel
-        const funnelData = await prisma.storeFunnel.aggregate({
+        // Get Store Funnel (only records with sessions > 0 = real ShopifyQL data)
+        const storeFunnelAgg = await prisma.storeFunnel.aggregate({
             where: {
                 organizationId,
-                date: { gte: from, lte: to },
+                date: dateFilter,
+                sessions: { gt: 0 },
             },
             _sum: {
                 sessions: true,
@@ -405,15 +406,35 @@ export async function getMetricsForReport(
                 checkoutsInitiated: true,
                 ordersGenerated: true,
             },
-        });
+        }).catch(() => ({ _sum: { sessions: 0, addToCart: 0, checkoutsInitiated: 0, ordersGenerated: 0 } }));
+
+        // Get Order data (real orders from Order table)
+        const [totalOrders, paidOrders] = await Promise.all([
+            prisma.order.count({ where: { organizationId, orderDate: dateFilter } }),
+            prisma.order.count({ where: { organizationId, orderDate: dateFilter, status: "paid" } }),
+        ]);
+
+        // Sessions: StoreFunnel first, fallback to AdMetric clicks
+        const storeSessions = Number(storeFunnelAgg._sum.sessions || 0);
+        const storeAddToCart = Number(storeFunnelAgg._sum.addToCart || 0);
+        const storeCheckouts = Number(storeFunnelAgg._sum.checkoutsInitiated || 0);
+
+        let sessions = storeSessions;
+        let funnelAddToCart = storeAddToCart;
+        let funnelCheckout = storeCheckouts;
+
+        if (sessions === 0) {
+            sessions = Number(adMetrics._sum.clicks || 0);
+            if (funnelAddToCart === 0) funnelAddToCart = Number(adMetrics._sum.addToCart || 0);
+            if (funnelCheckout === 0) funnelCheckout = Number(adMetrics._sum.initiateCheckout || 0);
+        }
 
         // Calculate derived metrics
         const spend = Number(adMetrics._sum.spend) || 0;
         const revenue = Number(adMetrics._sum.revenue) || 0;
-        const conversions = adMetrics._sum.conversions || 0;
         const roas = spend > 0 ? revenue / spend : 0;
-        const cpa = conversions > 0 ? spend / conversions : 0;
-        const ticketMedio = conversions > 0 ? revenue / conversions : 0;
+        const cpa = paidOrders > 0 ? spend / paidOrders : 0;
+        const ticketMedio = paidOrders > 0 ? revenue / paidOrders : 0;
 
         // Get previous period for comparison
         const periodDays = Math.ceil((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
@@ -430,21 +451,24 @@ export async function getMetricsForReport(
             _sum: {
                 spend: true,
                 revenue: true,
-                conversions: true,
             },
         });
 
         const prevSpend = Number(prevAdMetrics._sum.spend) || 0;
         const prevRevenue = Number(prevAdMetrics._sum.revenue) || 0;
-        const prevConversions = prevAdMetrics._sum.conversions || 0;
         const prevRoas = prevSpend > 0 ? prevRevenue / prevSpend : 0;
+
+        const [prevTotalOrders, prevPaidOrders] = await Promise.all([
+            prisma.order.count({ where: { organizationId, orderDate: { gte: prevFrom, lte: prevTo } } }),
+            prisma.order.count({ where: { organizationId, orderDate: { gte: prevFrom, lte: prevTo }, status: "paid" } }),
+        ]);
 
         // Get Top Creatives
         const topCreatives = await prisma.adMetric.groupBy({
             by: ["adId", "adName"],
             where: {
                 organizationId,
-                date: { gte: from, lte: to },
+                date: dateFilter,
                 adId: { not: null },
             },
             _sum: {
@@ -475,36 +499,36 @@ export async function getMetricsForReport(
             period: { from, to },
             metrics: {
                 faturamento: revenue,
-                roas,
                 investimento: spend,
-                pedidos: conversions,
+                roas,
                 cpa,
                 ticketMedio,
             },
             funnel: {
-                sessions: funnelData._sum.sessions || 0,
-                addToCart: funnelData._sum.addToCart || adMetrics._sum.addToCart || 0,
-                checkout: funnelData._sum.checkoutsInitiated || adMetrics._sum.initiateCheckout || 0,
-                conversions,
+                sessions,
+                addToCart: funnelAddToCart,
+                checkout: funnelCheckout,
+                pedidosGerados: totalOrders,
+                pedidosPagos: paidOrders,
+                taxaPagamento: totalOrders > 0 ? (paidOrders / totalOrders) * 100 : 0,
             },
             comparison: {
                 faturamento: revenue - prevRevenue,
                 faturamentoPercent: prevRevenue > 0 ? ((revenue - prevRevenue) / prevRevenue) * 100 : 0,
                 roas: roas - prevRoas,
-                pedidos: conversions - prevConversions,
+                pedidosGerados: totalOrders - prevTotalOrders,
+                pedidosPagos: paidOrders - prevPaidOrders,
             },
             topCreatives: creativesWithRoas,
         };
     } catch (error) {
         console.error("getMetricsForReport error:", error);
-        // Return empty/default metrics
         return {
             period: { from, to },
             metrics: {
                 faturamento: 0,
-                roas: 0,
                 investimento: 0,
-                pedidos: 0,
+                roas: 0,
                 cpa: 0,
                 ticketMedio: 0,
             },
@@ -512,13 +536,16 @@ export async function getMetricsForReport(
                 sessions: 0,
                 addToCart: 0,
                 checkout: 0,
-                conversions: 0,
+                pedidosGerados: 0,
+                pedidosPagos: 0,
+                taxaPagamento: 0,
             },
             comparison: {
                 faturamento: 0,
                 faturamentoPercent: 0,
                 roas: 0,
-                pedidos: 0,
+                pedidosGerados: 0,
+                pedidosPagos: 0,
             },
             topCreatives: [],
         };
