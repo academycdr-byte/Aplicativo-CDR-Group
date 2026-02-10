@@ -20,6 +20,22 @@ async function requireAdmin() {
     return { userId: session.user.id, organizationId: membership.organizationId };
 }
 
+// ─── ACCESS CHECK ─────────────────────────────────
+
+export async function checkReportsAccess(): Promise<{ allowed: boolean; role?: string }> {
+    const session = await auth();
+    if (!session?.user?.id) return { allowed: false };
+
+    const membership = await prisma.membership.findFirst({
+        where: { userId: session.user.id },
+    });
+
+    if (!membership) return { allowed: false };
+
+    const isAdmin = ["OWNER", "ADMIN"].includes(membership.role);
+    return { allowed: isAdmin, role: membership.role };
+}
+
 // ─── CLIENTS ───────────────────────────────────────
 
 export async function getReportClients() {

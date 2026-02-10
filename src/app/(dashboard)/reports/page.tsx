@@ -21,7 +21,9 @@ import {
   Clock,
   Phone,
   Building2,
-  RefreshCw
+  RefreshCw,
+  Shield,
+  TestTube
 } from "lucide-react";
 import {
   Card,
@@ -86,6 +88,7 @@ import {
   getReportLogs,
   getMetricsForReport,
   createReportLog,
+  checkReportsAccess,
 } from "@/actions/reports";
 import { buildReportMessage } from "@/lib/report-message";
 
@@ -192,6 +195,7 @@ export default function ReportsPage() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [whatsappStatus, setWhatsappStatus] = useState<string>("DISCONNECTED");
   const [loading, setLoading] = useState(true);
+  const [accessDenied, setAccessDenied] = useState(false);
 
   // Load initial data
   useEffect(() => {
@@ -201,6 +205,14 @@ export default function ReportsPage() {
   async function loadData() {
     setLoading(true);
     try {
+      // Check admin access first
+      const access = await checkReportsAccess();
+      if (!access.allowed) {
+        setAccessDenied(true);
+        setLoading(false);
+        return;
+      }
+
       const [clientsData, schedulesData, logsData, session] = await Promise.all([
         getReportClients(),
         getReportSchedules(),
@@ -211,11 +223,26 @@ export default function ReportsPage() {
       setSchedules(schedulesData as Schedule[]);
       setLogs(logsData as LogEntry[]);
       setWhatsappStatus(session?.status || "DISCONNECTED");
-    } catch (error: any) {
-      toast.error(error.message || "Erro ao carregar dados");
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : "Erro ao carregar dados";
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
+  }
+
+  if (accessDenied) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center animate-in fade-in duration-500">
+        <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
+          <Shield className="w-8 h-8 text-red-500" />
+        </div>
+        <h2 className="text-xl font-bold mb-2">Acesso Restrito</h2>
+        <p className="text-muted-foreground max-w-md">
+          A página de relatórios é acessível apenas para administradores (OWNER ou ADMIN).
+        </p>
+      </div>
+    );
   }
 
   return (
@@ -300,6 +327,9 @@ function CreateReportTab({ clients, onRefresh }: { clients: Client[]; onRefresh:
   const [period, setPeriod] = useState("last7");
   const [customHeader, setCustomHeader] = useState("");
   const [sending, setSending] = useState(false);
+  const [testPhone, setTestPhone] = useState("");
+  const [showTestDialog, setShowTestDialog] = useState(false);
+  const [sendingTest, setSendingTest] = useState(false);
 
   // Metrics
   const [metrics, setMetrics] = useState({
@@ -616,6 +646,81 @@ function CreateReportTab({ clients, onRefresh }: { clients: Client[]; onRefresh:
                 </>
               )}
             </Button>
+            <Dialog open={showTestDialog} onOpenChange={setShowTestDialog}>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <TestTube className="w-4 h-4 mr-2" />
+                  Enviar Teste
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Enviar Teste via WhatsApp</DialogTitle>
+                  <DialogDescription>
+                    Envie o relatório atual para um número de teste.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="testPhone">Número de WhatsApp</Label>
+                    <Input
+                      id="testPhone"
+                      value={testPhone}
+                      onChange={(e) => setTestPhone(e.target.value)}
+                      placeholder="+55 11 99999-9999"
+                      type="tel"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Formato: +55 DDD XXXXX-XXXX
+                    </p>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setShowTestDialog(false)}>
+                    Cancelar
+                  </Button>
+                  <Button
+                    disabled={!testPhone || sendingTest || !previewMessage}
+                    onClick={async () => {
+                      setSendingTest(true);
+                      try {
+                        const res = await fetch("/api/whatsapp/send", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            phone: testPhone,
+                            message: previewMessage,
+                          }),
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                          toast.success("Teste enviado com sucesso!");
+                          setShowTestDialog(false);
+                        } else {
+                          toast.error(data.error || "Erro ao enviar teste");
+                        }
+                      } catch {
+                        toast.error("Erro ao enviar teste");
+                      } finally {
+                        setSendingTest(false);
+                      }
+                    }}
+                  >
+                    {sendingTest ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        Enviando...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4 mr-2" />
+                        Enviar Teste
+                      </>
+                    )}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
             <Button variant="outline">
               <Calendar className="w-4 h-4 mr-2" />
               Agendar
