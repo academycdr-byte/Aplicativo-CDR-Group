@@ -18,7 +18,6 @@ import {
     MousePointerClick,
     Eye,
     Target,
-    Layers,
     MapPin,
     Users,
     Smartphone,
@@ -27,6 +26,7 @@ import {
     Tablet,
     FileText,
     Link2,
+    Info,
     type LucideIcon,
 } from "lucide-react";
 import {
@@ -37,9 +37,6 @@ import {
     YAxis,
     CartesianGrid,
     Tooltip,
-    PieChart,
-    Pie,
-    Cell,
     BarChart,
     Bar,
     Legend,
@@ -69,10 +66,8 @@ type GAData = {
 };
 
 type PlatformComparisonEntry = { platform: string; cpa: number; roas: number };
-type PaidOrganicEntry = { name: string; value: number };
 
-const PIE_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"];
-const PAID_ORGANIC_COLORS = ["#3b82f6", "#10b981"];
+const TRAFFIC_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"];
 
 function fmtCurrencyGlobal(val: number) {
     return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val);
@@ -89,11 +84,8 @@ export default function AnalyticsPage() {
 
     // Ad metrics data states
     const [kpis, setKpis] = useState({ cpa: 0, cpc: 0, ctr: 0, cpm: 0 });
-    const [dailyData, setDailyData] = useState<{ date: string; faturamento: number; investimento: number; compras: number; ticketMedio: number; cpa: number; roas: number }[]>([]);
     const [creatives, setCreatives] = useState<{ adId: string; adName: string | null; thumbnailUrl: string | null; spend: number; revenue: number; roas: number; clicks: number; impressions: number }[]>([]);
-    const [platformData, setPlatformData] = useState<{ platform: string; orders: number; revenue: number }[]>([]);
     const [platformComparison, setPlatformComparison] = useState<PlatformComparisonEntry[]>([]);
-    const [paidVsOrganic, setPaidVsOrganic] = useState<PaidOrganicEntry[]>([]);
 
     // Google Analytics data
     const [gaData, setGaData] = useState<GAData | null>(null);
@@ -112,9 +104,7 @@ export default function AnalyticsPage() {
             const ctr = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0;
             const cpm = totals.impressions > 0 ? (totals.spend / totals.impressions) * 1000 : 0;
             setKpis({ cpa, cpc, ctr, cpm });
-            setDailyData(data.dailyData);
             setCreatives(data.creatives.slice(0, 5));
-            setPlatformData(data.platformData);
             setGaData(data.gaData || null);
 
             // CPA/ROAS by ad platform
@@ -134,17 +124,6 @@ export default function AnalyticsPage() {
                     roas: vals.spend > 0 ? vals.revenue / vals.spend : 0,
                 }))
             );
-
-            // Paid vs Organic revenue
-            const totalRevenue = (data.platformData || []).reduce(
-                (sum: number, p: Record<string, unknown>) => sum + (Number(p.revenue) || 0), 0
-            );
-            const paidRevenue = Math.min(Number(totals.revenue) || 0, totalRevenue);
-            const organicRevenue = Math.max(0, totalRevenue - paidRevenue);
-            setPaidVsOrganic([
-                { name: "Pago", value: paidRevenue },
-                { name: "Organico", value: organicRevenue },
-            ]);
         } catch (error) {
             console.error("Failed to load analytics data", error);
         }
@@ -180,7 +159,7 @@ export default function AnalyticsPage() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                         <h2 className="text-2xl font-bold tracking-tight">Analytics</h2>
-                        <p className="text-muted-foreground text-sm mt-0.5">Visão detalhada de performance, criativos e website.</p>
+                        <p className="text-muted-foreground text-sm mt-0.5">Visao detalhada de performance, criativos e website.</p>
                     </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -202,8 +181,6 @@ export default function AnalyticsPage() {
         );
     }
 
-    const totalPaidOrganic = paidVsOrganic.reduce((s, d) => s + d.value, 0) || 1;
-
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
             {/* Header */}
@@ -211,7 +188,7 @@ export default function AnalyticsPage() {
                 <div>
                     <h2 className="text-2xl font-bold tracking-tight">Analytics</h2>
                     <p className="text-muted-foreground text-sm mt-0.5">
-                        Visão detalhada de performance, criativos e website.
+                        Visao detalhada de performance, criativos e website.
                     </p>
                 </div>
                 <PeriodSelector value={period} onChange={setPeriod} />
@@ -232,77 +209,6 @@ export default function AnalyticsPage() {
                         <AnalyticsKPICard title="CPC" value={fmtCurrency(kpis.cpc)} icon={MousePointerClick} color="text-amber-500 bg-amber-500/10" />
                         <AnalyticsKPICard title="CTR" value={`${kpis.ctr.toFixed(2)}%`} icon={TrendingUp} color="text-emerald-500 bg-emerald-500/10" />
                         <AnalyticsKPICard title="CPM" value={fmtCurrency(kpis.cpm)} icon={Eye} color="text-purple-500 bg-purple-500/10" />
-                    </div>
-
-                    {/* Charts Section: Daily + Paid vs Organic */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <Card className="lg:col-span-2 border border-border shadow-none rounded-lg">
-                            <CardHeader className="border-b border-border/50 px-5 py-4">
-                                <CardTitle className="text-base font-semibold">Evolucao Diaria: Investimento vs Receita</CardTitle>
-                            </CardHeader>
-                            <CardContent className="p-5 h-[350px]">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <LineChart data={dailyData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-                                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} opacity={0.3} />
-                                        <XAxis dataKey="date" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false}
-                                            tickFormatter={(v) => { const d = new Date(v + "T00:00:00"); return `${d.getDate()}/${d.getMonth() + 1}`; }}
-                                        />
-                                        <YAxis yAxisId="left" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${v / 1000}k`} />
-                                        <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${v / 1000}k`} />
-                                        <Tooltip contentStyle={{ backgroundColor: "var(--card)", borderColor: "var(--border)", borderRadius: "12px" }} itemStyle={{ fontSize: "12px" }} labelStyle={{ fontSize: "12px", marginBottom: "8px", color: "var(--foreground)" }} />
-                                        <Legend verticalAlign="top" height={36} iconType="circle" />
-                                        <Line yAxisId="left" type="monotone" dataKey="investimento" name="Investimento" stroke="var(--destructive)" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
-                                        <Line yAxisId="right" type="monotone" dataKey="faturamento" name="Receita" stroke="var(--primary)" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
-                                    </LineChart>
-                                </ResponsiveContainer>
-                            </CardContent>
-                        </Card>
-
-                        {/* Paid vs Organic Donut */}
-                        <Card className="border border-border shadow-none rounded-lg">
-                            <CardHeader className="border-b border-border/50 px-5 py-4">
-                                <CardTitle className="text-base font-semibold">Pago vs Organico</CardTitle>
-                            </CardHeader>
-                            <CardContent className="p-5 h-[350px] flex flex-col items-center justify-center">
-                                {totalPaidOrganic > 1 ? (
-                                    <>
-                                        <ResponsiveContainer width="100%" height={220}>
-                                            <PieChart>
-                                                <Pie
-                                                    data={paidVsOrganic}
-                                                    cx="50%"
-                                                    cy="50%"
-                                                    innerRadius={55}
-                                                    outerRadius={85}
-                                                    dataKey="value"
-                                                    paddingAngle={2}
-                                                    stroke="none"
-                                                >
-                                                    {paidVsOrganic.map((_, idx) => (
-                                                        <Cell key={idx} fill={PAID_ORGANIC_COLORS[idx]} />
-                                                    ))}
-                                                </Pie>
-                                                <Tooltip
-                                                    contentStyle={{ backgroundColor: "var(--card)", borderColor: "var(--border)", borderRadius: "12px" }}
-                                                    formatter={(value) => fmtCurrencyGlobal(Number(value))}
-                                                />
-                                            </PieChart>
-                                        </ResponsiveContainer>
-                                        <div className="flex gap-6 mt-2">
-                                            {paidVsOrganic.map((d, i) => (
-                                                <div key={i} className="flex items-center gap-2 text-xs">
-                                                    <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: PAID_ORGANIC_COLORS[i] }} />
-                                                    <span className="text-muted-foreground">{d.name}</span>
-                                                    <span className="font-semibold">{((d.value / totalPaidOrganic) * 100).toFixed(1)}%</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </>
-                                ) : (
-                                    <div className="text-center text-muted-foreground text-sm">Sem dados de receita no periodo.</div>
-                                )}
-                            </CardContent>
-                        </Card>
                     </div>
 
                     {/* CPA / ROAS by Platform */}
@@ -375,58 +281,33 @@ export default function AnalyticsPage() {
                         </CardContent>
                     </Card>
 
-                    {/* Segmentation */}
+                    {/* Segmentation - Gender, Age, Region only */}
                     <Card className="border border-border shadow-none rounded-lg">
                         <CardHeader className="border-b border-border/50 px-5 py-2">
                             <CardTitle className="text-base font-semibold py-2">Segmentacao</CardTitle>
                         </CardHeader>
                         <CardContent className="p-5">
-                            <Tabs defaultValue="platform" className="w-full">
-                                <TabsList className="grid w-full max-w-md grid-cols-4 mb-4">
-                                    <TabsTrigger value="platform">Plataforma</TabsTrigger>
+                            <Tabs defaultValue="gender" className="w-full">
+                                <TabsList className="grid w-full max-w-sm grid-cols-3 mb-4">
                                     <TabsTrigger value="gender">Genero</TabsTrigger>
                                     <TabsTrigger value="age">Idade</TabsTrigger>
                                     <TabsTrigger value="state">Regiao</TabsTrigger>
                                 </TabsList>
-                                <TabsContent value="platform" className="mt-0">
-                                    <div className="space-y-2">
-                                        {platformData.map((p, i) => (
-                                            <div key={i} className="flex items-center justify-between p-3 border border-border rounded-lg">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
-                                                        <Layers className="w-4 h-4 text-muted-foreground" />
-                                                    </div>
-                                                    <div>
-                                                        <p className="font-medium text-sm">{p.platform}</p>
-                                                        <p className="text-xs text-muted-foreground">{p.orders} pedidos</p>
-                                                    </div>
-                                                </div>
-                                                <div className="text-right">
-                                                    <p className="font-bold text-sm">{fmtCurrency(p.revenue)}</p>
-                                                    <div className="w-24 h-1.5 bg-secondary rounded-full mt-1 overflow-hidden">
-                                                        <div className="h-full bg-primary" style={{ width: `${(p.revenue / Math.max(...platformData.map((x: Record<string, unknown>) => Number(x.revenue)), 1)) * 100}%` }} />
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                        {platformData.length === 0 && <div className="text-center text-muted-foreground text-sm py-4">Sem dados.</div>}
-                                    </div>
-                                </TabsContent>
-                                <TabsContent value="gender">
+                                <TabsContent value="gender" className="mt-0">
                                     {gaData?.gender && gaData.gender.length > 0 ? (
                                         <SegmentationList data={gaData.gender} icon={Users} />
                                     ) : (
-                                        <EmptyStateIcon icon={Users} label="Conecte o Google Analytics para ver dados de genero." />
+                                        <EmptyStateIcon icon={Users} label="Sem dados de genero. Verifique se o Google Signals esta ativo no GA4." />
                                     )}
                                 </TabsContent>
-                                <TabsContent value="age">
+                                <TabsContent value="age" className="mt-0">
                                     {gaData?.age && gaData.age.length > 0 ? (
-                                        <SegmentationList data={gaData.age} icon={Smartphone} />
+                                        <SegmentationList data={gaData.age} icon={Users} />
                                     ) : (
-                                        <EmptyStateIcon icon={Smartphone} label="Conecte o Google Analytics para ver dados de idade." />
+                                        <EmptyStateIcon icon={Users} label="Sem dados de idade. Verifique se o Google Signals esta ativo no GA4." />
                                     )}
                                 </TabsContent>
-                                <TabsContent value="state">
+                                <TabsContent value="state" className="mt-0">
                                     {gaData?.geography && gaData.geography.length > 0 ? (
                                         <div className="space-y-2">
                                             {gaData.geography.map((g, i) => {
@@ -450,7 +331,7 @@ export default function AnalyticsPage() {
                                             })}
                                         </div>
                                     ) : (
-                                        <EmptyStateIcon icon={MapPin} label="Conecte o Google Analytics para ver dados geograficos." />
+                                        <EmptyStateIcon icon={MapPin} label="Sem dados geograficos. Conecte o Google Analytics para ver esta informacao." />
                                     )}
                                 </TabsContent>
                             </Tabs>
@@ -478,26 +359,44 @@ export default function AnalyticsPage() {
                         </Card>
                     ) : (
                         <>
+                            {/* GA4 Disclaimer */}
+                            <div className="flex items-start gap-2.5 px-4 py-3 bg-muted/40 border border-border rounded-lg">
+                                <Info className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                    Os dados abaixo sao fornecidos pelo Google Analytics 4. Pequenas variacoes em relacao ao painel do GA4 sao normais devido a diferenca nos momentos de processamento e amostragem de dados.
+                                </p>
+                            </div>
+
                             {/* GA KPI Cards */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                                 <AnalyticsKPICard title="Sessoes" value={fmtNum(gaData.totals.sessions)} icon={Users} color="text-blue-500 bg-blue-500/10" />
                                 <AnalyticsKPICard title="Usuarios Ativos" value={fmtNum(gaData.totals.activeUsers)} icon={Eye} color="text-emerald-500 bg-emerald-500/10" />
                                 <AnalyticsKPICard title="Pageviews" value={fmtNum(gaData.totals.screenPageViews)} icon={FileText} color="text-amber-500 bg-amber-500/10" />
-                                <AnalyticsKPICard title="Engajamento" value={fmtPercent(gaData.totals.engagementRate)} icon={TrendingUp} color="text-purple-500 bg-purple-500/10" />
+                                <AnalyticsKPICard
+                                    title="Engajamento"
+                                    value={fmtPercent(gaData.totals.engagementRate)}
+                                    icon={TrendingUp}
+                                    color="text-purple-500 bg-purple-500/10"
+                                    tooltip="Percentual de sessoes que duraram mais de 10 segundos, tiveram um evento de conversao ou tiveram 2 ou mais visualizacoes de pagina."
+                                />
                             </div>
 
                             {/* GA Secondary KPIs */}
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                 <Card className="border border-border shadow-none rounded-lg p-4">
                                     <span className="text-[11px] uppercase tracking-wider font-medium text-muted-foreground">Novos Usuarios</span>
                                     <div className="text-lg font-bold mt-1">{fmtNum(gaData.totals.newUsers)}</div>
                                 </Card>
                                 <Card className="border border-border shadow-none rounded-lg p-4">
-                                    <span className="text-[11px] uppercase tracking-wider font-medium text-muted-foreground">Conversoes</span>
-                                    <div className="text-lg font-bold mt-1">{fmtNum(gaData.totals.conversions)}</div>
-                                </Card>
-                                <Card className="border border-border shadow-none rounded-lg p-4">
-                                    <span className="text-[11px] uppercase tracking-wider font-medium text-muted-foreground">Bounce Rate</span>
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-[11px] uppercase tracking-wider font-medium text-muted-foreground">Bounce Rate</span>
+                                        <div className="relative group">
+                                            <Info className="w-3.5 h-3.5 text-muted-foreground/50 cursor-help" />
+                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-popover text-popover-foreground text-xs rounded-lg shadow-lg border border-border opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 w-56 z-50 pointer-events-none">
+                                                Percentual de sessoes que nao foram engajadas, ou seja, duraram menos de 10 segundos e nao tiveram conversao nem segunda visualizacao.
+                                            </div>
+                                        </div>
+                                    </div>
                                     <div className="text-lg font-bold mt-1">{fmtPercent(gaData.totals.bounceRate)}</div>
                                 </Card>
                                 <Card className="border border-border shadow-none rounded-lg p-4">
@@ -529,46 +428,45 @@ export default function AnalyticsPage() {
                                 </CardContent>
                             </Card>
 
-                            {/* Traffic Sources: Pie + Table + Top Pages */}
+                            {/* Traffic Sources (redesigned) + Traffic Table + Top Pages */}
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                {/* Traffic Sources Pie */}
-                                <Card className="border border-border shadow-none rounded-lg">
+                                {/* Traffic Sources - Horizontal Bars */}
+                                <Card className="lg:col-span-1 border border-border shadow-none rounded-lg">
                                     <CardHeader className="border-b border-border/50 px-5 py-4">
                                         <CardTitle className="text-base font-semibold">Origens de Trafego</CardTitle>
                                     </CardHeader>
-                                    <CardContent className="p-5 flex flex-col items-center">
+                                    <CardContent className="p-5">
                                         {gaData.trafficSources.length > 0 ? (
-                                            <>
-                                                <ResponsiveContainer width="100%" height={200}>
-                                                    <PieChart>
-                                                        <Pie
-                                                            data={gaData.trafficSources.slice(0, 8)}
-                                                            cx="50%"
-                                                            cy="50%"
-                                                            outerRadius={75}
-                                                            dataKey="sessions"
-                                                            nameKey="source"
-                                                            stroke="none"
-                                                        >
-                                                            {gaData.trafficSources.slice(0, 8).map((_, idx) => (
-                                                                <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
-                                                            ))}
-                                                        </Pie>
-                                                        <Tooltip
-                                                            contentStyle={{ backgroundColor: "var(--card)", borderColor: "var(--border)", borderRadius: "12px" }}
-                                                            formatter={(value) => fmtNumGlobal(Number(value))}
-                                                        />
-                                                    </PieChart>
-                                                </ResponsiveContainer>
-                                                <div className="flex flex-wrap gap-2 mt-2 justify-center">
-                                                    {gaData.trafficSources.slice(0, 8).map((s, i) => (
-                                                        <div key={i} className="flex items-center gap-1.5 text-[10px]">
-                                                            <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
-                                                            <span className="text-muted-foreground truncate max-w-[80px]">{s.source}</span>
+                                            <div className="space-y-3">
+                                                {gaData.trafficSources.slice(0, 8).map((s, i) => {
+                                                    const totalSessions = gaData.trafficSources.reduce((sum, t) => sum + t.sessions, 0) || 1;
+                                                    const maxSessions = Math.max(...gaData.trafficSources.slice(0, 8).map(t => t.sessions), 1);
+                                                    const pct = ((s.sessions / totalSessions) * 100).toFixed(1);
+                                                    return (
+                                                        <div key={i} className="space-y-1.5">
+                                                            <div className="flex items-center justify-between">
+                                                                <div className="flex items-center gap-2 min-w-0">
+                                                                    <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: TRAFFIC_COLORS[i % TRAFFIC_COLORS.length] }} />
+                                                                    <span className="text-sm font-medium truncate">{s.source}</span>
+                                                                </div>
+                                                                <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                                                                    <span className="text-xs text-muted-foreground">{pct}%</span>
+                                                                    <span className="text-sm font-semibold w-14 text-right">{fmtNum(s.sessions)}</span>
+                                                                </div>
+                                                            </div>
+                                                            <div className="w-full h-1.5 bg-secondary rounded-full overflow-hidden">
+                                                                <div
+                                                                    className="h-full rounded-full transition-all duration-500"
+                                                                    style={{
+                                                                        width: `${(s.sessions / maxSessions) * 100}%`,
+                                                                        backgroundColor: TRAFFIC_COLORS[i % TRAFFIC_COLORS.length],
+                                                                    }}
+                                                                />
+                                                            </div>
                                                         </div>
-                                                    ))}
-                                                </div>
-                                            </>
+                                                    );
+                                                })}
+                                            </div>
                                         ) : (
                                             <div className="h-40 flex items-center justify-center text-muted-foreground text-sm">Sem dados.</div>
                                         )}
@@ -642,7 +540,10 @@ export default function AnalyticsPage() {
                                 {/* Devices */}
                                 <Card className="border border-border shadow-none rounded-lg">
                                     <CardHeader className="border-b border-border/50 px-5 py-4">
-                                        <CardTitle className="text-base font-semibold">Dispositivos</CardTitle>
+                                        <div>
+                                            <CardTitle className="text-base font-semibold">Dispositivos</CardTitle>
+                                            <p className="text-xs text-muted-foreground mt-0.5">Sessoes por tipo de dispositivo</p>
+                                        </div>
                                     </CardHeader>
                                     <CardContent className="p-5">
                                         <div className="space-y-3">
@@ -657,7 +558,7 @@ export default function AnalyticsPage() {
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-center justify-between mb-1">
                                                                 <span className="font-medium text-sm capitalize">{d.device}</span>
-                                                                <span className="text-sm font-semibold">{fmtNum(d.sessions)}</span>
+                                                                <span className="text-sm font-semibold">{fmtNum(d.sessions)} <span className="text-xs font-normal text-muted-foreground">sessoes</span></span>
                                                             </div>
                                                             <div className="w-full h-1.5 bg-secondary rounded-full overflow-hidden">
                                                                 <div className="h-full bg-primary rounded-full" style={{ width: `${(d.sessions / maxSessions) * 100}%` }} />
@@ -675,7 +576,10 @@ export default function AnalyticsPage() {
                                 {/* Geography - Top 10 */}
                                 <Card className="border border-border shadow-none rounded-lg">
                                     <CardHeader className="border-b border-border/50 px-5 py-4">
-                                        <CardTitle className="text-base font-semibold">Top 10 Regioes</CardTitle>
+                                        <div>
+                                            <CardTitle className="text-base font-semibold">Top 10 Regioes</CardTitle>
+                                            <p className="text-xs text-muted-foreground mt-0.5">Sessoes por regiao</p>
+                                        </div>
                                     </CardHeader>
                                     <CardContent className="p-5">
                                         <div className="space-y-2">
@@ -692,7 +596,7 @@ export default function AnalyticsPage() {
                                                             <div className="w-20 h-1.5 bg-secondary rounded-full overflow-hidden">
                                                                 <div className="h-full bg-primary rounded-full" style={{ width: `${(g.sessions / maxSessions) * 100}%` }} />
                                                             </div>
-                                                            <span className="text-sm font-medium w-16 text-right">{fmtNum(g.sessions)}</span>
+                                                            <span className="text-sm font-medium w-20 text-right">{fmtNum(g.sessions)} <span className="text-xs font-normal text-muted-foreground">sessoes</span></span>
                                                         </div>
                                                     </div>
                                                 );
@@ -711,11 +615,21 @@ export default function AnalyticsPage() {
     );
 }
 
-function AnalyticsKPICard({ title, value, icon: Icon, color }: { title: string; value: string; icon: LucideIcon; color: string }) {
+function AnalyticsKPICard({ title, value, icon: Icon, color, tooltip }: { title: string; value: string; icon: LucideIcon; color: string; tooltip?: string }) {
     return (
         <Card className="border border-border shadow-none rounded-lg p-5">
             <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] uppercase tracking-wider font-medium text-muted-foreground">{title}</span>
+                <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] uppercase tracking-wider font-medium text-muted-foreground">{title}</span>
+                    {tooltip && (
+                        <div className="relative group">
+                            <Info className="w-3.5 h-3.5 text-muted-foreground/50 cursor-help" />
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-popover text-popover-foreground text-xs rounded-lg shadow-lg border border-border opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 w-56 z-50 pointer-events-none">
+                                {tooltip}
+                            </div>
+                        </div>
+                    )}
+                </div>
                 <div className={cn("w-8 h-8 rounded-full flex items-center justify-center", color)}>
                     <Icon className="w-4 h-4" />
                 </div>
@@ -729,7 +643,7 @@ function EmptyStateIcon({ icon: Icon, label }: { icon: LucideIcon; label: string
     return (
         <div className="h-40 flex flex-col items-center justify-center text-muted-foreground gap-2 border border-dashed rounded-lg">
             <Icon className="w-8 h-8 opacity-50" />
-            <p className="text-xs">{label}</p>
+            <p className="text-xs text-center px-4">{label}</p>
         </div>
     );
 }
