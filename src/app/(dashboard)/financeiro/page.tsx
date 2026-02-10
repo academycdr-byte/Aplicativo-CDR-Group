@@ -2,15 +2,18 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { PeriodSelector, periodToParams, type PeriodValue } from "@/components/period-selector";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import {
     DollarSign,
     TrendingUp,
     CreditCard,
     Percent,
     ShoppingCart,
-    PieChart
+    PieChart,
+    Landmark,
+    ArrowDownRight,
+    Receipt,
+    AlertTriangle,
 } from "lucide-react";
 import { subDays } from "date-fns";
 import {
@@ -18,7 +21,7 @@ import {
     getProductCosts,
     getFinancialConfig,
     type FinancialMetrics,
-} from "@/actions/finance"; // Server actions
+} from "@/actions/finance";
 import { ProductCostTable } from "@/components/finance/product-cost-table";
 import { FinancialConfigDialog } from "@/components/finance/financial-config-dialog";
 import { cn } from "@/lib/utils";
@@ -30,21 +33,35 @@ export default function FinancePage() {
         revenue: 0,
         adSpend: 0,
         productCosts: 0,
-        fees: 0,
+        gatewayFee: 0,
+        checkoutFee: 0,
+        taxFee: 0,
+        fixedCosts: 0,
+        chargebackCost: 0,
+        transactionFees: 0,
         netProfit: 0,
         margin: 0,
         roi: 0,
-        orderCount: 0
+        orderCount: 0,
+        ticketMedio: 0,
     });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [costs, setCosts] = useState<any[]>([]);
-    const [config, setConfig] = useState({ defaultTaxRate: 0, fixedTransactionFee: 0 });
+    const [config, setConfig] = useState({
+        defaultTaxRate: 0,
+        fixedTransactionFee: 0,
+        gatewayRate: 0,
+        checkoutRate: 0,
+        taxBase: "revenue",
+        fixedCosts: 0,
+        chargebackRate: 0,
+    });
 
     const loadData = useCallback(async () => {
         setLoading(true);
         try {
             const { days, from, to } = periodToParams(period);
 
-            // Calculate dates
             let fromDate: Date, toDate: Date;
             if (from && to) {
                 fromDate = new Date(from);
@@ -54,7 +71,6 @@ export default function FinancePage() {
                 fromDate = subDays(toDate, days);
             }
 
-            // Fetch all data in parallel with graceful degradation
             const results = await Promise.allSettled([
                 getFinancialMetrics({ from: fromDate, to: toDate }),
                 getProductCosts(),
@@ -64,14 +80,17 @@ export default function FinancePage() {
             if (results[0].status === "fulfilled") setMetrics(results[0].value);
             if (results[1].status === "fulfilled") setCosts(results[1].value);
             if (results[2].status === "fulfilled" && results[2].value) {
+                const c = results[2].value;
                 setConfig({
-                    defaultTaxRate: Number(results[2].value.defaultTaxRate),
-                    fixedTransactionFee: Number(results[2].value.fixedTransactionFee)
+                    defaultTaxRate: Number(c.defaultTaxRate),
+                    fixedTransactionFee: Number(c.fixedTransactionFee),
+                    gatewayRate: Number(c.gatewayRate),
+                    checkoutRate: Number(c.checkoutRate),
+                    taxBase: String(c.taxBase),
+                    fixedCosts: Number(c.fixedCosts),
+                    chargebackRate: Number(c.chargebackRate),
                 });
             }
-
-            const failed = results.filter((r) => r.status === "rejected");
-            if (failed.length > 0) console.error("Some financial data failed to load", failed);
         } catch (error) {
             console.error("Failed to load financial data", error);
         } finally {
@@ -87,12 +106,16 @@ export default function FinancePage() {
         return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val);
     }
 
-    // Calculate percentages for the breakdown bar
-    const revenue = metrics.revenue || 1; // avoid division by zero
+    const revenue = metrics.revenue || 1;
     const cogsPct = (metrics.productCosts / revenue) * 100;
     const adsPct = (metrics.adSpend / revenue) * 100;
-    const feesPct = (metrics.fees / revenue) * 100;
-    const profitPct = (metrics.netProfit / revenue) * 100;
+    const gatewayPct = (metrics.gatewayFee / revenue) * 100;
+    const checkoutPct = (metrics.checkoutFee / revenue) * 100;
+    const taxPct = (metrics.taxFee / revenue) * 100;
+    const fixedPct = (metrics.fixedCosts / revenue) * 100;
+    const chargebackPct = (metrics.chargebackCost / revenue) * 100;
+    const txFeePct = (metrics.transactionFees / revenue) * 100;
+    const profitPct = Math.max(0, (metrics.netProfit / revenue) * 100);
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
@@ -116,19 +139,18 @@ export default function FinancePage() {
             ) : (
                 <>
                     {/* KPI Grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-6 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                         <FinancialCard
                             title="Receita Bruta"
                             value={fmt(metrics.revenue)}
                             icon={DollarSign}
-                            className="text-foreground"
                             iconClass="bg-primary/10 text-primary"
+                            subText={`${metrics.orderCount} pedidos`}
                         />
                         <FinancialCard
                             title="Custos (CMV)"
                             value={fmt(metrics.productCosts)}
                             icon={ShoppingCart}
-                            className="text-foreground"
                             iconClass="bg-amber-500/10 text-amber-500"
                             subText={`${cogsPct.toFixed(1)}% da receita`}
                         />
@@ -136,32 +158,70 @@ export default function FinancePage() {
                             title="Ads (Tráfego)"
                             value={fmt(metrics.adSpend)}
                             icon={TrendingUp}
-                            className="text-foreground"
                             iconClass="bg-red-500/10 text-red-500"
                             subText={`${adsPct.toFixed(1)}% da receita`}
                         />
                         <FinancialCard
-                            title="Taxas & Impostos"
-                            value={fmt(metrics.fees)}
+                            title="Gateway"
+                            value={fmt(metrics.gatewayFee)}
                             icon={CreditCard}
-                            className="text-foreground"
-                            iconClass="bg-purple-500/10 text-purple-500"
-                            subText={`${feesPct.toFixed(1)}% da receita`}
+                            iconClass="bg-blue-500/10 text-blue-500"
+                            subText={`${gatewayPct.toFixed(1)}% da receita`}
                         />
+                        <FinancialCard
+                            title="Checkout"
+                            value={fmt(metrics.checkoutFee)}
+                            icon={Receipt}
+                            iconClass="bg-indigo-500/10 text-indigo-500"
+                            subText={`${checkoutPct.toFixed(1)}% da receita`}
+                        />
+                        <FinancialCard
+                            title="Impostos"
+                            value={fmt(metrics.taxFee)}
+                            icon={Landmark}
+                            iconClass="bg-purple-500/10 text-purple-500"
+                            subText={`${taxPct.toFixed(1)}% da receita`}
+                        />
+                        <FinancialCard
+                            title="Custos Fixos"
+                            value={fmt(metrics.fixedCosts)}
+                            icon={ArrowDownRight}
+                            iconClass="bg-orange-500/10 text-orange-500"
+                            subText={`${fixedPct.toFixed(1)}% da receita`}
+                        />
+                        <FinancialCard
+                            title="Chargebacks"
+                            value={fmt(metrics.chargebackCost)}
+                            icon={AlertTriangle}
+                            iconClass="bg-rose-500/10 text-rose-500"
+                            subText={`${chargebackPct.toFixed(1)}% da receita`}
+                        />
+                    </div>
+
+                    {/* Bottom row: Net Profit + Margin */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <FinancialCard
                             title="Lucro Líquido"
                             value={fmt(metrics.netProfit)}
                             icon={PieChart}
-                            className={metrics.netProfit >= 0 ? "text-emerald-500 border-emerald-500/20 bg-emerald-500/5" : "text-red-500 border-red-500/20 bg-red-500/5"}
+                            className={metrics.netProfit >= 0 ? "border-emerald-500/20 bg-emerald-500/5" : "border-red-500/20 bg-red-500/5"}
                             iconClass={metrics.netProfit >= 0 ? "bg-emerald-500/20 text-emerald-500" : "bg-red-500/20 text-red-500"}
                             valueClass={metrics.netProfit >= 0 ? "text-emerald-600" : "text-red-600"}
                         />
                         <FinancialCard
                             title="Margem Líquida"
-                            value={`${metrics.margin.toFixed(1)}%`}
+                            value={`${metrics.margin.toFixed(2)}%`}
                             icon={Percent}
-                            className={metrics.margin >= 0 ? "text-emerald-600" : "text-red-600"}
+                            className={metrics.margin >= 0 ? "" : ""}
                             iconClass={metrics.margin >= 0 ? "bg-emerald-500/10 text-emerald-500" : "bg-red-500/10 text-red-500"}
+                            valueClass={metrics.margin >= 0 ? "text-emerald-600" : "text-red-600"}
+                        />
+                        <FinancialCard
+                            title="Ticket Médio"
+                            value={fmt(metrics.ticketMedio)}
+                            icon={DollarSign}
+                            iconClass="bg-sky-500/10 text-sky-500"
+                            subText={`Taxa fixa/tx: ${fmt(metrics.transactionFees / Math.max(metrics.orderCount, 1))}`}
                         />
                     </div>
 
@@ -169,32 +229,50 @@ export default function FinancePage() {
                     <Card className="border border-border shadow-none rounded-lg p-6">
                         <h3 className="text-sm font-medium text-muted-foreground mb-4">Composição da Receita</h3>
                         <div className="w-full h-8 flex rounded-md overflow-hidden bg-secondary">
-                            {metrics.productCosts > 0 && (
-                                <div style={{ width: `${cogsPct}%` }} className="bg-amber-400 h-full flex items-center justify-center text-[10px] font-bold text-white relative group">
+                            {cogsPct > 0 && (
+                                <div style={{ width: `${cogsPct}%` }} className="bg-amber-400 h-full flex items-center justify-center text-[10px] font-bold text-white">
                                     <span className="truncate px-1">CMV</span>
                                 </div>
                             )}
-                            {metrics.adSpend > 0 && (
-                                <div style={{ width: `${adsPct}%` }} className="bg-red-400 h-full flex items-center justify-center text-[10px] font-bold text-white relative group">
+                            {adsPct > 0 && (
+                                <div style={{ width: `${adsPct}%` }} className="bg-red-400 h-full flex items-center justify-center text-[10px] font-bold text-white">
                                     <span className="truncate px-1">Ads</span>
                                 </div>
                             )}
-                            {metrics.fees > 0 && (
-                                <div style={{ width: `${feesPct}%` }} className="bg-purple-400 h-full flex items-center justify-center text-[10px] font-bold text-white relative group">
-                                    <span className="truncate px-1">Taxas</span>
+                            {gatewayPct > 0.5 && (
+                                <div style={{ width: `${gatewayPct}%` }} className="bg-blue-400 h-full flex items-center justify-center text-[10px] font-bold text-white">
+                                    <span className="truncate px-1">GW</span>
                                 </div>
                             )}
-                            {metrics.netProfit > 0 && (
-                                <div style={{ width: `${profitPct}%` }} className="bg-emerald-500 h-full flex items-center justify-center text-[10px] font-bold text-white relative group">
+                            {checkoutPct > 0.5 && (
+                                <div style={{ width: `${checkoutPct}%` }} className="bg-indigo-400 h-full flex items-center justify-center text-[10px] font-bold text-white">
+                                    <span className="truncate px-1">CK</span>
+                                </div>
+                            )}
+                            {taxPct > 0.5 && (
+                                <div style={{ width: `${taxPct}%` }} className="bg-purple-400 h-full flex items-center justify-center text-[10px] font-bold text-white">
+                                    <span className="truncate px-1">Tax</span>
+                                </div>
+                            )}
+                            {(fixedPct + chargebackPct + txFeePct) > 0.5 && (
+                                <div style={{ width: `${fixedPct + chargebackPct + txFeePct}%` }} className="bg-orange-400 h-full flex items-center justify-center text-[10px] font-bold text-white">
+                                    <span className="truncate px-1">Outros</span>
+                                </div>
+                            )}
+                            {profitPct > 0 && (
+                                <div style={{ width: `${profitPct}%` }} className="bg-emerald-500 h-full flex items-center justify-center text-[10px] font-bold text-white">
                                     <span className="truncate px-1">Lucro</span>
                                 </div>
                             )}
                         </div>
-                        <div className="flex gap-4 mt-3 text-xs text-muted-foreground justify-center">
-                            <div className="flex items-center gap-1"><div className="w-3 h-3 bg-amber-400 rounded-sm"></div>Produto</div>
-                            <div className="flex items-center gap-1"><div className="w-3 h-3 bg-red-400 rounded-sm"></div>Anúncios</div>
-                            <div className="flex items-center gap-1"><div className="w-3 h-3 bg-purple-400 rounded-sm"></div>Taxas</div>
-                            <div className="flex items-center gap-1"><div className="w-3 h-3 bg-emerald-500 rounded-sm"></div>Lucro</div>
+                        <div className="flex flex-wrap gap-3 mt-3 text-xs text-muted-foreground justify-center">
+                            <div className="flex items-center gap-1"><div className="w-3 h-3 bg-amber-400 rounded-sm" />Produto</div>
+                            <div className="flex items-center gap-1"><div className="w-3 h-3 bg-red-400 rounded-sm" />Anúncios</div>
+                            <div className="flex items-center gap-1"><div className="w-3 h-3 bg-blue-400 rounded-sm" />Gateway</div>
+                            <div className="flex items-center gap-1"><div className="w-3 h-3 bg-indigo-400 rounded-sm" />Checkout</div>
+                            <div className="flex items-center gap-1"><div className="w-3 h-3 bg-purple-400 rounded-sm" />Impostos</div>
+                            <div className="flex items-center gap-1"><div className="w-3 h-3 bg-orange-400 rounded-sm" />Outros</div>
+                            <div className="flex items-center gap-1"><div className="w-3 h-3 bg-emerald-500 rounded-sm" />Lucro</div>
                         </div>
                     </Card>
 
@@ -208,7 +286,15 @@ export default function FinancePage() {
     );
 }
 
-function FinancialCard({ title, value, icon: Icon, className, iconClass, valueClass, subText }: any) {
+function FinancialCard({ title, value, icon: Icon, className, iconClass, valueClass, subText }: {
+    title: string;
+    value: string;
+    icon: React.ComponentType<{ className?: string }>;
+    className?: string;
+    iconClass?: string;
+    valueClass?: string;
+    subText?: string;
+}) {
     return (
         <Card className={cn("border border-border shadow-none rounded-lg p-5 transition-all hover:border-primary/20", className)}>
             <div className="flex items-center justify-between mb-2">

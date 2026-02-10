@@ -9,11 +9,17 @@ export type FinancialMetrics = {
     revenue: number;
     adSpend: number;
     productCosts: number;
-    fees: number;
+    gatewayFee: number;
+    checkoutFee: number;
+    taxFee: number;
+    fixedCosts: number;
+    chargebackCost: number;
+    transactionFees: number;
     netProfit: number;
     margin: number;
     roi: number;
     orderCount: number;
+    ticketMedio: number;
 };
 
 export type ProductCostInput = {
@@ -26,11 +32,26 @@ export type ProductCostInput = {
 export type FinancialConfigInput = {
     defaultTaxRate: number;
     fixedTransactionFee: number;
+    gatewayRate: number;
+    checkoutRate: number;
+    taxBase: string;
+    fixedCosts: number;
+    chargebackRate: number;
 };
 
 /**
  * Get financial metrics for a given period.
- * Calculates Revenue, Ad Spend, COGS (Product Costs), Fees, and Net Profit.
+ * Calculation:
+ *   Receita Bruta
+ *   - COGS (Custos de Produto)
+ *   - Investimento em Ads
+ *   - Gateway Fee (Receita * gatewayRate%)
+ *   - Checkout Fee (Receita * checkoutRate%)
+ *   - Imposto (depende de taxBase: "revenue" = Receita * taxRate%, "profit" = LucroBruto * taxRate%)
+ *   - Custos Fixos (valor absoluto)
+ *   - Chargebacks (ticketMedio * chargebackRate%)
+ *   - Transaction Fee (fixedFee * orderCount)
+ *   = Lucro Líquido
  */
 export async function getFinancialMetrics({
     from,
@@ -43,20 +64,33 @@ export async function getFinancialMetrics({
     if (!ctx) throw new Error("Nao autenticado");
     const organizationId = ctx.organization.id;
 
-    // 2. Fetch Financial Config
+    // Fetch Financial Config
     const config = await db.financialConfig.findUnique({
         where: { organizationId },
-    }) || { defaultTaxRate: 0, fixedTransactionFee: 0 };
+    }) || {
+        defaultTaxRate: 0,
+        fixedTransactionFee: 0,
+        gatewayRate: 0,
+        checkoutRate: 0,
+        taxBase: "revenue",
+        fixedCosts: 0,
+        chargebackRate: 0,
+    };
 
     const taxRate = Number(config.defaultTaxRate) / 100;
-    const fixedFee = Number(config.fixedTransactionFee);
+    const fixedFeePerTx = Number(config.fixedTransactionFee);
+    const gatewayRate = Number(config.gatewayRate) / 100;
+    const checkoutRate = Number(config.checkoutRate) / 100;
+    const taxBase = String(config.taxBase || "revenue");
+    const fixedCosts = Number(config.fixedCosts);
+    const chargebackRate = Number(config.chargebackRate) / 100;
 
-    // 3. Fetch Orders in Period
+    // Fetch Orders in Period
     const orders = await db.order.findMany({
         where: {
             organizationId,
             orderDate: { gte: from, lte: to },
-            status: { notIn: ["cancelled", "refunded"] }, // Exclude cancelled/refunded
+            status: { notIn: ["cancelled", "refunded"] },
         },
         select: {
             id: true,
@@ -67,68 +101,51 @@ export async function getFinancialMetrics({
         },
     });
 
-    // 4. Fetch Ad Level Metrics in Period (Spend)
+    // Fetch Ad Spend in Period
     const adMetrics = await db.adMetric.aggregate({
         where: {
             organizationId,
             date: { gte: from, lte: to },
         },
-        _sum: {
-            spend: true,
-        },
+        _sum: { spend: true },
     });
 
-    // 5. Fetch Product Costs
+    // Fetch Product Costs
     const productCosts = await db.productCost.findMany({
         where: { organizationId },
     });
 
-    const costMap = new Map<string, number>(); // SKU -> Cost
+    const costMap = new Map<string, number>();
     productCosts.forEach(pc => {
         costMap.set(pc.sku.toLowerCase().trim(), Number(pc.costPrice));
     });
 
-    // 6. Calculate Metrics
+    // Calculate Metrics
     let revenue = 0;
-    let cogs = 0; // Cost of Goods Sold
-    let fees = 0;
+    let cogs = 0;
 
     for (const order of orders) {
         const amount = Number(order.totalAmount);
         revenue += amount;
 
-        // Calculate Fees (Gateway + Platform)
-        // Formula: (Revenue * TaxRate) + FixedFee
-        fees += (amount * taxRate) + fixedFee;
+        // Calculate COGS from line items
+        const data = order.rawData as Record<string, unknown> | null;
+        let items: Record<string, unknown>[] = [];
 
-        // Calculate COGS
-        // We need to parse order items.
-        // Platform-specific parsing:
-        const data: any = order.rawData || {};
-        let items: any[] = [];
-
-        // Attempt to standardize items extraction
-        if (Array.isArray(data.line_items)) {
-            items = data.line_items; // Shopify, commonly
-        } else if (Array.isArray(data.items)) {
-            items = data.items; // Some others
-        } else if (data.products && Array.isArray(data.products)) {
-            items = data.products;
+        if (data) {
+            if (Array.isArray(data.line_items)) {
+                items = data.line_items;
+            } else if (Array.isArray(data.items)) {
+                items = data.items;
+            } else if (data.products && Array.isArray(data.products)) {
+                items = data.products as Record<string, unknown>[];
+            }
         }
-
-        // Fallback if no items found in rawData -> estimate based on itemCount ?
-        // If we can't find items, we can't calculate COGS accurately.
-        // For now, if items found, sum costs.
 
         for (const item of items) {
             const quantity = Number(item.quantity || 1);
             const sku = (item.sku || item.product_id || item.title || "").toString().toLowerCase().trim();
-
-            // Try to find cost
-            // 1. Exact SKU match
-            let cost = costMap.get(sku);
-
-            // 2. If not found, maybe try fuzzy match or fallback? (skipped for now)
+            const cost = costMap.get(sku);
             if (cost !== undefined) {
                 cogs += cost * quantity;
             }
@@ -136,22 +153,42 @@ export async function getFinancialMetrics({
     }
 
     const adSpend = Number(adMetrics._sum.spend || 0);
-    const netProfit = revenue - adSpend - cogs - fees;
+    const orderCount = orders.length;
+    const ticketMedio = orderCount > 0 ? revenue / orderCount : 0;
+
+    // Fee calculations
+    const gatewayFee = revenue * gatewayRate;
+    const checkoutFee = revenue * checkoutRate;
+    const transactionFees = fixedFeePerTx * orderCount;
+    const chargebackCost = ticketMedio * chargebackRate;
+
+    // Tax depends on taxBase
+    const grossProfit = revenue - cogs - adSpend - gatewayFee - checkoutFee - transactionFees - fixedCosts - chargebackCost;
+    const taxFee = taxBase === "profit"
+        ? Math.max(0, grossProfit) * taxRate
+        : revenue * taxRate;
+
+    const netProfit = revenue - cogs - adSpend - gatewayFee - checkoutFee - taxFee - transactionFees - fixedCosts - chargebackCost;
     const margin = revenue > 0 ? (netProfit / revenue) * 100 : 0;
-    const roi = adSpend > 0 ? (netProfit / adSpend) * 100 : 0; // ROI on Ad Spend context? adjusting... usually ROI = (Net / Cost). 
+    const roi = adSpend > 0 ? (netProfit / adSpend) * 100 : 0;
 
     return {
         revenue,
         adSpend,
         productCosts: cogs,
-        fees,
+        gatewayFee,
+        checkoutFee,
+        taxFee,
+        fixedCosts,
+        chargebackCost,
+        transactionFees,
         netProfit,
         margin,
         roi,
-        orderCount: orders.length
+        orderCount,
+        ticketMedio,
     };
 }
-
 
 /**
  * Get all product costs for management table
@@ -190,7 +227,7 @@ export async function saveProductCost(input: ProductCostInput) {
         },
         update: {
             costPrice: input.costPrice,
-            name: input.name, // update name if provided
+            name: input.name,
             imageUrl: input.imageUrl
         }
     });
@@ -219,12 +256,8 @@ export async function saveFinancialConfig(input: FinancialConfigInput) {
     if (!ctx) throw new Error("Nao autenticado");
     const orgId = ctx.organization.id;
 
-    // Validate inputs
     if (isNaN(input.defaultTaxRate) || input.defaultTaxRate < 0 || input.defaultTaxRate > 100) {
-        throw new Error("Taxa padrao deve ser entre 0 e 100");
-    }
-    if (isNaN(input.fixedTransactionFee) || input.fixedTransactionFee < 0) {
-        throw new Error("Taxa fixa de transacao deve ser >= 0");
+        throw new Error("Taxa de imposto deve ser entre 0 e 100");
     }
 
     await db.financialConfig.upsert({
@@ -232,11 +265,21 @@ export async function saveFinancialConfig(input: FinancialConfigInput) {
         create: {
             organizationId: orgId,
             defaultTaxRate: input.defaultTaxRate,
-            fixedTransactionFee: input.fixedTransactionFee
+            fixedTransactionFee: input.fixedTransactionFee,
+            gatewayRate: input.gatewayRate,
+            checkoutRate: input.checkoutRate,
+            taxBase: input.taxBase,
+            fixedCosts: input.fixedCosts,
+            chargebackRate: input.chargebackRate,
         },
         update: {
             defaultTaxRate: input.defaultTaxRate,
-            fixedTransactionFee: input.fixedTransactionFee
+            fixedTransactionFee: input.fixedTransactionFee,
+            gatewayRate: input.gatewayRate,
+            checkoutRate: input.checkoutRate,
+            taxBase: input.taxBase,
+            fixedCosts: input.fixedCosts,
+            chargebackRate: input.chargebackRate,
         }
     });
 
