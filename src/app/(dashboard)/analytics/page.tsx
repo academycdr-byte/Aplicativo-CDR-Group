@@ -37,11 +37,11 @@ import {
     YAxis,
     CartesianGrid,
     Tooltip,
-    RadarChart,
-    PolarGrid,
-    PolarAngleAxis,
-    PolarRadiusAxis,
-    Radar,
+    PieChart,
+    Pie,
+    Cell,
+    BarChart,
+    Bar,
     Legend,
 } from "recharts";
 import { loadAllAnalyticsData } from "@/actions/ads";
@@ -64,7 +64,23 @@ type GAData = {
     devices: { device: string; sessions: number; activeUsers: number }[];
     geography: { country: string; sessions: number; activeUsers: number }[];
     topPages: { path: string; screenPageViews: number; activeUsers: number }[];
+    gender?: { label: string; sessions: number; activeUsers: number }[];
+    age?: { label: string; sessions: number; activeUsers: number }[];
 };
+
+type PlatformComparisonEntry = { platform: string; cpa: number; roas: number };
+type PaidOrganicEntry = { name: string; value: number };
+
+const PIE_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"];
+const PAID_ORGANIC_COLORS = ["#3b82f6", "#10b981"];
+
+function fmtCurrencyGlobal(val: number) {
+    return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val);
+}
+
+function fmtNumGlobal(val: number) {
+    return new Intl.NumberFormat("pt-BR").format(val);
+}
 
 export default function AnalyticsPage() {
     const [period, setPeriod] = useState<PeriodValue>({ type: "preset", days: 30 });
@@ -73,9 +89,14 @@ export default function AnalyticsPage() {
 
     // Ad metrics data states
     const [kpis, setKpis] = useState({ cpa: 0, cpc: 0, ctr: 0, cpm: 0 });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [dailyData, setDailyData] = useState<any[]>([]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [creatives, setCreatives] = useState<any[]>([]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [platformData, setPlatformData] = useState<any[]>([]);
+    const [platformComparison, setPlatformComparison] = useState<PlatformComparisonEntry[]>([]);
+    const [paidVsOrganic, setPaidVsOrganic] = useState<PaidOrganicEntry[]>([]);
 
     // Google Analytics data
     const [gaData, setGaData] = useState<GAData | null>(null);
@@ -88,7 +109,7 @@ export default function AnalyticsPage() {
             const data = await loadAllAnalyticsData(days, from, to);
             if (!data) { setLoading(false); return; }
 
-            const totals = data.adMetrics.totals || { spend: 0, clicks: 0, impressions: 0, conversions: 0 };
+            const totals = data.adMetrics.totals || { spend: 0, clicks: 0, impressions: 0, conversions: 0, revenue: 0 };
             const cpa = totals.conversions > 0 ? totals.spend / totals.conversions : 0;
             const cpc = totals.clicks > 0 ? totals.spend / totals.clicks : 0;
             const ctr = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0;
@@ -98,6 +119,35 @@ export default function AnalyticsPage() {
             setCreatives(data.creatives.slice(0, 5));
             setPlatformData(data.platformData);
             setGaData(data.gaData || null);
+
+            // CPA/ROAS by ad platform
+            const byPlatform: Record<string, { spend: number; revenue: number; conversions: number }> = {};
+            for (const m of (data.adMetrics.metrics || [])) {
+                const rec = m as Record<string, unknown>;
+                const p = String(rec.platform || "");
+                if (!byPlatform[p]) byPlatform[p] = { spend: 0, revenue: 0, conversions: 0 };
+                byPlatform[p].spend += Number(rec.spend) || 0;
+                byPlatform[p].revenue += Number(rec.revenue) || 0;
+                byPlatform[p].conversions += Number(rec.conversions) || 0;
+            }
+            setPlatformComparison(
+                Object.entries(byPlatform).map(([platform, vals]) => ({
+                    platform: platform.replace("FACEBOOK_ADS", "Facebook").replace("GOOGLE_ADS", "Google"),
+                    cpa: vals.conversions > 0 ? vals.spend / vals.conversions : 0,
+                    roas: vals.spend > 0 ? vals.revenue / vals.spend : 0,
+                }))
+            );
+
+            // Paid vs Organic revenue
+            const totalRevenue = (data.platformData || []).reduce(
+                (sum: number, p: Record<string, unknown>) => sum + (Number(p.revenue) || 0), 0
+            );
+            const paidRevenue = Math.min(Number(totals.revenue) || 0, totalRevenue);
+            const organicRevenue = Math.max(0, totalRevenue - paidRevenue);
+            setPaidVsOrganic([
+                { name: "Pago", value: paidRevenue },
+                { name: "Organico", value: organicRevenue },
+            ]);
         } catch (error) {
             console.error("Failed to load analytics data", error);
         }
@@ -109,13 +159,12 @@ export default function AnalyticsPage() {
         loadData();
     }, [loadData]);
 
-
     function fmtCurrency(val: number) {
-        return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val);
+        return fmtCurrencyGlobal(val);
     }
 
     function fmtNum(val: number) {
-        return new Intl.NumberFormat("pt-BR").format(val);
+        return fmtNumGlobal(val);
     }
 
     function fmtDuration(seconds: number) {
@@ -128,24 +177,11 @@ export default function AnalyticsPage() {
         return `${(val * 100).toFixed(1)}%`;
     }
 
-    const radarData = platformData.map(p => ({
-        subject: p.platform,
-        A: p.revenue > 0 ? Math.log(p.revenue) * 10 : 0,
-        B: p.orders * 5,
-        fullMark: 150
-    }));
-    const finalRadarData = radarData.length ? radarData : [
-        { subject: 'Shopify', A: 120, B: 110, fullMark: 150 },
-        { subject: 'Facebook', A: 98, B: 130, fullMark: 150 },
-        { subject: 'Google', A: 86, B: 130, fullMark: 150 },
-        { subject: 'Tiktok', A: 99, B: 100, fullMark: 150 },
-        { subject: 'Email', A: 85, B: 90, fullMark: 150 },
-        { subject: 'Direct', A: 65, B: 85, fullMark: 150 },
-    ];
-
     if (loading) {
         return <div className="p-8 flex items-center justify-center text-muted-foreground">Carregando analytics...</div>;
     }
+
+    const totalPaidOrganic = paidVsOrganic.reduce((s, d) => s + d.value, 0) || 1;
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
@@ -177,7 +213,7 @@ export default function AnalyticsPage() {
                         <AnalyticsKPICard title="CPM" value={fmtCurrency(kpis.cpm)} icon={Eye} color="text-purple-500 bg-purple-500/10" />
                     </div>
 
-                    {/* Charts Section */}
+                    {/* Charts Section: Daily + Paid vs Organic */}
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         <Card className="lg:col-span-2 border border-border shadow-none rounded-lg">
                             <CardHeader className="border-b border-border/50 px-5 py-4">
@@ -201,23 +237,78 @@ export default function AnalyticsPage() {
                             </CardContent>
                         </Card>
 
+                        {/* Paid vs Organic Donut */}
                         <Card className="border border-border shadow-none rounded-lg">
                             <CardHeader className="border-b border-border/50 px-5 py-4">
-                                <CardTitle className="text-base font-semibold">Performance Relativa</CardTitle>
+                                <CardTitle className="text-base font-semibold">Pago vs Organico</CardTitle>
                             </CardHeader>
-                            <CardContent className="p-5 h-[350px]">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <RadarChart cx="50%" cy="50%" outerRadius="80%" data={finalRadarData}>
-                                        <PolarGrid stroke="var(--border)" />
-                                        <PolarAngleAxis dataKey="subject" tick={{ fill: "var(--muted-foreground)", fontSize: 10 }} />
-                                        <PolarRadiusAxis angle={30} domain={[0, 150]} tick={false} axisLine={false} />
-                                        <Radar name="Performance" dataKey="A" stroke="var(--primary)" fill="var(--primary)" fillOpacity={0.2} />
-                                        <Tooltip contentStyle={{ borderRadius: "12px" }} />
-                                    </RadarChart>
-                                </ResponsiveContainer>
+                            <CardContent className="p-5 h-[350px] flex flex-col items-center justify-center">
+                                {totalPaidOrganic > 1 ? (
+                                    <>
+                                        <ResponsiveContainer width="100%" height={220}>
+                                            <PieChart>
+                                                <Pie
+                                                    data={paidVsOrganic}
+                                                    cx="50%"
+                                                    cy="50%"
+                                                    innerRadius={55}
+                                                    outerRadius={85}
+                                                    dataKey="value"
+                                                    paddingAngle={2}
+                                                    stroke="none"
+                                                >
+                                                    {paidVsOrganic.map((_, idx) => (
+                                                        <Cell key={idx} fill={PAID_ORGANIC_COLORS[idx]} />
+                                                    ))}
+                                                </Pie>
+                                                <Tooltip
+                                                    contentStyle={{ backgroundColor: "var(--card)", borderColor: "var(--border)", borderRadius: "12px" }}
+                                                    formatter={(value) => fmtCurrencyGlobal(Number(value))}
+                                                />
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                        <div className="flex gap-6 mt-2">
+                                            {paidVsOrganic.map((d, i) => (
+                                                <div key={i} className="flex items-center gap-2 text-xs">
+                                                    <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: PAID_ORGANIC_COLORS[i] }} />
+                                                    <span className="text-muted-foreground">{d.name}</span>
+                                                    <span className="font-semibold">{((d.value / totalPaidOrganic) * 100).toFixed(1)}%</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="text-center text-muted-foreground text-sm">Sem dados de receita no periodo.</div>
+                                )}
                             </CardContent>
                         </Card>
                     </div>
+
+                    {/* CPA / ROAS by Platform */}
+                    {platformComparison.length > 0 && (
+                        <Card className="border border-border shadow-none rounded-lg">
+                            <CardHeader className="border-b border-border/50 px-5 py-4">
+                                <CardTitle className="text-base font-semibold">CPA e ROAS por Plataforma</CardTitle>
+                            </CardHeader>
+                            <CardContent className="p-5 h-[300px]">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={platformComparison} margin={{ top: 5, right: 20, left: -10, bottom: 0 }}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} opacity={0.3} />
+                                        <XAxis dataKey="platform" tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
+                                        <YAxis yAxisId="cpa" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${v.toFixed(0)}`} />
+                                        <YAxis yAxisId="roas" orientation="right" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v.toFixed(1)}x`} />
+                                        <Tooltip
+                                            contentStyle={{ backgroundColor: "var(--card)", borderColor: "var(--border)", borderRadius: "12px" }}
+                                            formatter={(value, name) => name === "CPA" ? fmtCurrencyGlobal(Number(value)) : `${Number(value).toFixed(2)}x`}
+                                        />
+                                        <Legend verticalAlign="top" height={36} iconType="circle" />
+                                        <Bar yAxisId="cpa" dataKey="cpa" name="CPA" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={32} />
+                                        <Bar yAxisId="roas" dataKey="roas" name="ROAS" fill="#10b981" radius={[4, 4, 0, 0]} barSize={32} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </CardContent>
+                        </Card>
+                    )}
 
                     {/* Top Creatives */}
                     <Card className="border border-border shadow-none rounded-lg">
@@ -274,7 +365,7 @@ export default function AnalyticsPage() {
                                     <TabsTrigger value="platform">Plataforma</TabsTrigger>
                                     <TabsTrigger value="gender">Genero</TabsTrigger>
                                     <TabsTrigger value="age">Idade</TabsTrigger>
-                                    <TabsTrigger value="state">Estado</TabsTrigger>
+                                    <TabsTrigger value="state">Regiao</TabsTrigger>
                                 </TabsList>
                                 <TabsContent value="platform" className="mt-0">
                                     <div className="space-y-2">
@@ -292,7 +383,7 @@ export default function AnalyticsPage() {
                                                 <div className="text-right">
                                                     <p className="font-bold text-sm">{fmtCurrency(p.revenue)}</p>
                                                     <div className="w-24 h-1.5 bg-secondary rounded-full mt-1 overflow-hidden">
-                                                        <div className="h-full bg-primary" style={{ width: `${(p.revenue / Math.max(...platformData.map((x: any) => x.revenue), 1)) * 100}%` }} />
+                                                        <div className="h-full bg-primary" style={{ width: `${(p.revenue / Math.max(...platformData.map((x: Record<string, unknown>) => Number(x.revenue)), 1)) * 100}%` }} />
                                                     </div>
                                                 </div>
                                             </div>
@@ -301,13 +392,45 @@ export default function AnalyticsPage() {
                                     </div>
                                 </TabsContent>
                                 <TabsContent value="gender">
-                                    <EmptyStateIcon icon={Users} label="Dados demograficos (Genero) indisponiveis na origem." />
+                                    {gaData?.gender && gaData.gender.length > 0 ? (
+                                        <SegmentationList data={gaData.gender} icon={Users} />
+                                    ) : (
+                                        <EmptyStateIcon icon={Users} label="Conecte o Google Analytics para ver dados de genero." />
+                                    )}
                                 </TabsContent>
                                 <TabsContent value="age">
-                                    <EmptyStateIcon icon={Smartphone} label="Dados demograficos (Idade) indisponiveis na origem." />
+                                    {gaData?.age && gaData.age.length > 0 ? (
+                                        <SegmentationList data={gaData.age} icon={Smartphone} />
+                                    ) : (
+                                        <EmptyStateIcon icon={Smartphone} label="Conecte o Google Analytics para ver dados de idade." />
+                                    )}
                                 </TabsContent>
                                 <TabsContent value="state">
-                                    <EmptyStateIcon icon={MapPin} label="Dados geograficos indisponiveis na origem." />
+                                    {gaData?.geography && gaData.geography.length > 0 ? (
+                                        <div className="space-y-2">
+                                            {gaData.geography.map((g, i) => {
+                                                const maxSessions = Math.max(...gaData.geography.map(x => x.sessions), 1);
+                                                return (
+                                                    <div key={i} className="flex items-center justify-between p-3 border border-border rounded-lg">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
+                                                                <MapPin className="w-4 h-4 text-muted-foreground" />
+                                                            </div>
+                                                            <p className="font-medium text-sm">{g.country}</p>
+                                                        </div>
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-24 h-1.5 bg-secondary rounded-full overflow-hidden">
+                                                                <div className="h-full bg-primary" style={{ width: `${(g.sessions / maxSessions) * 100}%` }} />
+                                                            </div>
+                                                            <span className="text-sm font-semibold w-16 text-right">{fmtNum(g.sessions)}</span>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <EmptyStateIcon icon={MapPin} label="Conecte o Google Analytics para ver dados geograficos." />
+                                    )}
                                 </TabsContent>
                             </Tabs>
                         </CardContent>
@@ -385,8 +508,53 @@ export default function AnalyticsPage() {
                                 </CardContent>
                             </Card>
 
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                {/* Traffic Sources */}
+                            {/* Traffic Sources: Pie + Table + Top Pages */}
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                {/* Traffic Sources Pie */}
+                                <Card className="border border-border shadow-none rounded-lg">
+                                    <CardHeader className="border-b border-border/50 px-5 py-4">
+                                        <CardTitle className="text-base font-semibold">Origens de Trafego</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="p-5 flex flex-col items-center">
+                                        {gaData.trafficSources.length > 0 ? (
+                                            <>
+                                                <ResponsiveContainer width="100%" height={200}>
+                                                    <PieChart>
+                                                        <Pie
+                                                            data={gaData.trafficSources.slice(0, 8)}
+                                                            cx="50%"
+                                                            cy="50%"
+                                                            outerRadius={75}
+                                                            dataKey="sessions"
+                                                            nameKey="source"
+                                                            stroke="none"
+                                                        >
+                                                            {gaData.trafficSources.slice(0, 8).map((_, idx) => (
+                                                                <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
+                                                            ))}
+                                                        </Pie>
+                                                        <Tooltip
+                                                            contentStyle={{ backgroundColor: "var(--card)", borderColor: "var(--border)", borderRadius: "12px" }}
+                                                            formatter={(value) => fmtNumGlobal(Number(value))}
+                                                        />
+                                                    </PieChart>
+                                                </ResponsiveContainer>
+                                                <div className="flex flex-wrap gap-2 mt-2 justify-center">
+                                                    {gaData.trafficSources.slice(0, 8).map((s, i) => (
+                                                        <div key={i} className="flex items-center gap-1.5 text-[10px]">
+                                                            <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                                                            <span className="text-muted-foreground truncate max-w-[80px]">{s.source}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <div className="h-40 flex items-center justify-center text-muted-foreground text-sm">Sem dados.</div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+
+                                {/* Traffic Sources Table */}
                                 <Card className="border border-border shadow-none rounded-lg">
                                     <CardHeader className="border-b border-border/50 px-5 py-4">
                                         <CardTitle className="text-base font-semibold">Fontes de Trafego</CardTitle>
@@ -483,18 +651,19 @@ export default function AnalyticsPage() {
                                     </CardContent>
                                 </Card>
 
-                                {/* Geography */}
+                                {/* Geography - Top 10 */}
                                 <Card className="border border-border shadow-none rounded-lg">
                                     <CardHeader className="border-b border-border/50 px-5 py-4">
-                                        <CardTitle className="text-base font-semibold">Paises</CardTitle>
+                                        <CardTitle className="text-base font-semibold">Top 10 Regioes</CardTitle>
                                     </CardHeader>
                                     <CardContent className="p-5">
                                         <div className="space-y-2">
-                                            {gaData.geography.length > 0 ? gaData.geography.map((g, i) => {
+                                            {gaData.geography.length > 0 ? gaData.geography.slice(0, 10).map((g, i) => {
                                                 const maxSessions = Math.max(...gaData.geography.map(x => x.sessions), 1);
                                                 return (
                                                     <div key={i} className="flex items-center justify-between p-2">
                                                         <div className="flex items-center gap-2">
+                                                            <span className="text-xs text-muted-foreground font-medium w-5">{i + 1}.</span>
                                                             <Globe className="w-3.5 h-3.5 text-muted-foreground" />
                                                             <span className="text-sm">{g.country}</span>
                                                         </div>
@@ -540,6 +709,33 @@ function EmptyStateIcon({ icon: Icon, label }: { icon: LucideIcon; label: string
         <div className="h-40 flex flex-col items-center justify-center text-muted-foreground gap-2 border border-dashed rounded-lg">
             <Icon className="w-8 h-8 opacity-50" />
             <p className="text-xs">{label}</p>
+        </div>
+    );
+}
+
+function SegmentationList({ data, icon: Icon }: { data: { label: string; sessions: number; activeUsers: number }[]; icon: LucideIcon }) {
+    const maxSessions = Math.max(...data.map(d => d.sessions), 1);
+    return (
+        <div className="space-y-2">
+            {data.map((d, i) => (
+                <div key={i} className="flex items-center justify-between p-3 border border-border rounded-lg">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
+                            <Icon className="w-4 h-4 text-muted-foreground" />
+                        </div>
+                        <div>
+                            <p className="font-medium text-sm">{d.label}</p>
+                            <p className="text-xs text-muted-foreground">{fmtNumGlobal(d.activeUsers)} usuarios</p>
+                        </div>
+                    </div>
+                    <div className="text-right">
+                        <p className="font-bold text-sm">{fmtNumGlobal(d.sessions)} sessoes</p>
+                        <div className="w-24 h-1.5 bg-secondary rounded-full mt-1 overflow-hidden">
+                            <div className="h-full bg-primary" style={{ width: `${(d.sessions / maxSessions) * 100}%` }} />
+                        </div>
+                    </div>
+                </div>
+            ))}
         </div>
     );
 }
