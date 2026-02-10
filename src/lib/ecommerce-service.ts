@@ -8,6 +8,7 @@ export interface Product {
     collection: string;
     vendor: string;
     totalSold?: number; // Optional: specific to "best sellers" context
+    totalRevenue?: number; // Optional: actual revenue from order line_items
 }
 
 export interface Collection {

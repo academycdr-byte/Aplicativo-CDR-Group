@@ -1,18 +1,21 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { type Product, type Collection } from "@/lib/ecommerce-service";
 import { getBestSellersAction, getCollectionsAction } from "@/actions/ecommerce";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, ShoppingBag, TrendingUp, Filter, AlertCircle, ExternalLink, Package } from "lucide-react";
+import { ShoppingBag, TrendingUp, Filter, AlertCircle, Package, LayoutGrid, List, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import Image from "next/image";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { PeriodSelector, periodToParams, type PeriodValue } from "@/components/period-selector";
 import { motion } from "framer-motion";
+
+type SortField = "totalSold" | "revenue" | "ticket";
+type SortDir = "desc" | "asc";
 
 export default function BestSellersPage() {
     const [products, setProducts] = useState<Product[]>([]);
@@ -21,6 +24,9 @@ export default function BestSellersPage() {
     const [period, setPeriod] = useState<PeriodValue>({ type: "preset", days: 30 });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+    const [sortField, setSortField] = useState<SortField>("totalSold");
+    const [sortDir, setSortDir] = useState<SortDir>("desc");
 
     useEffect(() => {
         const fetchData = async () => {
@@ -35,12 +41,9 @@ export default function BestSellersPage() {
                     fromDate = new Date(params.from);
                     toDate = new Date(params.to);
                 } else if (period.type === "preset") {
-                    // Calculate dates for preset periods
                     toDate = new Date();
                     fromDate = new Date();
                     fromDate.setDate(toDate.getDate() - period.days);
-
-                    // Specific adjustment for "Today" (0 days) to be start of day
                     if (period.days === 0) {
                         fromDate.setHours(0, 0, 0, 0);
                     }
@@ -73,13 +76,43 @@ export default function BestSellersPage() {
         }).format(value);
     };
 
+    const handleSort = useCallback((field: SortField) => {
+        if (sortField === field) {
+            setSortDir(prev => prev === "desc" ? "asc" : "desc");
+        } else {
+            setSortField(field);
+            setSortDir("desc");
+        }
+    }, [sortField]);
+
+    const getProductRevenue = (p: Product) => p.totalRevenue ?? ((p.totalSold || 0) * p.price);
+    const getProductTicket = (p: Product) => {
+        const sold = p.totalSold || 0;
+        return sold > 0 ? getProductRevenue(p) / sold : 0;
+    };
+
+    const sortedProducts = [...products].sort((a, b) => {
+        const getVal = (p: Product) => {
+            if (sortField === "totalSold") return p.totalSold || 0;
+            if (sortField === "revenue") return getProductRevenue(p);
+            return getProductTicket(p);
+        };
+        const diff = getVal(b) - getVal(a);
+        return sortDir === "desc" ? diff : -diff;
+    });
+
+    const SortIcon = ({ field }: { field: SortField }) => {
+        if (sortField !== field) return <ArrowUpDown className="w-3.5 h-3.5 ml-1 opacity-40" />;
+        return sortDir === "desc"
+            ? <ArrowDown className="w-3.5 h-3.5 ml-1" />
+            : <ArrowUp className="w-3.5 h-3.5 ml-1" />;
+    };
+
     const container = {
         hidden: { opacity: 0 },
         show: {
             opacity: 1,
-            transition: {
-                staggerChildren: 0.1
-            }
+            transition: { staggerChildren: 0.1 }
         }
     };
 
@@ -102,6 +135,22 @@ export default function BestSellersPage() {
                 </div>
 
                 <div className="flex items-center gap-3">
+                    {/* View Toggle */}
+                    <div className="flex items-center rounded-lg border border-border/50 bg-background/50 p-1">
+                        <button
+                            onClick={() => setViewMode("grid")}
+                            className={`p-2 rounded-md transition-colors ${viewMode === "grid" ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                        >
+                            <LayoutGrid className="w-4 h-4" />
+                        </button>
+                        <button
+                            onClick={() => setViewMode("list")}
+                            className={`p-2 rounded-md transition-colors ${viewMode === "list" ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                        >
+                            <List className="w-4 h-4" />
+                        </button>
+                    </div>
+
                     <PeriodSelector
                         value={period}
                         onChange={setPeriod}
@@ -135,88 +184,161 @@ export default function BestSellersPage() {
             )}
 
             {loading ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-                        <Card key={i} className="border-border/40 bg-card/30 overflow-hidden h-[380px]">
-                            <div className="animate-pulse h-full w-full bg-muted/10"></div>
-                        </Card>
-                    ))}
-                </div>
+                viewMode === "grid" ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                            <Card key={i} className="border-border/40 bg-card/30 overflow-hidden h-[380px]">
+                                <div className="animate-pulse h-full w-full bg-muted/10"></div>
+                            </Card>
+                        ))}
+                    </div>
+                ) : (
+                    <Card className="border-border/40 bg-card/30 overflow-hidden">
+                        <div className="animate-pulse h-80 w-full bg-muted/10"></div>
+                    </Card>
+                )
             ) : (
                 <>
                     {products.length > 0 ? (
-                        <motion.div
-                            variants={container}
-                            initial="hidden"
-                            animate="show"
-                            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
-                        >
-                            {products.map((product, index) => (
-                                <motion.div key={product.id} variants={item}>
-                                    <Card className="group overflow-hidden bg-gradient-to-b from-card/50 to-card/30 border-white/5 transition-all duration-300 h-full flex flex-col backdrop-blur-sm">
-                                        {/* Image Container */}
-                                        <div className="relative aspect-[4/5] overflow-hidden bg-muted/20">
-                                            {product.imageUrl ? (
-                                                <Image
-                                                    src={product.imageUrl}
-                                                    alt={product.title}
-                                                    fill
-                                                    className="object-cover transition-transform duration-700"
-                                                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                                                />
-                                            ) : (
-                                                <div className="w-full h-full flex flex-col items-center justify-center bg-muted/30 text-muted-foreground gap-2">
-                                                    <Package className="w-10 h-10 opacity-20" />
-                                                    <span className="text-xs">Sem Imagem</span>
-                                                </div>
-                                            )}
+                        viewMode === "grid" ? (
+                            /* Grid View */
+                            <motion.div
+                                variants={container}
+                                initial="hidden"
+                                animate="show"
+                                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+                            >
+                                {sortedProducts.map((product, index) => (
+                                    <motion.div key={product.id} variants={item}>
+                                        <Card className="overflow-hidden bg-gradient-to-b from-card/50 to-card/30 border-white/5 transition-all duration-300 h-full flex flex-col backdrop-blur-sm">
+                                            {/* Image Container */}
+                                            <div className="relative aspect-[4/5] overflow-hidden bg-muted/20">
+                                                {product.imageUrl ? (
+                                                    <Image
+                                                        src={product.imageUrl}
+                                                        alt={product.title}
+                                                        fill
+                                                        className="object-cover"
+                                                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                                                    />
+                                                ) : (
+                                                    <div className="w-full h-full flex flex-col items-center justify-center bg-muted/30 text-muted-foreground gap-2">
+                                                        <Package className="w-10 h-10 opacity-20" />
+                                                        <span className="text-xs">Sem Imagem</span>
+                                                    </div>
+                                                )}
 
-                                            {/* Rank Badge */}
-                                            <div className="absolute top-3 left-3 z-10">
-                                                <Badge className={`${index < 3 ? 'bg-primary text-primary-foreground' : 'bg-black/60 text-white border-white/10'} backdrop-blur-md px-2.5 py-1 shadow-lg`}>
-                                                    #{index + 1}
-                                                </Badge>
+                                                {/* Rank Badge */}
+                                                <div className="absolute top-3 left-3 z-10">
+                                                    <Badge className={`${index < 3 ? 'bg-primary text-primary-foreground' : 'bg-black/60 text-white border-white/10'} backdrop-blur-md px-2.5 py-1 shadow-lg`}>
+                                                        #{index + 1}
+                                                    </Badge>
+                                                </div>
                                             </div>
 
-                                            {/* Overlay Actions */}
-                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center backdrop-blur-[2px]">
-                                                <Button variant="secondary" size="sm" className="gap-2 font-medium bg-white/90 text-black hover:bg-white transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-                                                    <ExternalLink className="w-4 h-4" />
-                                                    Ver na Loja
-                                                </Button>
-                                            </div>
-                                        </div>
-
-                                        <CardContent className="p-5 flex-1 flex flex-col justify-between gap-4">
-                                            <div className="space-y-1.5">
-                                                <div className="flex justify-between items-start gap-2">
-                                                    <h3 className="font-medium leading-snug line-clamp-2 text-foreground/90 group-hover:text-primary transition-colors min-h-[2.75rem]" title={product.title}>
-                                                        {product.title}
-                                                    </h3>
+                                            <CardContent className="p-5 flex-1 flex flex-col justify-between gap-4">
+                                                <div className="space-y-1.5">
+                                                    <div className="flex justify-between items-start gap-2">
+                                                        <h3 className="font-medium leading-snug line-clamp-2 text-foreground/90 min-h-[2.75rem]" title={product.title}>
+                                                            {product.title}
+                                                        </h3>
+                                                    </div>
+                                                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{product.vendor}</p>
                                                 </div>
-                                                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{product.vendor}</p>
-                                            </div>
 
-                                            <div className="flex items-end justify-between border-t border-border/40 pt-4 mt-2">
-                                                <div className="flex flex-col">
-                                                    <span className="text-[10px] text-muted-foreground uppercase opacity-70">Preço</span>
-                                                    <span className="text-lg font-bold text-foreground">
-                                                        {formatCurrency(product.price, product.currency)}
-                                                    </span>
-                                                </div>
-                                                <div className="flex flex-col items-end">
-                                                    <span className="text-[10px] text-muted-foreground uppercase opacity-70">Vendas</span>
-                                                    <div className="flex items-center gap-1.5 text-emerald-500 font-medium">
-                                                        <TrendingUp className="w-3.5 h-3.5" />
-                                                        <span>{product.totalSold || "-"}</span>
+                                                <div className="flex items-end justify-between border-t border-border/40 pt-4 mt-2">
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[10px] text-muted-foreground uppercase opacity-70">Receita</span>
+                                                        <span className="text-lg font-bold text-foreground">
+                                                            {formatCurrency(getProductRevenue(product), product.currency)}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex flex-col items-end">
+                                                        <span className="text-[10px] text-muted-foreground uppercase opacity-70">Vendas</span>
+                                                        <div className="flex items-center gap-1.5 text-emerald-500 font-medium">
+                                                            <TrendingUp className="w-3.5 h-3.5" />
+                                                            <span>{product.totalSold || "-"}</span>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                </motion.div>
-                            ))}
-                        </motion.div>
+                                            </CardContent>
+                                        </Card>
+                                    </motion.div>
+                                ))}
+                            </motion.div>
+                        ) : (
+                            /* List View */
+                            <Card className="overflow-hidden border-border/40 bg-card/30 backdrop-blur-sm">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full">
+                                        <thead>
+                                            <tr className="border-b border-border/40 text-xs text-muted-foreground uppercase tracking-wider">
+                                                <th className="text-left px-4 py-3 font-medium w-12">#</th>
+                                                <th className="text-left px-4 py-3 font-medium w-16">Imagem</th>
+                                                <th className="text-left px-4 py-3 font-medium">Nome</th>
+                                                <th className="text-right px-4 py-3 font-medium cursor-pointer select-none" onClick={() => handleSort("totalSold")}>
+                                                    <span className="inline-flex items-center justify-end">Qtd Vendida <SortIcon field="totalSold" /></span>
+                                                </th>
+                                                <th className="text-right px-4 py-3 font-medium cursor-pointer select-none" onClick={() => handleSort("revenue")}>
+                                                    <span className="inline-flex items-center justify-end">Receita <SortIcon field="revenue" /></span>
+                                                </th>
+                                                <th className="text-right px-4 py-3 font-medium cursor-pointer select-none" onClick={() => handleSort("ticket")}>
+                                                    <span className="inline-flex items-center justify-end">Ticket Médio <SortIcon field="ticket" /></span>
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {sortedProducts.map((product, index) => {
+                                                const sold = product.totalSold || 0;
+                                                const revenue = getProductRevenue(product);
+                                                const ticket = getProductTicket(product);
+                                                return (
+                                                    <tr key={product.id} className="border-b border-border/20 hover:bg-accent/30 transition-colors">
+                                                        <td className="px-4 py-3">
+                                                            <Badge className={`${index < 3 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'} text-xs`}>
+                                                                {index + 1}
+                                                            </Badge>
+                                                        </td>
+                                                        <td className="px-4 py-3">
+                                                            <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-muted/20 flex-shrink-0">
+                                                                {product.imageUrl ? (
+                                                                    <Image
+                                                                        src={product.imageUrl}
+                                                                        alt={product.title}
+                                                                        fill
+                                                                        className="object-cover"
+                                                                        sizes="40px"
+                                                                    />
+                                                                ) : (
+                                                                    <div className="w-full h-full flex items-center justify-center">
+                                                                        <Package className="w-4 h-4 opacity-30" />
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-4 py-3">
+                                                            <div>
+                                                                <p className="font-medium text-sm text-foreground/90 line-clamp-1">{product.title}</p>
+                                                                <p className="text-xs text-muted-foreground">{product.vendor}</p>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-4 py-3 text-right">
+                                                            <span className="font-medium text-sm">{sold.toLocaleString("pt-BR")}</span>
+                                                        </td>
+                                                        <td className="px-4 py-3 text-right">
+                                                            <span className="font-medium text-sm">{formatCurrency(revenue, product.currency)}</span>
+                                                        </td>
+                                                        <td className="px-4 py-3 text-right">
+                                                            <span className="font-medium text-sm text-muted-foreground">{formatCurrency(ticket, product.currency)}</span>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </Card>
+                        )
                     ) : (
                         <div className="flex flex-col items-center justify-center py-20 text-center border border-dashed border-border/30 rounded-xl bg-muted/5 animate-in fade-in zoom-in duration-500">
                             <div className="w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mb-6">

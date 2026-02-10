@@ -3,10 +3,11 @@
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { decrypt } from "@/lib/encryption"; // Added decrypt import
+import { decrypt } from "@/lib/encryption";
 import { fetchShopifyProducts, fetchShopifyCollections } from "@/lib/integrations/shopify";
 import { fetchNuvemshopProducts, fetchNuvemshopCollections } from "@/lib/integrations/nuvemshop";
 import { type Product, type Collection } from "@/lib/ecommerce-service";
+import { toBrasiliaStartOfDay, toBrasiliaEndOfDay, getBrazilToday } from "@/lib/date-utils";
 
 /**
  * Server Action to get best selling products from the connected store.
@@ -53,9 +54,14 @@ export async function getBestSellersAction(
     }
 
     try {
-        // 1. Validate dates or set defaults (last 30 days)
-        const endDate = to || new Date();
-        const startDate = from || new Date(new Date().setDate(endDate.getDate() - 30));
+        // 1. Validate dates or set defaults (last 30 days in Brasilia)
+        const todayStr = getBrazilToday();
+        const endDate = to || toBrasiliaEndOfDay(todayStr);
+        // Default start: 30 days ago in Brasilia timezone
+        const thirtyDaysAgo = new Date(todayStr);
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().slice(0, 10);
+        const startDate = from || toBrasiliaStartOfDay(thirtyDaysAgoStr);
 
         // 2. Fetch orders from database within the period
         const orders = await prisma.order.findMany({
@@ -66,40 +72,49 @@ export async function getBestSellersAction(
                     gte: startDate,
                     lte: endDate
                 },
-                status: { in: ["paid", "delivered", "shipped", "completed"] } // Only count valid sales
+                status: { in: ["paid", "partially_refunded", "delivered", "shipped"] } // Only count valid sales
             },
             select: {
                 rawData: true
             }
         });
 
-        // 3. Aggregate sales by product
+        // 3. Aggregate sales by product (quantity + revenue)
         const salesMap = new Map<string, number>();
+        const revenueMap = new Map<string, number>();
         const productIds = new Set<string>();
 
         for (const order of orders) {
-            const raw = order.rawData as any;
+            const raw = order.rawData as Record<string, unknown>;
 
             if (integration.platform === "SHOPIFY") {
                 // Shopify: line_items array
-                if (raw?.line_items && Array.isArray(raw.line_items)) {
-                    for (const item of raw.line_items) {
-                        if (item.product_id) {
-                            const pid = String(item.product_id);
-                            const qty = item.quantity || 0;
+                const lineItems = raw?.line_items;
+                if (Array.isArray(lineItems)) {
+                    for (const item of lineItems) {
+                        const li = item as Record<string, unknown>;
+                        if (li.product_id) {
+                            const pid = String(li.product_id);
+                            const qty = Number(li.quantity) || 0;
+                            const itemPrice = parseFloat(String(li.price || "0"));
                             salesMap.set(pid, (salesMap.get(pid) || 0) + qty);
+                            revenueMap.set(pid, (revenueMap.get(pid) || 0) + (itemPrice * qty));
                             productIds.add(pid);
                         }
                     }
                 }
             } else if (integration.platform === "NUVEMSHOP") {
                 // Nuvemshop: products array
-                if (raw?.products && Array.isArray(raw.products)) {
-                    for (const item of raw.products) {
-                        if (item.product_id) {
-                            const pid = String(item.product_id);
-                            const qty = parseInt(item.quantity) || 0;
+                const products = raw?.products;
+                if (Array.isArray(products)) {
+                    for (const item of products) {
+                        const li = item as Record<string, unknown>;
+                        if (li.product_id) {
+                            const pid = String(li.product_id);
+                            const qty = parseInt(String(li.quantity)) || 0;
+                            const itemPrice = parseFloat(String(li.price || "0"));
                             salesMap.set(pid, (salesMap.get(pid) || 0) + qty);
+                            revenueMap.set(pid, (revenueMap.get(pid) || 0) + (itemPrice * qty));
                             productIds.add(pid);
                         }
                     }
@@ -161,29 +176,24 @@ export async function getBestSellersAction(
             if (integration.platform === "SHOPIFY") {
                 const imageUrl = details.image?.src || details.images?.[0]?.src || "";
                 const price = details.variants?.[0]?.price || "0.00";
-
-                // Collection filter check (if local filtering is needed, though we passed ID to fetch products)
-                // Since we fetched by IDs from ALL orders, we might need to double check collection if passed.
-                // However, Shopify product details usually don't include collection ID directly in the simple JSON.
-                // For "Best Sellers" page, usually "All" is selected. If specific collection is selected, we should verify.
-                // Limitation: Checking if product is in collection requires another API call.
-                // For MVP: Ignore collection filter in "Best Sellers by Sales" logic OR implemented strictly.
-                // Let's assume for now we return what we found. 
+                const rev = revenueMap.get(id) || 0;
 
                 result.push({
                     id: String(details.id),
                     title: details.title,
                     price: parseFloat(price),
                     currency: "BRL",
-                    imageUrl: imageUrl || "https://placehold.co/500x500?text=No+Image",
-                    collection: "all", // We don't have this info easily here without extra calls
+                    imageUrl: imageUrl || "",
+                    collection: "all",
                     vendor: details.vendor,
-                    totalSold: qty
+                    totalSold: qty,
+                    totalRevenue: rev
                 });
             } else {
-                // Nuvemshop mapping...
+                // Nuvemshop mapping
                 const imageUrl = details.images?.[0]?.src || "";
                 const price = details.variants?.[0]?.price || "0.00";
+                const rev = revenueMap.get(id) || 0;
                 result.push({
                     id: String(details.id),
                     title: details.name?.pt || details.name || "Produto",
@@ -192,7 +202,8 @@ export async function getBestSellersAction(
                     imageUrl: imageUrl,
                     collection: "all",
                     vendor: details.brand,
-                    totalSold: qty
+                    totalSold: qty,
+                    totalRevenue: rev
                 });
             }
         }
