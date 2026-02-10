@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { type Product, type Collection } from "@/lib/ecommerce-service";
-import { getBestSellersAction, getCollectionsAction } from "@/actions/ecommerce";
+import { getBestSellersAction, getCollectionsAction, getOrdersRevenueTotalAction } from "@/actions/ecommerce";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,7 @@ export default function BestSellersPage() {
     const [period, setPeriod] = useState<PeriodValue>({ type: "preset", days: 30 });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [revenueTotal, setRevenueTotal] = useState<number>(0);
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
     const [sortField, setSortField] = useState<SortField>("totalSold");
     const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -51,13 +52,15 @@ export default function BestSellersPage() {
 
                 const results = await Promise.allSettled([
                     getBestSellersAction(selectedCollection === "all" ? undefined : selectedCollection, fromDate, toDate),
-                    getCollectionsAction()
+                    getCollectionsAction(),
+                    getOrdersRevenueTotalAction(fromDate, toDate)
                 ]);
 
                 if (results[0].status === "fulfilled") setProducts(results[0].value);
                 if (results[1].status === "fulfilled" && collections.length === 0 && results[1].value.length > 0) {
                     setCollections(results[1].value);
                 }
+                if (results[2].status === "fulfilled") setRevenueTotal(results[2].value);
             } catch (err) {
                 console.error("Failed to fetch data:", err);
                 setError("Não foi possível carregar os produtos. Verifique sua conexão com a loja ou tente novamente mais tarde.");
@@ -218,10 +221,7 @@ export default function BestSellersPage() {
                             <div>
                                 <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-semibold">Receita Total</p>
                                 <p className="text-2xl font-bold tracking-tight text-foreground">
-                                    {formatCurrency(
-                                        products.reduce((sum, p) => sum + getProductRevenue(p), 0),
-                                        products[0]?.currency || "BRL"
-                                    )}
+                                    {formatCurrency(revenueTotal, "BRL")}
                                 </p>
                             </div>
                         </CardContent>

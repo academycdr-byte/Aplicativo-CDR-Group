@@ -217,6 +217,40 @@ export async function getBestSellersAction(
 }
 
 /**
+ * Server Action to get total revenue from orders (same logic as Dashboard "Faturamento").
+ * Uses order.totalAmount with status="paid" to match dashboard exactly.
+ */
+export async function getOrdersRevenueTotalAction(from?: Date, to?: Date): Promise<number> {
+    const session = await auth();
+    if (!session?.user?.id) return 0;
+
+    const membership = await prisma.membership.findFirst({
+        where: { userId: session.user.id },
+        select: { organizationId: true }
+    });
+
+    if (!membership) return 0;
+
+    const todayStr = getBrazilToday();
+    const endDate = to || toBrasiliaEndOfDay(todayStr);
+    const thirtyDaysAgo = new Date(todayStr);
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().slice(0, 10);
+    const startDate = from || toBrasiliaStartOfDay(thirtyDaysAgoStr);
+
+    const result = await prisma.order.aggregate({
+        where: {
+            organizationId: membership.organizationId,
+            orderDate: { gte: startDate, lte: endDate },
+            status: "paid",
+        },
+        _sum: { totalAmount: true },
+    });
+
+    return Number(result._sum.totalAmount || 0);
+}
+
+/**
  * Server Action to get collections
  */
 export async function getCollectionsAction(): Promise<Collection[]> {
