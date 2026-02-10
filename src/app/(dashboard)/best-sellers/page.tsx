@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ShoppingBag, TrendingUp, Filter, AlertCircle, Package, LayoutGrid, List, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { ShoppingBag, TrendingUp, Filter, AlertCircle, Package, LayoutGrid, List, ArrowUpDown, ArrowUp, ArrowDown, Boxes } from "lucide-react";
 import Image from "next/image";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { PeriodSelector, periodToParams, type PeriodValue } from "@/components/period-selector";
@@ -181,6 +181,52 @@ export default function BestSellersPage() {
                     <AlertTitle>Erro na conexão</AlertTitle>
                     <AlertDescription>{error}</AlertDescription>
                 </Alert>
+            )}
+
+            {/* KPI Cards */}
+            {!loading && products.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <Card className="border-border/40 bg-card/30 backdrop-blur-sm">
+                        <CardContent className="p-5 flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                <Boxes className="w-6 h-6 text-primary" />
+                            </div>
+                            <div>
+                                <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-semibold">Produtos Diferentes</p>
+                                <p className="text-2xl font-bold tracking-tight text-foreground">{products.length}</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card className="border-border/40 bg-card/30 backdrop-blur-sm">
+                        <CardContent className="p-5 flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
+                                <TrendingUp className="w-6 h-6 text-emerald-500" />
+                            </div>
+                            <div>
+                                <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-semibold">Total Unidades Vendidas</p>
+                                <p className="text-2xl font-bold tracking-tight text-foreground">
+                                    {products.reduce((sum, p) => sum + (p.totalSold || 0), 0).toLocaleString("pt-BR")}
+                                </p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card className="border-border/40 bg-card/30 backdrop-blur-sm">
+                        <CardContent className="p-5 flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+                                <ShoppingBag className="w-6 h-6 text-blue-500" />
+                            </div>
+                            <div>
+                                <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-semibold">Receita Total</p>
+                                <p className="text-2xl font-bold tracking-tight text-foreground">
+                                    {formatCurrency(
+                                        products.reduce((sum, p) => sum + getProductRevenue(p), 0),
+                                        products[0]?.currency || "BRL"
+                                    )}
+                                </p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
             )}
 
             {loading ? (
