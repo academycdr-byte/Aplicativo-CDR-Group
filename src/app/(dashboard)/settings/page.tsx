@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { User, Building2, Users } from "lucide-react";
+import { User } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
 const settingsItems = [
@@ -8,12 +8,6 @@ const settingsItems = [
     icon: User,
     title: "Perfil",
     description: "Edite seu nome, email e senha.",
-  },
-  {
-    href: "/settings/organization",
-    icon: Building2,
-    title: "Organizacao",
-    description: "Gerencie sua organizacao e membros da equipe.",
   },
 ];
 

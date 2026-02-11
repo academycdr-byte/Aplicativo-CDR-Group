@@ -162,7 +162,9 @@ export function Sidebar() {
               {session?.user?.email}
             </p>
           </div>
-          <Settings className="w-4 h-4 text-sidebar-text/30 group-hover:text-sidebar-text/70 transition-colors" />
+          <Link href="/settings">
+            <Settings className="w-4 h-4 text-sidebar-text/30 group-hover:text-sidebar-text/70 transition-colors" />
+          </Link>
         </div>
       </div>
     </aside>

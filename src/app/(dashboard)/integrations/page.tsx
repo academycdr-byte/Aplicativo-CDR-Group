@@ -79,14 +79,6 @@ const platforms: PlatformConfig[] = [
     fields: [],
   },
   {
-    name: "Google Ads",
-    platform: "GOOGLE_ADS",
-    description: "Conecte sua conta do Google Ads.",
-    authType: "oauth",
-    color: "#4285F4",
-    fields: [],
-  },
-  {
     name: "Google Analytics",
     platform: "GOOGLE_ANALYTICS",
     description: "Conecte sua propriedade do Google Analytics 4 (GA4).",
