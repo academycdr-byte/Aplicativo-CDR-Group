@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { decrypt } from "@/lib/encryption";
 import { parseOrderDate, toDateKeyBrasilia } from "@/lib/date-utils";
 
+const CARTPANDA_API_BASE = "https://accounts.cartpanda.com/api";
+
 /**
  * Validate Cartpanda API credentials by making a test request.
  * Returns { valid: true } or { valid: false, error: string }.
@@ -12,11 +14,11 @@ export async function validateCartpandaCredentials(
 ): Promise<{ valid: boolean; error?: string }> {
   try {
     const response = await fetch(
-      `https://api.cartpanda.com/v1/stores/${storeId}/orders?page=1&limit=1`,
+      `${CARTPANDA_API_BASE}/${storeId}/orders?page=1&limit=1`,
       {
         headers: {
           Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
+          Accept: "application/json",
         },
       }
     );
@@ -71,11 +73,11 @@ export async function syncCartpandaOrders(organizationId: string) {
 
     while (hasMore) {
       const response = await fetch(
-        `https://api.cartpanda.com/v1/stores/${storeId}/orders?page=${page}&limit=100`,
+        `${CARTPANDA_API_BASE}/${storeId}/orders?page=${page}&limit=100`,
         {
           headers: {
             Authorization: `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
+            Accept: "application/json",
           },
         }
       );

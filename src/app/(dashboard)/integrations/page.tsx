@@ -54,8 +54,8 @@ const platforms: PlatformConfig[] = [
     authType: "apikey",
     color: "#FF6B35",
     fields: [
-      { key: "apiKey", label: "API Key", placeholder: "Cole sua API Key da Cartpanda" },
-      { key: "externalStoreId", label: "Store ID", placeholder: "ID da sua loja" },
+      { key: "apiKey", label: "Token", placeholder: "Cole o Token do perfil da Cartpanda" },
+      { key: "externalStoreId", label: "Slug da loja", placeholder: "ex: minha-loja (parte antes de .mycartpanda.com)" },
     ],
   },
   {
