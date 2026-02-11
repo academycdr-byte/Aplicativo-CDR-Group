@@ -218,12 +218,35 @@ export async function syncNuvemshopOrders(
         break;
       }
 
-      // 7. Save this page to DB IMMEDIATELY
-      const operations = orders.map((order: Record<string, unknown>) =>
-        buildOrderUpsert(organizationId, order)
-      );
-      await prisma.$transaction(operations);
-      totalSyncedThisCall += orders.length;
+      // 7. Save in mini-batches of CHUNK_SIZE to avoid Prisma/Neon transaction timeout
+      const CHUNK_SIZE = 10;
+      for (let i = 0; i < orders.length; i += CHUNK_SIZE) {
+        // Check time budget before each chunk
+        if (Date.now() - startTime > timeBudgetMs) {
+          // Save cursor: stay on same page but we've saved partial progress
+          if (logId) {
+            await saveSyncCursor(integration.id, { nextPage: currentPage, syncLogId: logId });
+            await prisma.syncLog.update({
+              where: { id: logId },
+              data: { recordsSynced: { increment: totalSyncedThisCall } },
+            }).catch(() => {});
+          }
+          return {
+            success: true,
+            synced: totalSyncedThisCall,
+            hasMore: true,
+            nextPage: currentPage,
+            syncLogId: logId || undefined,
+          };
+        }
+
+        const chunk = orders.slice(i, i + CHUNK_SIZE);
+        const operations = chunk.map((order: Record<string, unknown>) =>
+          buildOrderUpsert(organizationId, order)
+        );
+        await prisma.$transaction(operations);
+        totalSyncedThisCall += chunk.length;
+      }
 
       // Less than PER_PAGE means last page
       if (orders.length < PER_PAGE) {
