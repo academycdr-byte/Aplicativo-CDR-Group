@@ -1,21 +1,31 @@
 "use client";
 
-import { Eye, ShoppingCart, MousePointerClick, Package } from "lucide-react";
+import { type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type FunnelData = {
-    sessoes: number;
-    adicoesCarrinho: number;
-    checkoutsIniciados: number;
-    pedidosGerados: number;
+export type FunnelStep = {
+    id: string;
+    label: string;
+    value: number;
+    icon: LucideIcon;
+    color: string;
+    barColor: string;
+};
+
+export type FunnelRate = {
+    label: string;
+    value: number;
+    colorClass: string;
+    bgClass: string;
 };
 
 interface FunnelVisualProps {
-    data: FunnelData | null;
+    steps: FunnelStep[];
+    rates?: FunnelRate[];
 }
 
-export function FunnelVisual({ data }: FunnelVisualProps) {
-    if (!data) {
+export function FunnelVisual({ steps, rates }: FunnelVisualProps) {
+    if (!steps || steps.length === 0) {
         return (
             <div className="h-full flex items-center justify-center p-6 text-muted-foreground text-sm">
                 Sem dados do funil
@@ -23,50 +33,7 @@ export function FunnelVisual({ data }: FunnelVisualProps) {
         );
     }
 
-    const steps = [
-        {
-            id: "sessions",
-            label: "Sessões",
-            value: data.sessoes,
-            icon: Eye,
-            color: "bg-primary/10 text-primary border-primary/20",
-            barColor: "bg-primary"
-        },
-        {
-            id: "atc",
-            label: "Adicionado ao Carrinho",
-            value: data.adicoesCarrinho,
-            icon: ShoppingCart,
-            color: "bg-blue-500/10 text-blue-500 border-blue-500/20",
-            barColor: "bg-blue-500"
-        },
-        {
-            id: "checkout",
-            label: "Chegou ao Checkout",
-            value: data.checkoutsIniciados,
-            icon: MousePointerClick,
-            color: "bg-amber-500/10 text-amber-500 border-amber-500/20",
-            barColor: "bg-amber-500"
-        },
-        {
-            id: "orders",
-            label: "Checkout Concluído",
-            value: data.pedidosGerados,
-            icon: Package,
-            color: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
-            barColor: "bg-emerald-500"
-        },
-    ];
-
-    const maxVal = Math.max(data.sessoes, 1);
-
-    // Key conversion rates (Shopify-style)
-    const taxaAdicaoCarrinho = data.sessoes > 0
-        ? (data.adicoesCarrinho / data.sessoes) * 100 : 0;
-    const taxaConversaoCheckout = data.checkoutsIniciados > 0
-        ? (data.pedidosGerados / data.checkoutsIniciados) * 100 : 0;
-    const taxaConversaoSessao = data.sessoes > 0
-        ? (data.pedidosGerados / data.sessoes) * 100 : 0;
+    const maxVal = Math.max(steps[0]?.value || 1, 1);
 
     function fmtNum(n: number) {
         return new Intl.NumberFormat("pt-BR").format(n);
@@ -120,29 +87,22 @@ export function FunnelVisual({ data }: FunnelVisualProps) {
                 );
             })}
 
-            {/* Key Conversion Rates - Visual Emphasis */}
-            <div className="mt-8 pt-6 border-t border-border/40">
-                <div className="grid grid-cols-3 gap-2 sm:gap-3">
-                    <RateHighlight
-                        label="Adição ao Carrinho"
-                        value={taxaAdicaoCarrinho}
-                        colorClass="text-blue-500"
-                        bgClass="bg-blue-500/10 border-blue-500/20"
-                    />
-                    <RateHighlight
-                        label="Conversão Checkout"
-                        value={taxaConversaoCheckout}
-                        colorClass="text-amber-500"
-                        bgClass="bg-amber-500/10 border-amber-500/20"
-                    />
-                    <RateHighlight
-                        label="Conversão por Sessão"
-                        value={taxaConversaoSessao}
-                        colorClass="text-emerald-500"
-                        bgClass="bg-emerald-500/10 border-emerald-500/20"
-                    />
+            {/* Key Conversion Rates */}
+            {rates && rates.length > 0 && (
+                <div className="mt-8 pt-6 border-t border-border/40">
+                    <div className={cn("grid gap-2 sm:gap-3", `grid-cols-${Math.min(rates.length, 3)}`)}>
+                        {rates.map((rate) => (
+                            <RateHighlight
+                                key={rate.label}
+                                label={rate.label}
+                                value={rate.value}
+                                colorClass={rate.colorClass}
+                                bgClass={rate.bgClass}
+                            />
+                        ))}
+                    </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 }

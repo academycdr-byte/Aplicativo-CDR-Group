@@ -197,9 +197,9 @@ export async function getMetricsAnalysis(days: number = 30, from?: string, to?: 
 /**
  * E-commerce funnel: Sessoes → Add Carrinho → Chegou ao Checkout → Checkout Concluido
  *
- * When only Shopify is connected (no Cartpanda/Yampi), uses Shopify's session-based
- * funnel data exclusively (FROM sessions ShopifyQL - same as Shopify Analytics).
- * Otherwise falls back to mixed sources.
+ * Shopify: full funnel via ShopifyQL sessions data (sessions > 0).
+ * Nuvemshop: partial funnel using abandoned checkouts + orders (no session/ATC data).
+ * Falls back to Facebook Ads clicks as "sessions" when no store session data.
  */
 export async function getFunnelData(days: number = 30, from?: string, to?: string) {
   const ctx = await getSessionWithOrg();
@@ -219,36 +219,41 @@ export async function getFunnelData(days: number = 30, from?: string, to?: strin
   });
 
   const hasShopify = ecommerceIntegrations.some((i) => i.platform === "SHOPIFY");
-  const shopifyOnly = hasShopify && ecommerceIntegrations.length === 1;
+  const hasNuvemshop = ecommerceIntegrations.some((i) => i.platform === "NUVEMSHOP");
 
+  // Query StoreFunnel separately per platform to avoid mixing Shopify bad records
+  // with valid Nuvemshop data. Shopify: filter sessions > 0 (exclude Strategy 2 fallback).
+  // Nuvemshop: no sessions filter (Nuvemshop always has sessions=0).
   const [
     totalOrders,
     paidOrders,
     shippedOrders,
     deliveredOrders,
-    storeFunnelAgg,
+    shopifyFunnel,
+    nuvemshopFunnel,
   ] = await Promise.all([
     prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter } }),
     prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter, status: "paid" } }),
     prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter, status: { in: ["shipped", "delivered"] } } }),
     prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter, status: "delivered" } }),
-    // StoreFunnel: only aggregate records with sessions > 0 (real ShopifyQL data).
-    // Strategy 2 fallback records have sessions=0 and wrong addToCart/checkouts values.
-    prisma.storeFunnel.aggregate({
-      where: {
-        organizationId: orgId,
-        date: dateFilter,
-        ...(shopifyOnly ? { platform: "SHOPIFY" } : {}),
-        sessions: { gt: 0 },
-      },
-      _sum: { sessions: true, addToCart: true, checkoutsInitiated: true, ordersGenerated: true },
-    }).catch(() => ({ _sum: { sessions: 0, addToCart: 0, checkoutsInitiated: 0, ordersGenerated: 0 } })),
+    hasShopify
+      ? prisma.storeFunnel.aggregate({
+          where: { organizationId: orgId, date: dateFilter, platform: "SHOPIFY", sessions: { gt: 0 } },
+          _sum: { sessions: true, addToCart: true, checkoutsInitiated: true, ordersGenerated: true },
+        }).catch(() => null)
+      : Promise.resolve(null),
+    hasNuvemshop
+      ? prisma.storeFunnel.aggregate({
+          where: { organizationId: orgId, date: dateFilter, platform: "NUVEMSHOP" },
+          _sum: { sessions: true, addToCart: true, checkoutsInitiated: true, ordersGenerated: true },
+        }).catch(() => null)
+      : Promise.resolve(null),
   ]);
 
-  const storeSessions = Number(storeFunnelAgg._sum.sessions || 0);
-  const storeAddToCart = Number(storeFunnelAgg._sum.addToCart || 0);
-  const storeCheckouts = Number(storeFunnelAgg._sum.checkoutsInitiated || 0);
-  const storeOrders = Number(storeFunnelAgg._sum.ordersGenerated || 0);
+  const storeSessions = Number(shopifyFunnel?._sum?.sessions || 0) + Number(nuvemshopFunnel?._sum?.sessions || 0);
+  const storeAddToCart = Number(shopifyFunnel?._sum?.addToCart || 0) + Number(nuvemshopFunnel?._sum?.addToCart || 0);
+  const storeCheckouts = Number(shopifyFunnel?._sum?.checkoutsInitiated || 0) + Number(nuvemshopFunnel?._sum?.checkoutsInitiated || 0);
+  const storeOrders = Number(shopifyFunnel?._sum?.ordersGenerated || 0) + Number(nuvemshopFunnel?._sum?.ordersGenerated || 0);
 
   let sessoes = storeSessions;
   let adicoesCarrinho = storeAddToCart;
@@ -267,6 +272,9 @@ export async function getFunnelData(days: number = 30, from?: string, to?: strin
     if (checkoutsIniciados === 0) checkoutsIniciados = Number(adAgg._sum.initiateCheckout || 0) || totalOrders;
   }
 
+  // hasSessionData: true when Shopify sessions or Facebook Ads clicks provide top-of-funnel data
+  const hasSessionData = sessoes > 0;
+
   return {
     sessoes,
     adicoesCarrinho,
@@ -275,6 +283,7 @@ export async function getFunnelData(days: number = 30, from?: string, to?: strin
     pedidosPagos: paidOrders,
     pedidosEnviados: shippedOrders,
     pedidosEntregues: deliveredOrders,
+    hasSessionData,
   };
 }
 

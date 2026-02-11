@@ -166,12 +166,15 @@ export async function getBestSellersAction(
                 productsDetails = data.products || [];
             }
         } else {
-            // Nuvemshop: fetch all products (paginated) and filter
-            try {
-                productsDetails = await fetchNuvemshopProducts(integration.id);
-            } catch {
-                // If Products API fails, we still have rawData info
-                productsDetails = [];
+            // Nuvemshop: only call Products API when filtering by collection
+            // (the API paginates through all products which is slow).
+            // For the default view, rawData provides name + image instantly.
+            if (collectionId && collectionId !== "all") {
+                try {
+                    productsDetails = await fetchNuvemshopProducts(integration.id, collectionId);
+                } catch {
+                    productsDetails = [];
+                }
             }
         }
 

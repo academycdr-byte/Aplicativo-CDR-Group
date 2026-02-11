@@ -17,6 +17,12 @@ import {
   Target,
   Search,
   ArrowRight,
+  Eye,
+  ShoppingCart,
+  MousePointerClick,
+  Package,
+  CreditCard,
+  Truck,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -35,7 +41,7 @@ import { loadAllDashboardData } from "@/actions/dashboard";
 import { syncAll } from "@/actions/sync";
 import { PeriodSelector, periodToParams, type PeriodValue } from "@/components/period-selector";
 import { EstimatedProfitCalendar } from "@/components/estimated-profit-calendar";
-import { FunnelVisual } from "@/components/funnel-visual";
+import { FunnelVisual, type FunnelStep, type FunnelRate } from "@/components/funnel-visual";
 import { cn } from "@/lib/utils";
 
 type DashboardStats = {
@@ -66,6 +72,7 @@ type FunnelData = {
   pedidosPagos: number;
   pedidosEnviados: number;
   pedidosEntregues: number;
+  hasSessionData: boolean;
 };
 
 type RatesData = {
@@ -392,13 +399,11 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="p-6">
-            {funnel && funnel.sessoes > 0 ? (
-              <FunnelVisual data={{
-                sessoes: funnel.sessoes,
-                adicoesCarrinho: funnel.adicoesCarrinho,
-                checkoutsIniciados: funnel.checkoutsIniciados,
-                pedidosGerados: funnel.pedidosGerados
-              }} />
+            {funnel && (funnel.pedidosGerados > 0 || funnel.checkoutsIniciados > 0 || funnel.sessoes > 0) ? (
+              <FunnelVisual
+                steps={buildFunnelSteps(funnel)}
+                rates={buildFunnelRates(funnel)}
+              />
             ) : (
               <div className="py-12 text-center text-muted-foreground text-sm">Sem dados do funil</div>
             )}
@@ -429,6 +434,69 @@ export default function DashboardPage() {
 
     </div>
   );
+}
+
+// Funnel helpers
+
+function buildFunnelSteps(f: FunnelData): FunnelStep[] {
+  if (f.hasSessionData) {
+    // Full funnel: Sessions → Add to Cart → Checkout → Orders → Paid
+    return [
+      { id: "sessions", label: "Sessões", value: f.sessoes, icon: Eye, color: "bg-blue-50 border-blue-200 text-blue-600 dark:bg-blue-950 dark:border-blue-800 dark:text-blue-400", barColor: "bg-blue-500" },
+      { id: "cart", label: "Adições ao Carrinho", value: f.adicoesCarrinho, icon: ShoppingCart, color: "bg-violet-50 border-violet-200 text-violet-600 dark:bg-violet-950 dark:border-violet-800 dark:text-violet-400", barColor: "bg-violet-500" },
+      { id: "checkout", label: "Checkouts Iniciados", value: f.checkoutsIniciados, icon: MousePointerClick, color: "bg-amber-50 border-amber-200 text-amber-600 dark:bg-amber-950 dark:border-amber-800 dark:text-amber-400", barColor: "bg-amber-500" },
+      { id: "orders", label: "Pedidos Gerados", value: f.pedidosGerados, icon: Package, color: "bg-emerald-50 border-emerald-200 text-emerald-600 dark:bg-emerald-950 dark:border-emerald-800 dark:text-emerald-400", barColor: "bg-emerald-500" },
+      { id: "paid", label: "Pedidos Pagos", value: f.pedidosPagos, icon: CreditCard, color: "bg-green-50 border-green-200 text-green-600 dark:bg-green-950 dark:border-green-800 dark:text-green-400", barColor: "bg-green-500" },
+    ];
+  }
+
+  // Nuvemshop partial funnel: Checkouts → Orders → Paid → Shipped
+  const steps: FunnelStep[] = [];
+
+  if (f.checkoutsIniciados > 0) {
+    steps.push({ id: "checkout", label: "Checkouts Iniciados", value: f.checkoutsIniciados, icon: MousePointerClick, color: "bg-amber-50 border-amber-200 text-amber-600 dark:bg-amber-950 dark:border-amber-800 dark:text-amber-400", barColor: "bg-amber-500" });
+  }
+
+  steps.push(
+    { id: "orders", label: "Pedidos Gerados", value: f.pedidosGerados, icon: Package, color: "bg-emerald-50 border-emerald-200 text-emerald-600 dark:bg-emerald-950 dark:border-emerald-800 dark:text-emerald-400", barColor: "bg-emerald-500" },
+    { id: "paid", label: "Pedidos Pagos", value: f.pedidosPagos, icon: CreditCard, color: "bg-green-50 border-green-200 text-green-600 dark:bg-green-950 dark:border-green-800 dark:text-green-400", barColor: "bg-green-500" },
+  );
+
+  if (f.pedidosEnviados > 0) {
+    steps.push({ id: "shipped", label: "Pedidos Enviados", value: f.pedidosEnviados, icon: Truck, color: "bg-sky-50 border-sky-200 text-sky-600 dark:bg-sky-950 dark:border-sky-800 dark:text-sky-400", barColor: "bg-sky-500" });
+  }
+
+  return steps;
+}
+
+function buildFunnelRates(f: FunnelData): FunnelRate[] {
+  const rates: FunnelRate[] = [];
+
+  if (f.hasSessionData) {
+    // Full funnel rates
+    if (f.sessoes > 0) {
+      rates.push({ label: "Sessão → Carrinho", value: (f.adicoesCarrinho / f.sessoes) * 100, colorClass: "text-violet-600 dark:text-violet-400", bgClass: "bg-violet-50/50 border-violet-200/50 dark:bg-violet-950/50 dark:border-violet-800/50" });
+    }
+    if (f.adicoesCarrinho > 0) {
+      rates.push({ label: "Carrinho → Checkout", value: (f.checkoutsIniciados / f.adicoesCarrinho) * 100, colorClass: "text-amber-600 dark:text-amber-400", bgClass: "bg-amber-50/50 border-amber-200/50 dark:bg-amber-950/50 dark:border-amber-800/50" });
+    }
+    if (f.sessoes > 0) {
+      rates.push({ label: "Conversão Total", value: (f.pedidosPagos / f.sessoes) * 100, colorClass: "text-green-600 dark:text-green-400", bgClass: "bg-green-50/50 border-green-200/50 dark:bg-green-950/50 dark:border-green-800/50" });
+    }
+  } else {
+    // Nuvemshop partial rates
+    if (f.checkoutsIniciados > 0) {
+      rates.push({ label: "Checkout → Pedido", value: (f.pedidosGerados / f.checkoutsIniciados) * 100, colorClass: "text-emerald-600 dark:text-emerald-400", bgClass: "bg-emerald-50/50 border-emerald-200/50 dark:bg-emerald-950/50 dark:border-emerald-800/50" });
+    }
+    if (f.pedidosGerados > 0) {
+      rates.push({ label: "Taxa de Pagamento", value: (f.pedidosPagos / f.pedidosGerados) * 100, colorClass: "text-green-600 dark:text-green-400", bgClass: "bg-green-50/50 border-green-200/50 dark:bg-green-950/50 dark:border-green-800/50" });
+    }
+    if (f.pedidosEnviados > 0 && f.pedidosPagos > 0) {
+      rates.push({ label: "Taxa de Envio", value: (f.pedidosEnviados / f.pedidosPagos) * 100, colorClass: "text-sky-600 dark:text-sky-400", bgClass: "bg-sky-50/50 border-sky-200/50 dark:bg-sky-950/50 dark:border-sky-800/50" });
+    }
+  }
+
+  return rates;
 }
 
 // Subcomponents
