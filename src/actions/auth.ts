@@ -86,7 +86,6 @@ export async function loginUser(formData: {
     await signIn("credentials", {
       email: formData.email,
       password: formData.password,
-      loginType: formData.loginType || "CLIENT",
       redirectTo: "/dashboard",
     });
   } catch (error) {

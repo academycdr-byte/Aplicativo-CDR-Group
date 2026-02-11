@@ -9,6 +9,7 @@ declare module "next-auth" {
       image?: string | null;
       organizationId?: string;
       role?: string;
+      isAppAdmin?: boolean;
     };
   }
 }

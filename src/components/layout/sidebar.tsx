@@ -59,7 +59,7 @@ export function Sidebar() {
 
   const userRole = session?.user?.role;
   const isInternal = userRole === "OWNER" || userRole === "ADMIN" || userRole === "MEMBER";
-  const isAdmin = userRole === "OWNER" || userRole === "ADMIN";
+  const isAdmin = session?.user?.isAppAdmin === true;
 
   const { filteredAiNav, filteredPlatformNav, filteredManagementNav } = useMemo(() => {
     const filterNav = (items: NavItem[]) =>

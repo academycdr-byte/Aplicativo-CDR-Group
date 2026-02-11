@@ -41,6 +41,7 @@ export const authConfig = {
       if (token.role) {
         session.user.role = token.role as string;
       }
+      session.user.isAppAdmin = (token.isAppAdmin as boolean) || false;
       return session;
     },
     jwt({ token, user, trigger, session }) {
