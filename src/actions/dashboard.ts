@@ -254,14 +254,14 @@ export async function getPaidAndRepurchaseRates(days: number = 30, from?: string
     }),
   ]);
 
-  // Try StoreFunnel customer metrics (may fail if migration not yet applied)
+  // Try StoreFunnel customer metrics from Shopify only (accurate ShopifyQL data)
   let totalCustomersSum = 0;
   let returningCustomersSum = 0;
   let usedFunnelData = false;
 
   try {
     const funnelData = await prisma.storeFunnel.findMany({
-      where: { organizationId: orgId, date: dateFilter },
+      where: { organizationId: orgId, platform: "SHOPIFY", date: dateFilter },
       select: { totalCustomers: true, returningCustomers: true },
     });
     const hasFunnelCustomerData = funnelData.some((f) => f.totalCustomers > 0);
@@ -276,40 +276,28 @@ export async function getPaidAndRepurchaseRates(days: number = 30, from?: string
     // StoreFunnel columns don't exist yet - fall through to local calculation
   }
 
-  // Fallback: calculate from local order data
+  // Fallback: calculate from order data (Nuvemshop and any platform without ShopifyQL)
+  // A recurring customer = has placed more than 1 order in all history
   if (!usedFunnelData) {
     const allHistoricalOrders = await prisma.order.findMany({
       where: { organizationId: orgId, customerEmail: { not: null } },
-      select: { customerEmail: true, orderDate: true },
-      orderBy: { orderDate: "asc" },
+      select: { customerEmail: true },
     });
 
-    const firstOrderByCustomer = new Map<string, Date>();
+    // Count total orders per customer across entire history
+    const orderCountByEmail = new Map<string, number>();
     for (const o of allHistoricalOrders) {
       const email = o.customerEmail!.toLowerCase();
-      if (!firstOrderByCustomer.has(email)) {
-        firstOrderByCustomer.set(email, o.orderDate);
-      }
+      orderCountByEmail.set(email, (orderCountByEmail.get(email) || 0) + 1);
     }
 
-    const customersByDay = new Map<string, Set<string>>();
-    for (const o of ordersInPeriod) {
-      const dayKey = toDateKeyBrasilia(o.orderDate);
-      const email = o.customerEmail!.toLowerCase();
-      if (!customersByDay.has(dayKey)) {
-        customersByDay.set(dayKey, new Set());
-      }
-      customersByDay.get(dayKey)!.add(email);
-    }
+    // Unique customers who ordered in the selected period
+    const uniqueEmailsInPeriod = new Set(ordersInPeriod.map((o) => o.customerEmail!.toLowerCase()));
 
-    for (const [dayKey, emails] of customersByDay) {
-      const dayStart = new Date(dayKey);
-      for (const email of emails) {
-        totalCustomersSum++;
-        const firstOrder = firstOrderByCustomer.get(email);
-        if (firstOrder && firstOrder < dayStart) {
-          returningCustomersSum++;
-        }
+    totalCustomersSum = uniqueEmailsInPeriod.size;
+    for (const email of uniqueEmailsInPeriod) {
+      if ((orderCountByEmail.get(email) || 0) > 1) {
+        returningCustomersSum++;
       }
     }
   }
