@@ -167,12 +167,11 @@ export async function syncNuvemshopOrders(
     const accessToken = decrypt(integration.accessToken);
     const storeId = integration.externalStoreId || "";
 
-    // Incremental sync: only fetch new orders since last sync
-    let sinceParam = "";
-    if (integration.lastSyncAt) {
-      const since = new Date(integration.lastSyncAt.getTime() - 60 * 60 * 1000);
-      sinceParam = `&created_at_min=${since.toISOString()}`;
-    }
+    // Always fetch last 90 days to ensure comprehensive coverage.
+    // Upserts handle duplicates, so re-fetching recent orders is safe.
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+    const sinceParam = `&created_at_min=${ninetyDaysAgo.toISOString()}`;
 
     let totalSyncedThisCall = 0;
     let hasMore = true;
@@ -324,14 +323,14 @@ export async function syncNuvemshopFunnel(organizationId: string) {
     const accessToken = decrypt(integration.accessToken);
     const storeId = integration.externalStoreId || "";
 
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
     // 1. Fetch abandoned checkouts
     const abandonedByDate = await fetchNuvemshopAbandonedCheckouts(
       storeId,
       accessToken,
-      thirtyDaysAgo
+      ninetyDaysAgo
     );
 
     // 2. Get orders by date from our database (with emails for customer metrics)
@@ -340,7 +339,7 @@ export async function syncNuvemshopFunnel(organizationId: string) {
         where: {
           organizationId,
           platform: "NUVEMSHOP",
-          orderDate: { gte: thirtyDaysAgo },
+          orderDate: { gte: ninetyDaysAgo },
         },
         select: { orderDate: true, customerEmail: true },
       }),
@@ -462,8 +461,7 @@ async function fetchNuvemshopAbandonedCheckouts(
 
   try {
     const sinceISO = since.toISOString();
-    // Limit to 2 pages max to avoid timeout
-    const MAX_PAGES = 2;
+    const MAX_PAGES = 10;
     let page = 1;
     let hasMore = true;
 

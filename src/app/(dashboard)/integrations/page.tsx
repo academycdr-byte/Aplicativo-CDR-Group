@@ -284,7 +284,7 @@ function IntegrationsContent() {
     let syncLogId: string | undefined;
     let totalSynced = 0;
     let iteration = 0;
-    const MAX_ITERATIONS = 20;
+    const MAX_ITERATIONS = 50;
 
     while (hasMore && iteration < MAX_ITERATIONS) {
       iteration++;
