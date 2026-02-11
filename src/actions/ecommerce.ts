@@ -72,7 +72,7 @@ export async function getBestSellersAction(
                     gte: startDate,
                     lte: endDate
                 },
-                status: { in: ["paid", "partially_refunded", "delivered", "shipped"] } // Only count valid sales
+                status: { in: ["paid", "authorized", "partially_paid", "partially_refunded", "delivered", "shipped"] } // Count confirmed sales
             },
             select: {
                 rawData: true

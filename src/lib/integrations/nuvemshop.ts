@@ -137,9 +137,12 @@ function mapNuvemshopStatus(status: string): string {
   const map: Record<string, string> = {
     paid: "paid",
     pending: "pending",
+    authorized: "authorized",
+    partially_paid: "partially_paid",
+    partially_refunded: "partially_refunded",
     refunded: "refunded",
     voided: "cancelled",
-    authorized: "pending",
+    abandoned: "cancelled",
   };
   return map[status] || status;
 }
