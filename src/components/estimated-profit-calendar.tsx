@@ -95,7 +95,7 @@ export function EstimatedProfitCalendar({ data, totalProfit, currentMonthLabel }
             )}
 
             {/* Grid */}
-            <div className="grid grid-cols-7 gap-2 w-full">
+            <div className="grid grid-cols-7 gap-1 sm:gap-2 w-full">
                 {/* Weekday Headers */}
                 {weekDays.map((d, i) => (
                     <div key={i} className="text-[10px] text-muted-foreground/50 text-center font-bold py-1">
@@ -132,7 +132,7 @@ export function EstimatedProfitCalendar({ data, totalProfit, currentMonthLabel }
                 ))}
             </div>
 
-            <div className="mt-8 flex items-center justify-center gap-6 text-[11px] font-medium text-muted-foreground">
+            <div className="mt-4 sm:mt-8 flex items-center justify-center gap-4 sm:gap-6 text-[11px] font-medium text-muted-foreground">
                 <div className="flex items-center gap-2">
                     <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
                     <span>Lucro</span>

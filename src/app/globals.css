@@ -281,6 +281,16 @@
   }
 }
 
+/* Hide scrollbar utility */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 /* Recharts Overrides - Apple Style */
 .recharts-default-tooltip {
   @apply !bg-card/95 !backdrop-blur-xl !border-border/30 !rounded-xl !shadow-md !px-4 !py-3;

@@ -103,35 +103,32 @@ export function ProductCostTable({ costs }: { costs: ProductCost[] }) {
                             </DialogDescription>
                         </DialogHeader>
                         <div className="grid gap-4 py-4">
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="sku" className="text-right">SKU</Label>
+                            <div className="space-y-2">
+                                <Label htmlFor="sku">SKU</Label>
                                 <Input
                                     id="sku"
                                     value={newProduct.sku}
                                     onChange={(e) => setNewProduct({ ...newProduct, sku: e.target.value })}
-                                    className="col-span-3"
                                     placeholder="Ex: CAMISA-001"
                                 />
                             </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="name" className="text-right">Nome</Label>
+                            <div className="space-y-2">
+                                <Label htmlFor="name">Nome</Label>
                                 <Input
                                     id="name"
                                     value={newProduct.name}
                                     onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
-                                    className="col-span-3"
                                     placeholder="Ex: Camisa Básica Branca"
                                 />
                             </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="cost" className="text-right">Custo (R$)</Label>
+                            <div className="space-y-2">
+                                <Label htmlFor="cost">Custo (R$)</Label>
                                 <Input
                                     id="cost"
                                     type="number"
                                     step="0.01"
                                     value={newProduct.costPrice}
                                     onChange={(e) => setNewProduct({ ...newProduct, costPrice: parseFloat(e.target.value) })}
-                                    className="col-span-3"
                                     placeholder="0.00"
                                 />
                             </div>
@@ -143,8 +140,8 @@ export function ProductCostTable({ costs }: { costs: ProductCost[] }) {
                 </Dialog>
             </div>
 
-            <div className="border rounded-md">
-                <Table>
+            <div className="border rounded-md overflow-x-auto">
+                <Table className="min-w-[480px]">
                     <TableHeader>
                         <TableRow>
                             <TableHead>SKU</TableHead>

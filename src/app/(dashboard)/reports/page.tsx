@@ -274,28 +274,30 @@ export default function ReportsPage() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
-          <TabsTrigger value="enviar" className="gap-2">
-            <Send className="w-4 h-4" />
-            <span className="hidden sm:inline">Criar & Enviar</span>
-          </TabsTrigger>
-          <TabsTrigger value="clientes" className="gap-2">
-            <Users className="w-4 h-4" />
-            <span className="hidden sm:inline">Clientes</span>
-          </TabsTrigger>
-          <TabsTrigger value="whatsapp" className="gap-2">
-            <MessageSquare className="w-4 h-4" />
-            <span className="hidden sm:inline">WhatsApp</span>
-          </TabsTrigger>
-          <TabsTrigger value="agendamentos" className="gap-2">
-            <Calendar className="w-4 h-4" />
-            <span className="hidden sm:inline">Agendamentos</span>
-          </TabsTrigger>
-          <TabsTrigger value="historico" className="gap-2">
-            <History className="w-4 h-4" />
-            <span className="hidden sm:inline">Histórico</span>
-          </TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0 no-scrollbar">
+          <TabsList className="inline-flex w-auto min-w-full sm:min-w-0 sm:grid sm:w-full sm:grid-cols-5 lg:w-auto lg:inline-grid">
+            <TabsTrigger value="enviar" className="gap-1.5 sm:gap-2 text-xs sm:text-sm whitespace-nowrap">
+              <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="hidden xs:inline sm:inline">Enviar</span>
+            </TabsTrigger>
+            <TabsTrigger value="clientes" className="gap-1.5 sm:gap-2 text-xs sm:text-sm whitespace-nowrap">
+              <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="hidden xs:inline sm:inline">Clientes</span>
+            </TabsTrigger>
+            <TabsTrigger value="whatsapp" className="gap-1.5 sm:gap-2 text-xs sm:text-sm whitespace-nowrap">
+              <MessageSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="hidden xs:inline sm:inline">WhatsApp</span>
+            </TabsTrigger>
+            <TabsTrigger value="agendamentos" className="gap-1.5 sm:gap-2 text-xs sm:text-sm whitespace-nowrap">
+              <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">Agendamentos</span>
+            </TabsTrigger>
+            <TabsTrigger value="historico" className="gap-1.5 sm:gap-2 text-xs sm:text-sm whitespace-nowrap">
+              <History className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">Histórico</span>
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* TAB: Criar & Enviar */}
         <TabsContent value="enviar" className="mt-6">
@@ -480,23 +482,23 @@ function CreateReportTab({ clients, onRefresh }: { clients: Client[]; onRefresh:
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
       {/* Left: Preview */}
       <Card className="order-2 lg:order-1">
-        <CardHeader>
+        <CardHeader className="pb-3 sm:pb-6">
           <CardTitle className="text-base">Pré-visualização</CardTitle>
-          <CardDescription>Como a mensagem aparecerá no WhatsApp</CardDescription>
+          <CardDescription className="hidden sm:block">Como a mensagem aparecerá no WhatsApp</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="bg-[#0b141a] rounded-lg p-4 min-h-[400px]">
-            <div className="bg-[#005c4b] rounded-lg p-3 max-w-[90%] ml-auto">
+        <CardContent className="px-3 sm:px-6">
+          <div className="bg-[#0b141a] rounded-lg p-3 sm:p-4 min-h-[300px] sm:min-h-[400px]">
+            <div className="bg-[#005c4b] rounded-lg p-2.5 sm:p-3 max-w-[95%] sm:max-w-[90%] ml-auto">
               {loadingPreview ? (
                 <div className="flex items-center gap-2 text-white/70">
                   <RefreshCw className="w-4 h-4 animate-spin" />
                   Carregando...
                 </div>
               ) : (
-                <pre className="text-sm text-white whitespace-pre-wrap font-sans leading-relaxed">
+                <pre className="text-xs sm:text-sm text-white whitespace-pre-wrap font-sans leading-relaxed">
                   {previewMessage}
                 </pre>
               )}
@@ -510,10 +512,10 @@ function CreateReportTab({ clients, onRefresh }: { clients: Client[]; onRefresh:
 
       {/* Right: Configuration */}
       <Card className="order-1 lg:order-2">
-        <CardHeader>
+        <CardHeader className="pb-3 sm:pb-6">
           <CardTitle className="text-base">Configuração de Envio</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-5 sm:space-y-6 px-3 sm:px-6">
           {/* Period */}
           <div className="space-y-2">
             <Label>Período das Métricas</Label>
@@ -663,7 +665,7 @@ function CreateReportTab({ clients, onRefresh }: { clients: Client[]; onRefresh:
           </div>
 
           {/* Actions */}
-          <div className="flex gap-3 pt-4">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-4">
             <Button
               className="flex-1 bg-primary hover:bg-primary/90"
               onClick={handleSend}
@@ -681,11 +683,12 @@ function CreateReportTab({ clients, onRefresh }: { clients: Client[]; onRefresh:
                 </>
               )}
             </Button>
+            <div className="flex gap-2 sm:gap-3">
             <Dialog open={showTestDialog} onOpenChange={setShowTestDialog}>
               <DialogTrigger asChild>
-                <Button variant="outline">
+                <Button variant="outline" className="flex-1 sm:flex-initial">
                   <TestTube className="w-4 h-4 mr-2" />
-                  Enviar Teste
+                  <span className="hidden sm:inline">Enviar </span>Teste
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-md">
@@ -758,7 +761,7 @@ function CreateReportTab({ clients, onRefresh }: { clients: Client[]; onRefresh:
             </Dialog>
             <Dialog open={showScheduleDialog} onOpenChange={setShowScheduleDialog}>
               <DialogTrigger asChild>
-                <Button variant="outline">
+                <Button variant="outline" className="flex-1 sm:flex-initial">
                   <Calendar className="w-4 h-4 mr-2" />
                   Agendar
                 </Button>
@@ -776,6 +779,7 @@ function CreateReportTab({ clients, onRefresh }: { clients: Client[]; onRefresh:
                 onRefresh={onRefresh}
               />
             </Dialog>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -880,7 +884,7 @@ function ScheduleFormDialog({
           </Select>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <div className="space-y-2">
             <Label>Frequência</Label>
             <Select value={frequency} onValueChange={(v) => setFrequency(v as any)}>
@@ -971,11 +975,11 @@ function ClientsTab({ clients, onRefresh }: { clients: Client[]; onRefresh: () =
   const activeCount = clients.filter((c) => c.status === "ACTIVE").length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-4">
-          <div className="relative flex-1 sm:w-80">
+      <div className="flex flex-col gap-3 sm:gap-4">
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+          <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Buscar clientes..."
@@ -984,38 +988,40 @@ function ClientsTab({ clients, onRefresh }: { clients: Client[]; onRefresh: () =
               className="pl-9"
             />
           </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="ACTIVE">Ativos</SelectItem>
-              <SelectItem value="PAUSED">Pausados</SelectItem>
-              <SelectItem value="CANCELLED">Cancelados</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={planFilter} onValueChange={setPlanFilter}>
-            <SelectTrigger className="w-[160px]">
-              <SelectValue placeholder="Plano" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os planos</SelectItem>
-              <SelectItem value="FORMULA_BASE">Fórmula Base</SelectItem>
-              <SelectItem value="FORMULA_AVANCADA">Fórmula Avançada</SelectItem>
-              <SelectItem value="FORMULA_TOTAL">Fórmula Total</SelectItem>
-              <SelectItem value="PERSONALIZADO">Personalizado</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex gap-2">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full sm:w-[140px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="ACTIVE">Ativos</SelectItem>
+                <SelectItem value="PAUSED">Pausados</SelectItem>
+                <SelectItem value="CANCELLED">Cancelados</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={planFilter} onValueChange={setPlanFilter}>
+              <SelectTrigger className="w-full sm:w-[160px]">
+                <SelectValue placeholder="Plano" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os planos</SelectItem>
+                <SelectItem value="FORMULA_BASE">Fórmula Base</SelectItem>
+                <SelectItem value="FORMULA_AVANCADA">Fórmula Avançada</SelectItem>
+                <SelectItem value="FORMULA_TOTAL">Fórmula Total</SelectItem>
+                <SelectItem value="PERSONALIZADO">Personalizado</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between sm:justify-end gap-3">
           <Badge variant="secondary" className="text-sm">
             {activeCount} clientes ativos
           </Badge>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button onClick={() => setEditingClient(null)}>
-                <Plus className="w-4 h-4 mr-2" />
+              <Button onClick={() => setEditingClient(null)} size="sm" className="sm:size-default">
+                <Plus className="w-4 h-4 mr-1 sm:mr-2" />
                 Novo Cliente
               </Button>
             </DialogTrigger>
@@ -1034,7 +1040,8 @@ function ClientsTab({ clients, onRefresh }: { clients: Client[]; onRefresh: () =
       {/* Table */}
       <Card>
         <CardContent className="p-0">
-          <Table>
+          <div className="overflow-x-auto">
+          <Table className="min-w-[700px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Cliente</TableHead>
@@ -1144,6 +1151,7 @@ function ClientsTab({ clients, onRefresh }: { clients: Client[]; onRefresh: () =
               )}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
     </div>
@@ -1232,7 +1240,7 @@ function ClientFormDialog({
         </DialogDescription>
       </DialogHeader>
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <div className="space-y-2">
             <Label htmlFor="name">Nome da Loja/Empresa *</Label>
             <Input
@@ -1253,7 +1261,7 @@ function ClientFormDialog({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <div className="space-y-2">
             <Label htmlFor="phone">WhatsApp *</Label>
             <Input
@@ -1276,7 +1284,7 @@ function ClientFormDialog({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <div className="space-y-2">
             <Label>Plano *</Label>
             <Select value={form.plan} onValueChange={(v) => setForm({ ...form, plan: v })}>
@@ -1663,17 +1671,17 @@ function SchedulesTab({
   const [showNewDialog, setShowNewDialog] = useState(false);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h3 className="text-lg font-medium">Envios Agendados</h3>
           <p className="text-sm text-muted-foreground">
-            Configure envios automáticos recorrentes para seus clientes.
+            Configure envios automáticos recorrentes.
           </p>
         </div>
         <Dialog open={showNewDialog} onOpenChange={setShowNewDialog}>
           <DialogTrigger asChild>
-            <Button>
+            <Button size="sm" className="sm:size-default w-full sm:w-auto">
               <Plus className="w-4 h-4 mr-2" />
               Novo Agendamento
             </Button>
@@ -1695,7 +1703,8 @@ function SchedulesTab({
 
       <Card>
         <CardContent className="p-0">
-          <Table>
+          <div className="overflow-x-auto">
+          <Table className="min-w-[600px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Cliente</TableHead>
@@ -1774,6 +1783,7 @@ function SchedulesTab({
               )}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
     </div>
@@ -1807,17 +1817,17 @@ function HistoryTab({
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="text-lg font-medium">Histórico de Envios</h3>
           <p className="text-sm text-muted-foreground">
             Acompanhe todos os relatórios enviados.
           </p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-2 sm:gap-3">
           <Select value={clientFilter} onValueChange={setClientFilter}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full sm:w-[180px]">
               <SelectValue placeholder="Todos os clientes" />
             </SelectTrigger>
             <SelectContent>
@@ -1830,7 +1840,7 @@ function HistoryTab({
             </SelectContent>
           </Select>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[140px]">
+            <SelectTrigger className="w-full sm:w-[140px]">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -1845,7 +1855,8 @@ function HistoryTab({
 
       <Card>
         <CardContent className="p-0">
-          <Table>
+          <div className="overflow-x-auto">
+          <Table className="min-w-[600px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Data/Hora</TableHead>
@@ -1902,6 +1913,7 @@ function HistoryTab({
               )}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

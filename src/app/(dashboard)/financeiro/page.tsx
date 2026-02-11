@@ -128,7 +128,7 @@ export default function FinancePage() {
     const profitPct = Math.max(0, (metrics.netProfit / revenue) * 100);
 
     return (
-        <div className="space-y-6 animate-in fade-in duration-500">
+        <div className="space-y-5 sm:space-y-6 animate-in fade-in duration-500">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h2 className="text-2xl font-bold tracking-tight">Financeiro</h2>
@@ -168,7 +168,7 @@ export default function FinancePage() {
             ) : (
                 <>
                     {/* KPI Grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
                         <FinancialCard
                             title="Receita Bruta"
                             value={fmt(metrics.revenue)}
@@ -228,7 +228,7 @@ export default function FinancePage() {
                     </div>
 
                     {/* Bottom row: Net Profit + Margin */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                         <FinancialCard
                             title="Lucro Liquido"
                             value={fmt(metrics.netProfit)}
@@ -256,82 +256,80 @@ export default function FinancePage() {
 
                     {/* Profit Breakdown Bar */}
                     <Card className="border border-border shadow-none rounded-lg p-4 sm:p-6">
-                        <h3 className="text-sm font-medium text-muted-foreground mb-4">Composicao da Receita</h3>
-                        <div className="w-full h-8 flex rounded-md overflow-hidden bg-secondary">
+                        <h3 className="text-sm font-medium text-muted-foreground mb-3 sm:mb-4">Composicao da Receita</h3>
+                        <div className="w-full h-7 sm:h-8 flex rounded-md overflow-hidden bg-secondary">
                             {cogsPct > 0 && (
-                                <div style={{ width: `${cogsPct}%` }} className="bg-amber-400 h-full flex items-center justify-center text-[10px] font-bold text-white">
-                                    <span className="truncate px-1">CMV</span>
+                                <div style={{ width: `${cogsPct}%` }} className="bg-amber-400 h-full flex items-center justify-center text-[9px] sm:text-[10px] font-bold text-white">
+                                    <span className="truncate px-0.5">CMV</span>
                                 </div>
                             )}
                             {adsPct > 0 && (
-                                <div style={{ width: `${adsPct}%` }} className="bg-red-400 h-full flex items-center justify-center text-[10px] font-bold text-white">
-                                    <span className="truncate px-1">Ads</span>
+                                <div style={{ width: `${adsPct}%` }} className="bg-red-400 h-full flex items-center justify-center text-[9px] sm:text-[10px] font-bold text-white">
+                                    <span className="truncate px-0.5">Ads</span>
                                 </div>
                             )}
                             {gatewayPct > 0.5 && (
-                                <div style={{ width: `${gatewayPct}%` }} className="bg-blue-400 h-full flex items-center justify-center text-[10px] font-bold text-white">
-                                    <span className="truncate px-1">GW</span>
+                                <div style={{ width: `${gatewayPct}%` }} className="bg-blue-400 h-full flex items-center justify-center text-[9px] sm:text-[10px] font-bold text-white">
+                                    <span className="truncate px-0.5">GW</span>
                                 </div>
                             )}
                             {checkoutPct > 0.5 && (
-                                <div style={{ width: `${checkoutPct}%` }} className="bg-indigo-400 h-full flex items-center justify-center text-[10px] font-bold text-white">
-                                    <span className="truncate px-1">CK</span>
+                                <div style={{ width: `${checkoutPct}%` }} className="bg-indigo-400 h-full flex items-center justify-center text-[9px] sm:text-[10px] font-bold text-white">
+                                    <span className="truncate px-0.5">CK</span>
                                 </div>
                             )}
                             {taxPct > 0.5 && (
-                                <div style={{ width: `${taxPct}%` }} className="bg-purple-400 h-full flex items-center justify-center text-[10px] font-bold text-white">
-                                    <span className="truncate px-1">Tax</span>
+                                <div style={{ width: `${taxPct}%` }} className="bg-purple-400 h-full flex items-center justify-center text-[9px] sm:text-[10px] font-bold text-white">
+                                    <span className="truncate px-0.5">Tax</span>
                                 </div>
                             )}
                             {(fixedPct + chargebackPct + txFeePct) > 0.5 && (
-                                <div style={{ width: `${fixedPct + chargebackPct + txFeePct}%` }} className="bg-orange-400 h-full flex items-center justify-center text-[10px] font-bold text-white">
-                                    <span className="truncate px-1">Outros</span>
+                                <div style={{ width: `${fixedPct + chargebackPct + txFeePct}%` }} className="bg-orange-400 h-full flex items-center justify-center text-[9px] sm:text-[10px] font-bold text-white">
+                                    <span className="truncate px-0.5">+</span>
                                 </div>
                             )}
                             {profitPct > 0 && (
-                                <div style={{ width: `${profitPct}%` }} className="bg-emerald-500 h-full flex items-center justify-center text-[10px] font-bold text-white">
-                                    <span className="truncate px-1">Lucro</span>
+                                <div style={{ width: `${profitPct}%` }} className="bg-emerald-500 h-full flex items-center justify-center text-[9px] sm:text-[10px] font-bold text-white">
+                                    <span className="truncate px-0.5">Lucro</span>
                                 </div>
                             )}
                         </div>
-                        <div className="flex flex-wrap gap-3 mt-3 text-xs text-muted-foreground justify-center">
-                            <div className="flex items-center gap-1"><div className="w-3 h-3 bg-amber-400 rounded-sm" />Produto</div>
-                            <div className="flex items-center gap-1"><div className="w-3 h-3 bg-red-400 rounded-sm" />Anuncios</div>
-                            <div className="flex items-center gap-1"><div className="w-3 h-3 bg-blue-400 rounded-sm" />Gateway</div>
-                            <div className="flex items-center gap-1"><div className="w-3 h-3 bg-indigo-400 rounded-sm" />Checkout</div>
-                            <div className="flex items-center gap-1"><div className="w-3 h-3 bg-purple-400 rounded-sm" />Impostos</div>
-                            <div className="flex items-center gap-1"><div className="w-3 h-3 bg-orange-400 rounded-sm" />Outros</div>
-                            <div className="flex items-center gap-1"><div className="w-3 h-3 bg-emerald-500 rounded-sm" />Lucro</div>
+                        <div className="flex flex-wrap gap-x-3 gap-y-1.5 mt-3 text-[11px] sm:text-xs text-muted-foreground justify-center">
+                            <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-amber-400 rounded-sm" />Produto</div>
+                            <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-red-400 rounded-sm" />Anuncios</div>
+                            <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-blue-400 rounded-sm" />Gateway</div>
+                            <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-indigo-400 rounded-sm" />Checkout</div>
+                            <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-purple-400 rounded-sm" />Impostos</div>
+                            <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-orange-400 rounded-sm" />Outros</div>
+                            <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-emerald-500 rounded-sm" />Lucro</div>
                         </div>
                     </Card>
 
                     {/* CMV Management Section - conditional based on cmvMethod */}
-                    <Card className="border border-border shadow-none rounded-lg p-6">
+                    <Card className="border border-border shadow-none rounded-lg p-4 sm:p-6">
                         {config.cmvMethod === "supplier_payments" ? (
                             <SupplierPaymentTable
                                 payments={supplierPayments}
                                 onUpdate={loadData}
                             />
                         ) : config.cmvMethod === "average" ? (
-                            <div className="space-y-2">
-                                <h3 className="text-lg font-medium">Custos (CMV) - Custo Medio</h3>
+                            <div className="space-y-3">
+                                <h3 className="text-base sm:text-lg font-medium">Custos (CMV) - Custo Medio</h3>
                                 <p className="text-sm text-muted-foreground">
                                     Metodo ativo: <span className="font-medium text-foreground">Custo Medio por Pedido</span>
                                 </p>
-                                <div className="flex items-center gap-4 p-4 rounded-lg border border-blue-500/20 bg-blue-500/5">
-                                    <div>
-                                        <p className="text-xs text-muted-foreground">Custo medio por pedido</p>
-                                        <p className="text-xl font-bold">{fmt(config.averageCostPerOrder)}</p>
+                                <div className="grid grid-cols-3 gap-3 p-3 sm:p-4 rounded-lg border border-blue-500/20 bg-blue-500/5">
+                                    <div className="text-center">
+                                        <p className="text-[10px] sm:text-xs text-muted-foreground">Custo/pedido</p>
+                                        <p className="text-base sm:text-xl font-bold">{fmt(config.averageCostPerOrder)}</p>
                                     </div>
-                                    <div className="text-2xl text-muted-foreground">&times;</div>
-                                    <div>
-                                        <p className="text-xs text-muted-foreground">Pedidos no periodo</p>
-                                        <p className="text-xl font-bold">{metrics.orderCount}</p>
+                                    <div className="text-center">
+                                        <p className="text-[10px] sm:text-xs text-muted-foreground">Pedidos</p>
+                                        <p className="text-base sm:text-xl font-bold">{metrics.orderCount}</p>
                                     </div>
-                                    <div className="text-2xl text-muted-foreground">=</div>
-                                    <div>
-                                        <p className="text-xs text-muted-foreground">CMV total</p>
-                                        <p className="text-xl font-bold text-amber-600">{fmt(metrics.productCosts)}</p>
+                                    <div className="text-center">
+                                        <p className="text-[10px] sm:text-xs text-muted-foreground">CMV total</p>
+                                        <p className="text-base sm:text-xl font-bold text-amber-600">{fmt(metrics.productCosts)}</p>
                                     </div>
                                 </div>
                                 <p className="text-xs text-muted-foreground">
@@ -358,16 +356,16 @@ function FinancialCard({ title, value, icon: Icon, className, iconClass, valueCl
     subText?: string;
 }) {
     return (
-        <Card className={cn("border border-border shadow-none rounded-lg p-5 transition-all hover:border-primary/20", className)}>
-            <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] uppercase tracking-wider font-medium opacity-70">{title}</span>
-                <div className={cn("w-8 h-8 rounded-full flex items-center justify-center", iconClass)}>
-                    <Icon className="w-4 h-4" />
+        <Card className={cn("border border-border shadow-none rounded-lg p-3 sm:p-5 transition-all hover:border-primary/20", className)}>
+            <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+                <span className="text-[10px] sm:text-[11px] uppercase tracking-wider font-medium opacity-70 leading-tight">{title}</span>
+                <div className={cn("w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center shrink-0", iconClass)}>
+                    <Icon className="w-3 h-3 sm:w-4 sm:h-4" />
                 </div>
             </div>
             <div>
-                <div className={cn("text-2xl font-bold tracking-tight", valueClass)}>{value}</div>
-                {subText && <p className="text-xs opacity-70 mt-1">{subText}</p>}
+                <div className={cn("text-lg sm:text-2xl font-bold tracking-tight", valueClass)}>{value}</div>
+                {subText && <p className="text-[10px] sm:text-xs opacity-70 mt-0.5 sm:mt-1">{subText}</p>}
             </div>
         </Card>
     );

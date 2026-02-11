@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 
 type AvatarContextType = {
@@ -16,19 +16,29 @@ const AvatarContext = createContext<AvatarContextType>({
 export function AvatarProvider({ children }: { children: React.ReactNode }) {
   const { data: session } = useSession();
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [loaded, setLoaded] = useState(false);
+  const fetchedForUser = useRef<string | null>(null);
 
   useEffect(() => {
-    if (session?.user?.id && !loaded) {
+    const userId = session?.user?.id;
+    if (userId && userId !== fetchedForUser.current) {
+      // Reset avatar when user changes to prevent showing stale data
+      setAvatarUrl(null);
+      fetchedForUser.current = userId;
+
       fetch("/api/upload/avatar")
         .then((res) => res.json())
         .then((data) => {
           if (data.image) setAvatarUrl(data.image);
-          setLoaded(true);
         })
-        .catch(() => setLoaded(true));
+        .catch(() => {});
     }
-  }, [session?.user?.id, loaded]);
+
+    // Clear when logged out
+    if (!userId) {
+      fetchedForUser.current = null;
+      setAvatarUrl(null);
+    }
+  }, [session?.user?.id]);
 
   return (
     <AvatarContext.Provider value={{ avatarUrl, setAvatarUrl }}>

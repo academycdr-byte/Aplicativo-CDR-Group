@@ -122,7 +122,7 @@ export function FunnelVisual({ data }: FunnelVisualProps) {
 
             {/* Key Conversion Rates - Visual Emphasis */}
             <div className="mt-8 pt-6 border-t border-border/40">
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-3 gap-2 sm:gap-3">
                     <RateHighlight
                         label="Adição ao Carrinho"
                         value={taxaAdicaoCarrinho}
@@ -154,11 +154,11 @@ function RateHighlight({ label, value, colorClass, bgClass }: {
     bgClass: string;
 }) {
     return (
-        <div className={cn("rounded-xl border p-3 text-center transition-all", bgClass)}>
-            <p className={cn("text-2xl font-bold tracking-tight", colorClass)}>
+        <div className={cn("rounded-xl border p-2 sm:p-3 text-center transition-all", bgClass)}>
+            <p className={cn("text-lg sm:text-2xl font-bold tracking-tight", colorClass)}>
                 {value.toFixed(1)}%
             </p>
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mt-1 leading-tight">
+            <p className="text-[9px] sm:text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mt-0.5 sm:mt-1 leading-tight">
                 {label}
             </p>
         </div>

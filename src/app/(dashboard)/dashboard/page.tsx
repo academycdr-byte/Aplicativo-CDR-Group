@@ -241,20 +241,20 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Performance Chart */}
         <Card className="xl:col-span-2 shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between space-y-0 pb-4">
             <div className="space-y-1">
               <CardTitle>Performance</CardTitle>
-              <CardDescription>Análise detalhada do período</CardDescription>
+              <CardDescription className="hidden sm:block">Análise detalhada do período</CardDescription>
             </div>
 
             {/* Filters/Toggles */}
-            <div className="flex flex-wrap gap-1 sm:gap-1.5">
+            <div className="flex flex-wrap gap-1.5">
               {metricToggles.map((m) => (
                 <button
                   key={m.key}
                   onClick={() => toggleMetric(m.key)}
                   className={cn(
-                    "flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] uppercase tracking-wide font-semibold border transition-all duration-200",
+                    "flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] uppercase tracking-wide font-semibold border transition-all duration-200",
                     activeMetrics.has(m.key)
                       ? "bg-primary/10 text-primary border-primary/20 hover:bg-primary/20"
                       : "bg-transparent text-muted-foreground border-transparent hover:bg-secondary"
@@ -267,10 +267,10 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
 
-          <CardContent className="px-2 sm:px-6 pb-6 min-h-[350px]">
+          <CardContent className="px-1 sm:px-6 pb-4 sm:pb-6">
             {metricsData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={340}>
-                <ComposedChart data={metricsData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <ResponsiveContainer width="100%" height={280} className="sm:!h-[340px]">
+                <ComposedChart data={metricsData} margin={{ top: 10, right: 5, left: -25, bottom: 0 }}>
                   <defs>
                     <linearGradient id="gradientPrimary" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.2} />
@@ -280,10 +280,11 @@ export default function DashboardPage() {
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} opacity={0.3} />
                   <XAxis
                     dataKey="date"
-                    tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                    tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
                     tickLine={false}
                     axisLine={false}
-                    tickMargin={12}
+                    tickMargin={8}
+                    interval="preserveStartEnd"
                     tickFormatter={(v) => {
                       const d = new Date(v + "T00:00:00");
                       return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -291,19 +292,19 @@ export default function DashboardPage() {
                   />
                   <YAxis
                     yAxisId="left"
-                    tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                    tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
                     tickLine={false}
                     axisLine={false}
                     tickFormatter={(v) => fmtShort(v)}
-                    width={45}
+                    width={40}
                   />
                   <YAxis
                     yAxisId="right"
                     orientation="right"
-                    tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                    tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
                     tickLine={false}
                     axisLine={false}
-                    width={30}
+                    width={25}
                   />
                   <Tooltip
                     cursor={{ stroke: "var(--primary)", strokeWidth: 1, strokeDasharray: "4 4", opacity: 0.5 }}
@@ -311,12 +312,12 @@ export default function DashboardPage() {
                       if (!active || !payload?.length) return null;
                       const d = new Date(label + "T00:00:00");
                       return (
-                        <div className="bg-card/95 backdrop-blur-xl border border-border/50 rounded-xl shadow-floating p-4 min-w-[200px]">
-                          <p className="font-semibold text-sm mb-3 text-foreground">{d.toLocaleDateString("pt-BR", { weekday: 'long', day: 'numeric', month: 'long' })}</p>
-                          <div className="space-y-2">
+                        <div className="bg-card/95 backdrop-blur-xl border border-border/50 rounded-xl shadow-floating p-3 sm:p-4 min-w-[180px] sm:min-w-[200px]">
+                          <p className="font-semibold text-xs sm:text-sm mb-2 sm:mb-3 text-foreground">{d.toLocaleDateString("pt-BR", { weekday: 'short', day: 'numeric', month: 'short' })}</p>
+                          <div className="space-y-1.5 sm:space-y-2">
                             {payload.map((p) => (
-                              <div key={p.dataKey} className="flex items-center justify-between gap-6 text-sm">
-                                <span className="text-muted-foreground capitalize flex items-center gap-2">
+                              <div key={p.dataKey} className="flex items-center justify-between gap-4 sm:gap-6 text-xs sm:text-sm">
+                                <span className="text-muted-foreground capitalize flex items-center gap-1.5">
                                   <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: p.color }} />
                                   {metricToggles.find((m) => m.key === p.dataKey)?.label}
                                 </span>
@@ -342,8 +343,8 @@ export default function DashboardPage() {
                       strokeWidth={2}
                     />
                   )}
-                  {activeMetrics.has("investimento") && <Bar yAxisId="left" dataKey="investimento" fill="var(--destructive)" radius={[4, 4, 0, 0]} barSize={24} fillOpacity={0.8} />}
-                  {activeMetrics.has("compras") && <Bar yAxisId="left" dataKey="compras" fill="var(--chart-2)" radius={[4, 4, 0, 0]} barSize={24} fillOpacity={0.8} />}
+                  {activeMetrics.has("investimento") && <Bar yAxisId="left" dataKey="investimento" fill="var(--destructive)" radius={[4, 4, 0, 0]} barSize={20} fillOpacity={0.8} />}
+                  {activeMetrics.has("compras") && <Bar yAxisId="left" dataKey="compras" fill="var(--chart-2)" radius={[4, 4, 0, 0]} barSize={20} fillOpacity={0.8} />}
 
                   {activeMetrics.has("ticketMedio") && <Line yAxisId="right" type="monotone" dataKey="ticketMedio" stroke="var(--chart-3)" strokeWidth={2} dot={false} />}
                   {activeMetrics.has("cpa") && <Line yAxisId="right" type="monotone" dataKey="cpa" stroke="var(--chart-4)" strokeWidth={2} dot={false} />}
@@ -351,7 +352,7 @@ export default function DashboardPage() {
                 </ComposedChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex flex-col items-center justify-center text-muted-foreground space-y-2">
+              <div className="h-[280px] sm:h-[340px] flex flex-col items-center justify-center text-muted-foreground space-y-2">
                 <BarChart className="w-8 h-8 opacity-20" />
                 <p className="text-sm">Sem dados para exibir no momento</p>
               </div>

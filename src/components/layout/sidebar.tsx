@@ -145,9 +145,12 @@ export function Sidebar() {
         )}
       </nav>
 
-      {/* User User Profile (Apple Style) */}
+      {/* User Profile (Apple Style) */}
       <div className="px-4 py-4 border-t border-sidebar-border mt-auto bg-black/10">
-        <div className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-white/5 transition-colors cursor-pointer group">
+        <Link
+          href="/settings"
+          className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-white/5 transition-colors cursor-pointer group"
+        >
           <Avatar className="h-10 w-10 border border-white/10 shadow-sm">
             <AvatarImage src={avatarUrl || ""} />
             <AvatarFallback className="bg-primary/20 text-primary text-xs font-bold">
@@ -162,10 +165,8 @@ export function Sidebar() {
               {session?.user?.email}
             </p>
           </div>
-          <Link href="/settings">
-            <Settings className="w-4 h-4 text-sidebar-text/30 group-hover:text-sidebar-text/70 transition-colors" />
-          </Link>
-        </div>
+          <ChevronRight className="w-4 h-4 text-sidebar-text/30 group-hover:text-sidebar-text/70 transition-colors" />
+        </Link>
       </div>
     </aside>
   );

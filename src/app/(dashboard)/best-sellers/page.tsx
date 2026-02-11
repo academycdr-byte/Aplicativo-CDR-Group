@@ -315,8 +315,15 @@ export default function BestSellersPage() {
                         ) : (
                             /* List View */
                             <Card className="overflow-hidden border-border/40 bg-card/30 backdrop-blur-sm">
+                                {/* Mobile scroll hint */}
+                                <div className="flex items-center gap-2 px-4 py-2 text-xs text-muted-foreground border-b border-border/30 sm:hidden">
+                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="shrink-0 opacity-60">
+                                        <path d="M2 8h12M10 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                    </svg>
+                                    Arraste para o lado para ver mais colunas
+                                </div>
                                 <div className="overflow-x-auto">
-                                    <table className="w-full">
+                                    <table className="w-full min-w-[640px]">
                                         <thead>
                                             <tr className="border-b border-border/40 text-xs text-muted-foreground uppercase tracking-wider">
                                                 <th className="text-left px-4 py-3 font-medium w-12">#</th>

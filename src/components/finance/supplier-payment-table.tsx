@@ -110,8 +110,8 @@ export function SupplierPaymentTable({
                             </DialogDescription>
                         </DialogHeader>
                         <div className="grid gap-4 py-4">
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="paymentAmount" className="text-right">Valor (R$)</Label>
+                            <div className="space-y-2">
+                                <Label htmlFor="paymentAmount">Valor (R$)</Label>
                                 <Input
                                     id="paymentAmount"
                                     type="number"
@@ -119,28 +119,25 @@ export function SupplierPaymentTable({
                                     min="0"
                                     value={newPayment.amount || ""}
                                     onChange={(e) => setNewPayment({ ...newPayment, amount: parseFloat(e.target.value) || 0 })}
-                                    className="col-span-3"
                                     placeholder="0,00"
                                 />
                             </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="paymentDesc" className="text-right">Descricao</Label>
+                            <div className="space-y-2">
+                                <Label htmlFor="paymentDesc">Descricao</Label>
                                 <Input
                                     id="paymentDesc"
                                     value={newPayment.description}
                                     onChange={(e) => setNewPayment({ ...newPayment, description: e.target.value })}
-                                    className="col-span-3"
                                     placeholder="Ex: Lote de camisetas janeiro"
                                 />
                             </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="paymentDate" className="text-right">Data</Label>
+                            <div className="space-y-2">
+                                <Label htmlFor="paymentDate">Data</Label>
                                 <Input
                                     id="paymentDate"
                                     type="date"
                                     value={newPayment.paymentDate}
                                     onChange={(e) => setNewPayment({ ...newPayment, paymentDate: e.target.value })}
-                                    className="col-span-3"
                                 />
                             </div>
                         </div>
@@ -151,8 +148,8 @@ export function SupplierPaymentTable({
                 </Dialog>
             </div>
 
-            <div className="border rounded-md">
-                <Table>
+            <div className="border rounded-md overflow-x-auto">
+                <Table className="min-w-[420px]">
                     <TableHeader>
                         <TableRow>
                             <TableHead>Data</TableHead>

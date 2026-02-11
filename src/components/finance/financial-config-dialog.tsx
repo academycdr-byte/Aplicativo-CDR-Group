@@ -202,7 +202,7 @@ export function FinancialConfigDialog({ config, onSave }: { config: FinancialCon
                             value={formData.defaultTaxRate}
                             onChange={(e) => setFormData({ ...formData, defaultTaxRate: parseFloat(e.target.value) || 0 })}
                         />
-                        <div className="flex gap-3 mt-2">
+                        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-2">
                             <label className="flex items-center gap-1.5 text-xs cursor-pointer">
                                 <input
                                     type="radio"

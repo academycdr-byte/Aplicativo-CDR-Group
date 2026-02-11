@@ -13,7 +13,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     ...authConfig.callbacks,
     async jwt({ token, user, trigger, session }) {
       if (user) {
+        // Reset ALL token fields to prevent stale data from previous sessions
         token.sub = user.id;
+        token.name = user.name;
+        token.email = user.email;
         token.picture = undefined; // Prevent base64 image bloating the JWT cookie
 
         // Load user's first organization
@@ -53,6 +56,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async session({ session, token }) {
       if (token.sub) {
         session.user.id = token.sub;
+      }
+      // Always sync name/email from token to prevent stale session data
+      if (token.name) {
+        session.user.name = token.name as string;
+      }
+      if (token.email) {
+        session.user.email = token.email as string;
       }
       if (token.organizationId) {
         session.user.organizationId = token.organizationId as string;
