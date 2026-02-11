@@ -66,6 +66,7 @@ export default function AnalyticsPage() {
     const [period, setPeriod] = useState<PeriodValue>({ type: "preset", days: 30 });
     const [loading, setLoading] = useState(true);
     const [gaData, setGaData] = useState<GAData | null>(null);
+    const [showBounceTooltip, setShowBounceTooltip] = useState(false);
 
     const loadData = useCallback(async () => {
         setLoading(true);
@@ -190,11 +191,21 @@ export default function AnalyticsPage() {
                         <Card className="border border-border shadow-none rounded-lg p-4">
                             <div className="flex items-center gap-1.5">
                                 <span className="text-[11px] uppercase tracking-wider font-medium text-muted-foreground">Bounce Rate</span>
-                                <div className="relative group">
-                                    <Info className="w-3.5 h-3.5 text-muted-foreground/50 cursor-help" />
-                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-popover text-popover-foreground text-xs rounded-lg shadow-lg border border-border opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 w-56 z-50 pointer-events-none">
-                                        Percentual de sessoes que nao foram engajadas, ou seja, duraram menos de 10 segundos e nao tiveram conversao nem segunda visualizacao.
-                                    </div>
+                                <div className="relative">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowBounceTooltip(!showBounceTooltip)}
+                                        onMouseEnter={() => setShowBounceTooltip(true)}
+                                        onMouseLeave={() => setShowBounceTooltip(false)}
+                                        className="focus:outline-none"
+                                    >
+                                        <Info className="w-3.5 h-3.5 text-muted-foreground/50 cursor-help" />
+                                    </button>
+                                    {showBounceTooltip && (
+                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-popover text-popover-foreground text-xs rounded-lg shadow-lg border border-border w-56 z-50">
+                                            Percentual de sessoes que nao foram engajadas, ou seja, duraram menos de 10 segundos e nao tiveram conversao nem segunda visualizacao.
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                             <div className="text-lg font-bold mt-1">{fmtPercent(gaData.totals.bounceRate)}</div>
@@ -414,17 +425,29 @@ export default function AnalyticsPage() {
 }
 
 function AnalyticsKPICard({ title, value, icon: Icon, color, tooltip }: { title: string; value: string; icon: LucideIcon; color: string; tooltip?: string }) {
+    const [showTooltip, setShowTooltip] = useState(false);
+
     return (
         <Card className="border border-border shadow-none rounded-lg p-5">
             <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-1.5">
                     <span className="text-[11px] uppercase tracking-wider font-medium text-muted-foreground">{title}</span>
                     {tooltip && (
-                        <div className="relative group">
-                            <Info className="w-3.5 h-3.5 text-muted-foreground/50 cursor-help" />
-                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-popover text-popover-foreground text-xs rounded-lg shadow-lg border border-border opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 w-56 z-50 pointer-events-none">
-                                {tooltip}
-                            </div>
+                        <div className="relative">
+                            <button
+                                type="button"
+                                onClick={() => setShowTooltip(!showTooltip)}
+                                onMouseEnter={() => setShowTooltip(true)}
+                                onMouseLeave={() => setShowTooltip(false)}
+                                className="focus:outline-none"
+                            >
+                                <Info className="w-3.5 h-3.5 text-muted-foreground/50 cursor-help" />
+                            </button>
+                            {showTooltip && (
+                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-popover text-popover-foreground text-xs rounded-lg shadow-lg border border-border w-56 z-50">
+                                    {tooltip}
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
