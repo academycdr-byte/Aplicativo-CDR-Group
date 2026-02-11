@@ -122,8 +122,7 @@ export async function getBestSellersAction(
                             // Collect product info from rawData (first occurrence wins)
                             if (!productInfoFromOrders.has(pid)) {
                                 const name = extractI18nName(li.name);
-                                const imageObj = li.image as Record<string, unknown> | undefined;
-                                const imageUrl = imageObj?.src ? String(imageObj.src) : "";
+                                const imageUrl = extractNuvemshopImage(li.image);
                                 productInfoFromOrders.set(pid, { name, imageUrl });
                             }
                         }
@@ -212,7 +211,7 @@ export async function getBestSellersAction(
                 let vendor = "";
 
                 if (details) {
-                    imageUrl = details.images?.[0]?.src || "";
+                    imageUrl = extractNuvemshopImage(details.images?.[0]);
                     title = extractI18nName(details.name);
                     price = details.variants?.[0]?.price || "0.00";
                     vendor = details.brand || "";
@@ -253,6 +252,22 @@ function extractI18nName(nameField: unknown): string {
         return obj.pt || obj.es || obj.en || Object.values(obj).find(v => typeof v === "string" && v) || "Produto";
     }
     return "Produto";
+}
+
+const NUVEMSHOP_NO_PHOTO = "no-photo";
+
+/** Extract image URL from a Nuvemshop image field (object or string), filtering placeholders */
+function extractNuvemshopImage(imageField: unknown): string {
+    let src = "";
+    if (typeof imageField === "string") {
+        src = imageField;
+    } else if (imageField && typeof imageField === "object") {
+        const obj = imageField as Record<string, unknown>;
+        src = obj.src ? String(obj.src) : "";
+    }
+    // Filter out the Nuvemshop no-photo placeholder
+    if (src && src.includes(NUVEMSHOP_NO_PHOTO)) return "";
+    return src;
 }
 
 /**

@@ -24,10 +24,10 @@ export async function getDashboardData(days: number = 30, from?: string, to?: st
     adRevenue,
   ] = await Promise.all([
     prisma.order.count({
-      where: { organizationId: orgId, orderDate: dateFilter },
+      where: { organizationId: orgId, orderDate: dateFilter, status: "paid" },
     }),
     prisma.order.count({
-      where: { organizationId: orgId, orderDate: prevDateFilter },
+      where: { organizationId: orgId, orderDate: prevDateFilter, status: "paid" },
     }),
     prisma.order.aggregate({
       where: { organizationId: orgId, orderDate: dateFilter, status: "paid" },

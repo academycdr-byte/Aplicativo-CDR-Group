@@ -82,8 +82,9 @@ export async function GET() {
     }
 
     // 3. DB state (read-only)
-    const [dbOrderCount, dbOrders, lastSyncLog] = await Promise.all([
+    const [dbOrderCount, dbPaidCount, dbOrders, lastSyncLog, sampleOrderWithRaw] = await Promise.all([
         prisma.order.count({ where: { organizationId: orgId, platform: "NUVEMSHOP" } }),
+        prisma.order.count({ where: { organizationId: orgId, platform: "NUVEMSHOP", status: "paid" } }),
         prisma.order.findMany({
             where: { organizationId: orgId, platform: "NUVEMSHOP" },
             select: { externalOrderId: true, status: true, totalAmount: true, orderDate: true, itemCount: true },
@@ -94,7 +95,78 @@ export async function GET() {
             where: { organizationId: orgId, platform: "NUVEMSHOP" },
             orderBy: { startedAt: "desc" },
         }),
+        // Fetch one order with rawData to inspect product image structure
+        prisma.order.findFirst({
+            where: { organizationId: orgId, platform: "NUVEMSHOP", itemCount: { gt: 0 } },
+            select: { externalOrderId: true, rawData: true },
+            orderBy: { orderDate: "desc" },
+        }),
     ]);
+
+    // 4. Extract image info from rawData sample
+    let rawDataSample: Record<string, unknown> | null = null;
+    if (sampleOrderWithRaw?.rawData) {
+        const raw = sampleOrderWithRaw.rawData as Record<string, unknown>;
+        const products = raw.products;
+        if (Array.isArray(products) && products.length > 0) {
+            const firstProduct = products[0] as Record<string, unknown>;
+            rawDataSample = {
+                orderId: sampleOrderWithRaw.externalOrderId,
+                productFields: Object.keys(firstProduct),
+                product_id: firstProduct.product_id,
+                name: firstProduct.name,
+                imageField: firstProduct.image,
+                imageType: typeof firstProduct.image,
+                // Show all products' image info
+                allProductImages: products.slice(0, 5).map((p: unknown) => {
+                    const prod = p as Record<string, unknown>;
+                    const img = prod.image as Record<string, unknown> | null;
+                    return {
+                        product_id: prod.product_id,
+                        name: prod.name,
+                        hasImage: !!img,
+                        imageSrc: img?.src || null,
+                    };
+                }),
+            };
+        }
+    }
+
+    // 5. Fetch first product from Products API to check image structure
+    let productsApiSample: Record<string, unknown> | null = null;
+    try {
+        const res = await fetch(
+            `https://api.nuvemshop.com.br/v1/${storeId}/products?per_page=1`,
+            {
+                headers: {
+                    Authentication: `bearer ${accessToken}`,
+                    "User-Agent": "CDR Group Hub (cdrgroup.com)",
+                    "Content-Type": "application/json",
+                },
+            }
+        );
+        if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data) && data.length > 0) {
+                const p = data[0];
+                productsApiSample = {
+                    id: p.id,
+                    name: p.name,
+                    hasImages: Array.isArray(p.images) && p.images.length > 0,
+                    imagesCount: Array.isArray(p.images) ? p.images.length : 0,
+                    firstImageSrc: p.images?.[0]?.src || null,
+                    brand: p.brand,
+                };
+            }
+        }
+    } catch { /* ignore */ }
+
+    // 6. Count orders by status
+    const statusCounts = await prisma.order.groupBy({
+        by: ["status"],
+        where: { organizationId: orgId, platform: "NUVEMSHOP" },
+        _count: { id: true },
+    });
 
     return NextResponse.json({
         integration: {
@@ -108,7 +180,7 @@ export async function GET() {
         api: {
             totalHint: apiTotalHint,
             error: apiError,
-            orders: apiOrders.map((o) => ({
+            orders: apiOrders.slice(0, 10).map((o) => ({
                 id: o.id,
                 number: o.number,
                 status: o.status,
@@ -117,10 +189,16 @@ export async function GET() {
                 created_at: o.created_at,
                 customer: (o.customer as Record<string, unknown>)?.name || null,
                 productsCount: Array.isArray(o.products) ? (o.products as unknown[]).length : 0,
+                // Show first product image info from API
+                firstProductImage: Array.isArray(o.products) && (o.products as unknown[]).length > 0
+                    ? ((o.products as Record<string, unknown>[])[0].image as Record<string, unknown>)?.src || null
+                    : null,
             })),
         },
         db: {
             totalOrders: dbOrderCount,
+            paidOrders: dbPaidCount,
+            statusBreakdown: statusCounts.map(s => ({ status: s.status, count: s._count.id })),
             orders: dbOrders.map((o) => ({
                 ...o,
                 totalAmount: Number(o.totalAmount),
@@ -132,6 +210,10 @@ export async function GET() {
                 startedAt: lastSyncLog.startedAt,
                 completedAt: lastSyncLog.completedAt,
             } : null,
+        },
+        imageDebug: {
+            rawDataSample,
+            productsApiSample,
         },
     });
 }
