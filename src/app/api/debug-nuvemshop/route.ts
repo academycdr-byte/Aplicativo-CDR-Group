@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { decrypt } from "@/lib/encryption";
+import { parseOrderDate } from "@/lib/date-utils";
 
 export async function GET() {
     const session = await auth();
@@ -18,54 +19,38 @@ export async function GET() {
     }
 
     const orgId = membership.organizationId;
+    const steps: Record<string, unknown> = {};
 
     // Step 1: Check integration
     const integration = await prisma.integration.findUnique({
         where: { organizationId_platform: { organizationId: orgId, platform: "NUVEMSHOP" } },
     });
 
-    if (!integration) {
-        return NextResponse.json({ step: "integration", error: "Integration not found" });
+    if (!integration || !integration.accessToken) {
+        return NextResponse.json({ error: "Integration not found or no token" });
     }
 
-    const integrationInfo = {
-        id: integration.id,
+    steps.integration = {
         status: integration.status,
-        hasAccessToken: !!integration.accessToken,
-        tokenLength: integration.accessToken?.length || 0,
-        externalStoreId: integration.externalStoreId,
         syncStatus: integration.syncStatus,
-        lastSyncAt: integration.lastSyncAt,
-        errorMessage: integration.errorMessage,
+        storeId: integration.externalStoreId,
     };
 
-    // Step 2: Try decrypt
+    // Step 2: Decrypt token
     let accessToken = "";
     try {
-        if (integration.accessToken) {
-            accessToken = decrypt(integration.accessToken);
-        }
+        accessToken = decrypt(integration.accessToken);
+        steps.decrypt = "OK";
     } catch (err: unknown) {
-        return NextResponse.json({
-            step: "decrypt",
-            error: err instanceof Error ? err.message : "Decrypt failed",
-            integrationInfo,
-        });
+        return NextResponse.json({ steps, error: "Decrypt failed: " + (err instanceof Error ? err.message : "unknown") });
     }
 
-    // Step 3: Check sync logs
-    const recentLogs = await prisma.syncLog.findMany({
-        where: { organizationId: orgId, platform: "NUVEMSHOP" },
-        orderBy: { startedAt: "desc" },
-        take: 5,
-    });
-
-    // Step 4: Try API call
+    // Step 3: Fetch first page of orders from Nuvemshop
     const storeId = integration.externalStoreId || "";
-    let apiResult: Record<string, unknown> = {};
+    let orders: Record<string, unknown>[] = [];
     try {
         const response = await fetch(
-            `https://api.nuvemshop.com.br/v1/${storeId}/orders?per_page=5&page=1`,
+            `https://api.nuvemshop.com.br/v1/${storeId}/orders?per_page=10&page=1`,
             {
                 headers: {
                     Authentication: `bearer ${accessToken}`,
@@ -75,53 +60,118 @@ export async function GET() {
             }
         );
 
-        apiResult = {
-            status: response.status,
-            statusText: response.statusText,
-            ok: response.ok,
-        };
+        steps.apiStatus = response.status;
 
-        if (response.ok) {
-            const data = await response.json();
-            apiResult.isArray = Array.isArray(data);
-            apiResult.count = Array.isArray(data) ? data.length : 0;
-            if (Array.isArray(data) && data.length > 0) {
-                apiResult.firstOrderId = data[0].id;
-                apiResult.firstOrderDate = data[0].created_at;
-                apiResult.firstOrderTotal = data[0].total;
-                apiResult.firstOrderStatus = data[0].payment_status;
-            }
-        } else {
+        if (!response.ok) {
             const text = await response.text();
-            apiResult.body = text.substring(0, 500);
+            return NextResponse.json({ steps, error: `API ${response.status}: ${text.substring(0, 300)}` });
         }
+
+        const data = await response.json();
+        orders = Array.isArray(data) ? data : [];
+        steps.ordersFromApi = orders.length;
     } catch (err: unknown) {
-        apiResult = { error: err instanceof Error ? err.message : "API call failed" };
+        return NextResponse.json({ steps, error: "API fetch failed: " + (err instanceof Error ? err.message : "unknown") });
     }
 
-    // Step 5: Check orders in DB
-    const orderCount = await prisma.order.count({
+    if (orders.length === 0) {
+        return NextResponse.json({ steps, result: "No orders in Nuvemshop store" });
+    }
+
+    // Step 4: Try to upsert FIRST order only (to test DB write)
+    const raw = orders[0];
+    const customer = raw.customer as Record<string, unknown> | null;
+    const products = raw.products as Array<Record<string, unknown>> | undefined;
+
+    const orderData = {
+        organizationId: orgId,
+        platform: "NUVEMSHOP" as const,
+        externalOrderId: String(raw.id),
+        status: mapStatus(String(raw.payment_status || "")),
+        customerName: (customer?.name as string) || null,
+        customerEmail: (customer?.email as string) || null,
+        totalAmount: parseFloat(String(raw.total || "0")),
+        currency: (raw.currency as string) || "BRL",
+        itemCount: products?.length || 0,
+        orderDate: parseOrderDate(String(raw.created_at)),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        rawData: { id: raw.id, total: raw.total, payment_status: raw.payment_status } as any,
+    };
+
+    steps.orderToWrite = {
+        externalOrderId: orderData.externalOrderId,
+        status: orderData.status,
+        totalAmount: orderData.totalAmount,
+        orderDate: orderData.orderDate,
+        customerEmail: orderData.customerEmail,
+    };
+
+    try {
+        const result = await prisma.order.upsert({
+            where: {
+                organizationId_platform_externalOrderId: {
+                    organizationId: orgId,
+                    platform: "NUVEMSHOP",
+                    externalOrderId: String(raw.id),
+                },
+            },
+            create: orderData,
+            update: {
+                status: orderData.status,
+                totalAmount: orderData.totalAmount,
+                customerName: orderData.customerName,
+                customerEmail: orderData.customerEmail,
+                itemCount: orderData.itemCount,
+                orderDate: orderData.orderDate,
+                rawData: orderData.rawData,
+            },
+        });
+
+        steps.upsertResult = { success: true, orderId: result.id };
+    } catch (err: unknown) {
+        steps.upsertResult = {
+            success: false,
+            error: err instanceof Error ? err.message : "Unknown",
+            stack: err instanceof Error ? err.stack?.substring(0, 500) : undefined,
+        };
+        return NextResponse.json({ steps, error: "DB upsert failed" });
+    }
+
+    // Step 5: Now try full sync
+    try {
+        // Reset sync status first
+        await prisma.integration.update({
+            where: { id: integration.id },
+            data: { syncStatus: "IDLE" },
+        });
+
+        // Run actual sync (imported dynamically to avoid issues)
+        const { syncNuvemshopOrders } = await import("@/lib/integrations/nuvemshop");
+        const syncResult = await syncNuvemshopOrders(orgId);
+        steps.fullSync = syncResult;
+    } catch (err: unknown) {
+        steps.fullSync = {
+            error: err instanceof Error ? err.message : "Unknown",
+            stack: err instanceof Error ? err.stack?.substring(0, 500) : undefined,
+        };
+    }
+
+    // Step 6: Final count
+    const finalCount = await prisma.order.count({
         where: { organizationId: orgId, platform: "NUVEMSHOP" },
     });
+    steps.finalOrderCount = finalCount;
 
-    const totalOrderCount = await prisma.order.count({
-        where: { organizationId: orgId },
-    });
+    return NextResponse.json({ steps, success: true });
+}
 
-    return NextResponse.json({
-        integrationInfo,
-        decryptOk: true,
-        tokenPreview: accessToken.substring(0, 8) + "...",
-        storeId,
-        apiResult,
-        nuvemshopOrdersInDb: orderCount,
-        totalOrdersInDb: totalOrderCount,
-        recentSyncLogs: recentLogs.map((l) => ({
-            status: l.status,
-            recordsSynced: l.recordsSynced,
-            errorMessage: l.errorMessage,
-            startedAt: l.startedAt,
-            completedAt: l.completedAt,
-        })),
-    });
+function mapStatus(status: string): string {
+    const map: Record<string, string> = {
+        paid: "paid",
+        pending: "pending",
+        refunded: "refunded",
+        voided: "cancelled",
+        authorized: "pending",
+    };
+    return map[status] || status;
 }
