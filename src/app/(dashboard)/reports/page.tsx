@@ -1353,7 +1353,7 @@ function ClientFormDialog({
                 <SelectItem value="">Nenhum (enviar direto)</SelectItem>
                 {groups.map((g) => (
                   <SelectItem key={g.id} value={g.id}>
-                    {g.name} ({g.participants} participantes)
+                    {g.name}{g.participants > 0 ? ` (${g.participants})` : ""}
                   </SelectItem>
                 ))}
               </SelectContent>
