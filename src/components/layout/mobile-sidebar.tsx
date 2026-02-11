@@ -57,7 +57,7 @@ export function MobileSidebar() {
   ];
 
   const managementNavItems = [
-    { name: "Integrações", href: "/integrations", icon: Link2, internalOnly: true },
+    { name: "Integrações", href: "/integrations", icon: Link2 },
     { name: "Configurações", href: "/settings", icon: Settings },
   ];
 

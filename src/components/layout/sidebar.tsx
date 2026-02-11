@@ -80,7 +80,7 @@ export function Sidebar() {
     ];
 
     const managementNavItems: NavItem[] = [
-      { name: "Integrações", href: "/integrations", icon: Link2, internalOnly: true },
+      { name: "Integrações", href: "/integrations", icon: Link2 },
       { name: "Configurações", href: "/settings", icon: Settings },
     ];
 
