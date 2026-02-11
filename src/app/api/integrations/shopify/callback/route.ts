@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { encrypt } from "@/lib/encryption";
+import { encrypt, decrypt } from "@/lib/encryption";
 import { exchangeShopifyCode, validateShopifyHmac, syncShopifyOrders, registerShopifyWebhooks } from "@/lib/integrations/shopify";
 import { cookies } from "next/headers";
+
+export const maxDuration = 60;
 
 // GET /api/integrations/shopify/callback?code=xxx&hmac=xxx&shop=xxx&state=xxx
 // Callback do OAuth Shopify - troca o code por access token
@@ -41,12 +43,33 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Validar HMAC se presente
-  if (hmac) {
+  // Use active organization from JWT session
+  const organizationId = session.user.organizationId;
+  if (!organizationId) {
+    return NextResponse.redirect(
+      new URL("/integrations?error=shopify_oauth_failed&detail=Organizacao+nao+encontrada", request.url)
+    );
+  }
+
+  // Look up stored credentials from Integration record
+  const integration = await prisma.integration.findUnique({
+    where: {
+      organizationId_platform: { organizationId, platform: "SHOPIFY" },
+    },
+  });
+
+  let clientId: string | undefined;
+  let clientSecret: string | undefined;
+
+  if (integration?.apiKey) clientId = decrypt(integration.apiKey);
+  if (integration?.apiSecret) clientSecret = decrypt(integration.apiSecret);
+
+  // Validar HMAC se presente (using per-store secret or env fallback)
+  if (hmac && clientSecret) {
     const queryObj: Record<string, string> = {};
     params.forEach((value, key) => { queryObj[key] = value; });
 
-    if (!validateShopifyHmac(queryObj)) {
+    if (!validateShopifyHmac(queryObj, clientSecret)) {
       console.error("[Shopify OAuth] HMAC validation failed");
       return NextResponse.redirect(
         new URL("/integrations?error=shopify_oauth_failed&detail=HMAC+invalido", request.url)
@@ -55,17 +78,6 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Trocar code por access token usando form-urlencoded
-    const tokenData = await exchangeShopifyCode(shop, code);
-
-    // Use active organization from JWT session
-    const organizationId = session.user.organizationId;
-    if (!organizationId) {
-      return NextResponse.redirect(
-        new URL("/integrations?error=shopify_oauth_failed&detail=Organizacao+nao+encontrada", request.url)
-      );
-    }
-
     // Verify user has membership in this org
     const membership = await prisma.membership.findFirst({
       where: { userId: session.user.id, organizationId },
@@ -77,7 +89,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Salvar integracao
+    // Trocar code por access token usando credenciais do banco ou env vars
+    const credentials = clientId && clientSecret ? { clientId, clientSecret } : undefined;
+    const tokenData = await exchangeShopifyCode(shop, code, credentials);
+
+    // Salvar integracao - keep apiKey/apiSecret for future re-auth
     await prisma.integration.upsert({
       where: {
         organizationId_platform: {
@@ -90,6 +106,8 @@ export async function GET(request: NextRequest) {
         platform: "SHOPIFY",
         status: "CONNECTED",
         accessToken: encrypt(tokenData.access_token),
+        apiKey: integration?.apiKey || null,
+        apiSecret: integration?.apiSecret || null,
         externalStoreId: shop,
         scopes: tokenData.scope,
       },

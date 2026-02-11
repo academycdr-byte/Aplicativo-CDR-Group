@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
+import { decrypt } from "@/lib/encryption";
 import { getShopifyAuthUrl, generateOAuthState } from "@/lib/integrations/shopify";
 import { cookies } from "next/headers";
 
@@ -23,6 +25,32 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    // Get organization from session
+    const organizationId = session.user.organizationId;
+    if (!organizationId) {
+      return NextResponse.redirect(
+        new URL("/integrations?error=shopify_config_error&detail=Organizacao+nao+encontrada", request.url)
+      );
+    }
+
+    // Look up stored credentials from the PENDING integration
+    const integration = await prisma.integration.findUnique({
+      where: {
+        organizationId_platform: { organizationId, platform: "SHOPIFY" },
+      },
+    });
+
+    let clientId: string | undefined;
+    if (integration?.apiKey) {
+      clientId = decrypt(integration.apiKey);
+    }
+
+    if (!clientId) {
+      return NextResponse.redirect(
+        new URL("/integrations?error=shopify_config_error&detail=Client+ID+nao+encontrado.+Preencha+as+credenciais+novamente.", request.url)
+      );
+    }
+
     const state = generateOAuthState();
     const baseUrl = process.env.AUTH_URL || process.env.NEXTAUTH_URL;
     if (!baseUrl) throw new Error("AUTH_URL nao configurado");
@@ -45,7 +73,7 @@ export async function GET(request: NextRequest) {
       path: "/",
     });
 
-    const authUrl = getShopifyAuthUrl(domain, redirectUri, state);
+    const authUrl = getShopifyAuthUrl(domain, redirectUri, state, clientId);
     console.log("[Shopify OAuth] Redirecting to:", authUrl);
 
     return NextResponse.redirect(authUrl);

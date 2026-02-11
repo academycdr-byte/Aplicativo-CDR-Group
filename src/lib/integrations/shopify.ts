@@ -11,12 +11,12 @@ const SHOPIFY_SCOPES = "read_orders,read_products,read_customers,read_reports";
  * Gera a URL de autorizacao OAuth do Shopify (Authorization Code Grant).
  * O usuario e redirecionado para esta URL para autorizar o app.
  */
-export function getShopifyAuthUrl(shop: string, redirectUri: string, state: string): string {
-  const clientId = process.env.SHOPIFY_CLIENT_ID?.trim();
-  if (!clientId) throw new Error("SHOPIFY_CLIENT_ID nao configurado");
+export function getShopifyAuthUrl(shop: string, redirectUri: string, state: string, clientId?: string): string {
+  const id = clientId?.trim() || process.env.SHOPIFY_CLIENT_ID?.trim();
+  if (!id) throw new Error("SHOPIFY_CLIENT_ID nao configurado");
 
   const params = new URLSearchParams({
-    client_id: clientId,
+    client_id: id,
     scope: SHOPIFY_SCOPES,
     redirect_uri: redirectUri,
     state,
@@ -32,13 +32,14 @@ export function getShopifyAuthUrl(shop: string, redirectUri: string, state: stri
  */
 export async function exchangeShopifyCode(
   shop: string,
-  code: string
+  code: string,
+  credentials?: { clientId: string; clientSecret: string }
 ): Promise<{ access_token: string; scope: string }> {
-  const clientId = process.env.SHOPIFY_CLIENT_ID?.trim();
-  const clientSecret = process.env.SHOPIFY_CLIENT_SECRET?.trim();
+  const clientId = credentials?.clientId?.trim() || process.env.SHOPIFY_CLIENT_ID?.trim();
+  const clientSecret = credentials?.clientSecret?.trim() || process.env.SHOPIFY_CLIENT_SECRET?.trim();
 
   if (!clientId || !clientSecret) {
-    throw new Error("SHOPIFY_CLIENT_ID ou SHOPIFY_CLIENT_SECRET nao configurado");
+    throw new Error("Client ID ou Client Secret nao configurado");
   }
 
   const body = new URLSearchParams({
@@ -79,8 +80,8 @@ export function generateOAuthState(): string {
 /**
  * Valida o HMAC da query string do callback Shopify.
  */
-export function validateShopifyHmac(query: Record<string, string>): boolean {
-  const clientSecret = process.env.SHOPIFY_CLIENT_SECRET?.trim();
+export function validateShopifyHmac(query: Record<string, string>, secret?: string): boolean {
+  const clientSecret = secret?.trim() || process.env.SHOPIFY_CLIENT_SECRET?.trim();
   if (!clientSecret) return false;
 
   const hmac = query.hmac;
