@@ -15,6 +15,8 @@ export type FinancialMetrics = {
     fixedCosts: number;
     chargebackCost: number;
     transactionFees: number;
+    manualCosts: number;
+    manualIncome: number;
     netProfit: number;
     margin: number;
     roi: number;
@@ -45,6 +47,14 @@ export type SupplierPaymentInput = {
     amount: number;
     description?: string;
     paymentDate: Date;
+};
+
+export type FinancialEntryInput = {
+    type: "cost" | "income";
+    amount: number;
+    description?: string;
+    category: string;
+    entryDate: Date;
 };
 
 /**
@@ -181,6 +191,26 @@ export async function getFinancialMetrics({
         }
     }
 
+    // Fetch manual financial entries in period
+    const manualCostsAgg = await db.financialEntry.aggregate({
+        where: {
+            organizationId,
+            type: "cost",
+            entryDate: { gte: from, lte: to },
+        },
+        _sum: { amount: true },
+    });
+    const manualIncomeAgg = await db.financialEntry.aggregate({
+        where: {
+            organizationId,
+            type: "income",
+            entryDate: { gte: from, lte: to },
+        },
+        _sum: { amount: true },
+    });
+    const manualCosts = Number(manualCostsAgg._sum.amount || 0);
+    const manualIncome = Number(manualIncomeAgg._sum.amount || 0);
+
     const adSpend = Number(adMetrics._sum.spend || 0);
     const orderCount = orders.length;
     const ticketMedio = orderCount > 0 ? revenue / orderCount : 0;
@@ -197,8 +227,9 @@ export async function getFinancialMetrics({
         ? Math.max(0, grossProfit) * taxRate
         : revenue * taxRate;
 
-    const netProfit = revenue - cogs - adSpend - gatewayFee - checkoutFee - taxFee - transactionFees - fixedCosts - chargebackCost;
-    const margin = revenue > 0 ? (netProfit / revenue) * 100 : 0;
+    const netProfit = revenue + manualIncome - cogs - adSpend - gatewayFee - checkoutFee - taxFee - transactionFees - fixedCosts - chargebackCost - manualCosts;
+    const totalRevenue = revenue + manualIncome;
+    const margin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
     const roi = adSpend > 0 ? (netProfit / adSpend) * 100 : 0;
 
     return {
@@ -211,6 +242,8 @@ export async function getFinancialMetrics({
         fixedCosts,
         chargebackCost,
         transactionFees,
+        manualCosts,
+        manualIncome,
         netProfit,
         margin,
         roi,
@@ -370,6 +403,73 @@ export async function deleteSupplierPayment(id: string) {
     if (!ctx) throw new Error("Nao autenticado");
 
     await db.supplierPayment.delete({
+        where: { id },
+    });
+
+    revalidatePath("/financeiro");
+    return { success: true };
+}
+
+// ─── FINANCIAL ENTRIES (MANUAL COSTS & INCOME) ────
+
+/**
+ * Save a manual financial entry (cost or income)
+ */
+export async function saveFinancialEntry(input: FinancialEntryInput) {
+    const ctx = await getSessionWithOrg();
+    if (!ctx) throw new Error("Nao autenticado");
+
+    if (isNaN(input.amount) || input.amount <= 0) {
+        throw new Error("Valor deve ser maior que zero");
+    }
+
+    if (input.type !== "cost" && input.type !== "income") {
+        throw new Error("Tipo deve ser 'cost' ou 'income'");
+    }
+
+    if (!input.category) {
+        throw new Error("Categoria e obrigatoria");
+    }
+
+    await db.financialEntry.create({
+        data: {
+            organizationId: ctx.organization.id,
+            type: input.type,
+            amount: input.amount,
+            description: input.description,
+            category: input.category,
+            entryDate: input.entryDate,
+        },
+    });
+
+    revalidatePath("/financeiro");
+    return { success: true };
+}
+
+/**
+ * Get financial entries for a given period
+ */
+export async function getFinancialEntries(from: Date, to: Date) {
+    const ctx = await getSessionWithOrg();
+    if (!ctx) return [];
+
+    return db.financialEntry.findMany({
+        where: {
+            organizationId: ctx.organization.id,
+            entryDate: { gte: from, lte: to },
+        },
+        orderBy: { entryDate: "desc" },
+    });
+}
+
+/**
+ * Delete a financial entry
+ */
+export async function deleteFinancialEntry(id: string) {
+    const ctx = await getSessionWithOrg();
+    if (!ctx) throw new Error("Nao autenticado");
+
+    await db.financialEntry.delete({
         where: { id },
     });
 

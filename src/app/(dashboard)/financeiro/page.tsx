@@ -12,6 +12,8 @@ import {
     PieChart,
     Landmark,
     ArrowDownRight,
+    ArrowDownLeft,
+    ArrowUpRight,
     Receipt,
     AlertTriangle,
 } from "lucide-react";
@@ -21,11 +23,13 @@ import {
     getProductCosts,
     getFinancialConfig,
     getSupplierPayments,
+    getFinancialEntries,
     type FinancialMetrics,
 } from "@/actions/finance";
 import { ProductCostTable } from "@/components/finance/product-cost-table";
 import { SupplierPaymentTable } from "@/components/finance/supplier-payment-table";
 import { FinancialConfigDialog } from "@/components/finance/financial-config-dialog";
+import { FinancialEntryTable } from "@/components/finance/financial-entry-table";
 import { cn } from "@/lib/utils";
 
 export default function FinancePage() {
@@ -41,6 +45,8 @@ export default function FinancePage() {
         fixedCosts: 0,
         chargebackCost: 0,
         transactionFees: 0,
+        manualCosts: 0,
+        manualIncome: 0,
         netProfit: 0,
         margin: 0,
         roi: 0,
@@ -51,6 +57,8 @@ export default function FinancePage() {
     const [costs, setCosts] = useState<any[]>([]);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [supplierPayments, setSupplierPayments] = useState<any[]>([]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [financialEntries, setFinancialEntries] = useState<any[]>([]);
     const [config, setConfig] = useState({
         defaultTaxRate: 0,
         fixedTransactionFee: 0,
@@ -82,6 +90,7 @@ export default function FinancePage() {
                 getProductCosts(),
                 getFinancialConfig(),
                 getSupplierPayments(fromDate, toDate),
+                getFinancialEntries(fromDate, toDate),
             ]);
 
             if (results[0].status === "fulfilled") setMetrics(results[0].value);
@@ -101,6 +110,7 @@ export default function FinancePage() {
                 });
             }
             if (results[3].status === "fulfilled") setSupplierPayments(results[3].value);
+            if (results[4].status === "fulfilled") setFinancialEntries(results[4].value);
         } catch (error) {
             console.error("Failed to load financial data", error);
         } finally {
@@ -117,6 +127,7 @@ export default function FinancePage() {
     }
 
     const revenue = metrics.revenue || 1;
+    const totalRevenue = metrics.revenue + metrics.manualIncome || 1;
     const cogsPct = (metrics.productCosts / revenue) * 100;
     const adsPct = (metrics.adSpend / revenue) * 100;
     const gatewayPct = (metrics.gatewayFee / revenue) * 100;
@@ -125,7 +136,8 @@ export default function FinancePage() {
     const fixedPct = (metrics.fixedCosts / revenue) * 100;
     const chargebackPct = (metrics.chargebackCost / revenue) * 100;
     const txFeePct = (metrics.transactionFees / revenue) * 100;
-    const profitPct = Math.max(0, (metrics.netProfit / revenue) * 100);
+    const manualCostsPct = (metrics.manualCosts / revenue) * 100;
+    const profitPct = Math.max(0, (metrics.netProfit / totalRevenue) * 100);
 
     return (
         <div className="space-y-5 sm:space-y-6 animate-in fade-in duration-500">
@@ -145,7 +157,7 @@ export default function FinancePage() {
             {loading ? (
                 <div className="space-y-6">
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                        {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => (
                             <Card key={i} className="border border-border shadow-none rounded-lg p-5">
                                 <div className="animate-pulse space-y-3">
                                     <div className="h-3 w-20 bg-muted/40 rounded" />
@@ -225,6 +237,20 @@ export default function FinancePage() {
                             iconClass="bg-rose-500/10 text-rose-500"
                             subText={`${chargebackPct.toFixed(2)}% da receita`}
                         />
+                        <FinancialCard
+                            title="Outros Custos"
+                            value={fmt(metrics.manualCosts)}
+                            icon={ArrowDownLeft}
+                            iconClass="bg-pink-500/10 text-pink-500"
+                            subText={`${manualCostsPct.toFixed(2)}% da receita`}
+                        />
+                        <FinancialCard
+                            title="Outras Receitas"
+                            value={fmt(metrics.manualIncome)}
+                            icon={ArrowUpRight}
+                            iconClass="bg-teal-500/10 text-teal-500"
+                            subText={metrics.revenue > 0 ? `${((metrics.manualIncome / metrics.revenue) * 100).toFixed(2)}% da receita` : "0.00% da receita"}
+                        />
                     </div>
 
                     {/* Bottom row: Net Profit + Margin */}
@@ -288,6 +314,11 @@ export default function FinancePage() {
                                     <span className="truncate px-0.5">+</span>
                                 </div>
                             )}
+                            {manualCostsPct > 0.5 && (
+                                <div style={{ width: `${manualCostsPct}%` }} className="bg-pink-400 h-full flex items-center justify-center text-[9px] sm:text-[10px] font-bold text-white">
+                                    <span className="truncate px-0.5">Manual</span>
+                                </div>
+                            )}
                             {profitPct > 0 && (
                                 <div style={{ width: `${profitPct}%` }} className="bg-emerald-500 h-full flex items-center justify-center text-[9px] sm:text-[10px] font-bold text-white">
                                     <span className="truncate px-0.5">Lucro</span>
@@ -300,7 +331,8 @@ export default function FinancePage() {
                             <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-blue-400 rounded-sm" />Gateway</div>
                             <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-indigo-400 rounded-sm" />Checkout</div>
                             <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-purple-400 rounded-sm" />Impostos</div>
-                            <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-orange-400 rounded-sm" />Outros</div>
+                            <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-orange-400 rounded-sm" />Fixos</div>
+                            <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-pink-400 rounded-sm" />Manual</div>
                             <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-emerald-500 rounded-sm" />Lucro</div>
                         </div>
                     </Card>
@@ -339,6 +371,14 @@ export default function FinancePage() {
                         ) : (
                             <ProductCostTable costs={costs} />
                         )}
+                    </Card>
+
+                    {/* Manual Financial Entries Section */}
+                    <Card className="border border-border shadow-none rounded-lg p-4 sm:p-6">
+                        <FinancialEntryTable
+                            entries={financialEntries}
+                            onUpdate={loadData}
+                        />
                     </Card>
                 </>
             )}

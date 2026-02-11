@@ -125,6 +125,7 @@ model Organization {
   productCosts     ProductCost[]
   financialConfig  FinancialConfig?
   supplierPayments SupplierPayment[]
+  financialEntries FinancialEntry[]
 
   @@map("organizations")
 }
@@ -182,6 +183,24 @@ model SupplierPayment {
 
   @@index([organizationId, paymentDate])
   @@map("supplier_payments")
+}
+
+model FinancialEntry {
+  id             String       @id @default(cuid())
+  organizationId String
+  type           String       // "cost" or "income"
+  amount         Decimal      @db.Decimal(10, 2)
+  description    String?
+  category       String       // "ferramentas", "marketing", "freelancer", etc.
+  entryDate      DateTime
+
+  createdAt      DateTime     @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, entryDate])
+  @@index([organizationId, type])
+  @@map("financial_entries")
 }
 
 model Membership {
