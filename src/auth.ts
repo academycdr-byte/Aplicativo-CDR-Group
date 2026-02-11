@@ -14,6 +14,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async jwt({ token, user, trigger, session }) {
       if (user) {
         token.sub = user.id;
+        token.picture = undefined; // Prevent base64 image bloating the JWT cookie
 
         // Load user's first organization
         const membership = await prisma.membership.findFirst({
@@ -96,7 +97,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           id: user.id,
           name: user.name,
           email: user.email,
-          image: user.image,
         };
       },
     }),

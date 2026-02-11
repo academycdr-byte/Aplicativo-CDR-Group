@@ -34,6 +34,12 @@ export default function LoginPage() {
 
     setLoading(true);
 
+    // Safety timeout: if login takes too long, stop loading
+    const timeout = setTimeout(() => {
+      setLoading(false);
+      setError("Tempo de conexão esgotado. Tente novamente.");
+    }, 15000);
+
     try {
       const result = await loginUser({ email, password, loginType });
       if (result?.error) {
@@ -42,6 +48,7 @@ export default function LoginPage() {
     } catch {
       // signIn redirects on success
     } finally {
+      clearTimeout(timeout);
       setLoading(false);
     }
   }
