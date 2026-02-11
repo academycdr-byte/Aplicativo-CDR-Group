@@ -13,7 +13,7 @@ import { getProfile, updateProfile, changePassword } from "@/actions/auth";
 import { useAvatar } from "@/contexts/avatar-context";
 
 export default function ProfilePage() {
-  const { data: session } = useSession();
+  const { data: session, update: updateSession } = useSession();
   const { setAvatarUrl } = useAvatar();
 
   const [name, setName] = useState("");
@@ -118,6 +118,7 @@ export default function ProfilePage() {
     if (result.error) {
       setProfileMsg(result.error);
     } else {
+      await updateSession({ name: name.trim() });
       toast.success("Perfil atualizado com sucesso!");
     }
     setProfileLoading(false);

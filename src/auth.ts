@@ -36,6 +36,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       // Allow updating the token from session update
       if (trigger === "update" && session) {
+        if (session.name) {
+          token.name = session.name;
+        }
         if (session.organizationId) {
           token.organizationId = session.organizationId;
         }
