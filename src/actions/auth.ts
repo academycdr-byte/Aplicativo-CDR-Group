@@ -100,6 +100,25 @@ export async function logoutUser() {
   await signOut({ redirectTo: "/login" });
 }
 
+export async function checkIsAppAdmin(): Promise<boolean> {
+  const session = await auth();
+  if (!session?.user?.id) return false;
+
+  // Fetch email directly from DB to avoid JWT issues
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { email: true },
+  });
+
+  if (!user?.email) return false;
+
+  const adminEmails = (process.env.ADMIN_EMAILS || "academy.cdr@gmail.com")
+    .split(",")
+    .map((e) => e.trim().toLowerCase());
+
+  return adminEmails.includes(user.email.toLowerCase());
+}
+
 export async function getProfile() {
   const session = await auth();
   if (!session?.user?.id) return null;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAvatar } from "@/contexts/avatar-context";
+import { checkIsAppAdmin } from "@/actions/auth";
 
 type NavItem = {
   name: string;
@@ -56,10 +57,17 @@ export function Sidebar() {
   const { data: session } = useSession();
 
   const { avatarUrl } = useAvatar();
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const userRole = session?.user?.role;
   const isInternal = userRole === "OWNER" || userRole === "ADMIN" || userRole === "MEMBER";
-  const isAdmin = session?.user?.isAppAdmin === true;
+
+  // Server-side admin check — bypasses JWT, reads email from DB directly
+  useEffect(() => {
+    if (session?.user?.id) {
+      checkIsAppAdmin().then(setIsAdmin);
+    }
+  }, [session?.user?.id]);
 
   const { filteredAiNav, filteredPlatformNav, filteredManagementNav } = useMemo(() => {
     const filterNav = (items: NavItem[]) =>
