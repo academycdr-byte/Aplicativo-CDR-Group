@@ -152,14 +152,13 @@ export async function getAdMetrics(params?: FilterParams) {
   };
 }
 
-export async function getAdMetricsByDay(days: number = 30, from?: string, to?: string, search?: string, exclude?: string[], platform?: string) {
+export async function getAdMetricsByDay(days: number = 30, from?: string, to?: string, search?: string, exclude?: string[], platform?: string, accountId?: string) {
   const ctx = await getSessionWithOrg();
   if (!ctx) return [];
 
   const dateFilter = buildDateFilter(getDateRange(days, from, to));
 
-  // Reuse logic by constructing params object
-  const params: FilterParams = { search, exclude, platform };
+  const params: FilterParams = { search, exclude, platform, accountId };
   const where = buildWhereClause(ctx.organization.id, dateFilter, params);
 
   const metrics = await prisma.adMetric.findMany({
@@ -387,7 +386,7 @@ export async function loadAllAdsData(
   const { days, from, to } = params;
   const results = await Promise.allSettled([
     getAdMetrics(params),
-    getAdMetricsByDay(days, from, to, searchQuery, excludedTerms, params.platform),
+    getAdMetricsByDay(days, from, to, searchQuery, excludedTerms, params.platform, params.accountId),
     getCreativePerformance(params),
     getAdSetPerformance(params),
   ]);

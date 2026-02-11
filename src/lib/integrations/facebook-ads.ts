@@ -338,85 +338,117 @@ export async function syncFacebookAdsMetrics(organizationId: string) {
     ].join(",");
 
     const today = new Date();
+    const startTime = Date.now();
+    const TIME_BUDGET_MS = 50_000; // 50s safe margin within 60s Vercel limit
     let totalSynced = 0;
     const noMedia: Record<string, string> = {};
+    const accountErrors: string[] = [];
 
-    // Use Brasilia timezone for date calculations
     const daysAgo = (n: number) => {
       const d = new Date(today);
       d.setDate(today.getDate() - n);
       return toBrasiliaDateStr(d);
     };
 
-    // Sync each selected account
+    const hasTimeLeft = () => Date.now() - startTime < TIME_BUDGET_MS;
+
+    const buildUrl = (adAccountId: string, since: string, until: string) =>
+      `https://graph.facebook.com/${FB_GRAPH_VERSION}/act_${adAccountId}/insights?fields=${fields}&level=ad&time_range=${encodeURIComponent(JSON.stringify({ since, until }))}&time_increment=1&limit=500&access_token=${accessToken}`;
+
+    // ===== BREADTH-FIRST SYNC: Recent data for ALL accounts first =====
+
+    // PHASE 1: Last 7 days for ALL accounts (highest priority)
     for (const adAccountId of accountIds) {
-      // Helper to build Facebook insights URL for a date range
-      const buildUrl = (since: string, until: string) =>
-        `https://graph.facebook.com/${FB_GRAPH_VERSION}/act_${adAccountId}/insights?fields=${fields}&level=ad&time_range=${encodeURIComponent(JSON.stringify({ since, until }))}&time_increment=1&limit=500&access_token=${accessToken}`;
+      if (!hasTimeLeft()) break;
+      try {
+        const insights = await fetchAllInsights(buildUrl(adAccountId, daysAgo(7), daysAgo(0)));
+        totalSynced += await saveInsightsToDB(insights, organizationId, noMedia, noMedia, adAccountId);
+      } catch (err) {
+        accountErrors.push(`Phase1 act_${adAccountId}: ${err instanceof Error ? err.message : "Unknown"}`);
+      }
+    }
 
-      // ===== PHASE 1: Last 7 days - NO thumbnails/videos - fastest possible =====
-      const phase1 = await fetchAllInsights(buildUrl(daysAgo(7), daysAgo(0)));
-      totalSynced += await saveInsightsToDB(phase1, organizationId, noMedia, noMedia, adAccountId);
+    // PHASE 2: Days 8-30 for ALL accounts
+    for (const adAccountId of accountIds) {
+      if (!hasTimeLeft()) break;
+      try {
+        const insights = await fetchAllInsights(buildUrl(adAccountId, daysAgo(30), daysAgo(7)));
+        totalSynced += await saveInsightsToDB(insights, organizationId, noMedia, noMedia, adAccountId);
+      } catch (err) {
+        accountErrors.push(`Phase2 act_${adAccountId}: ${err instanceof Error ? err.message : "Unknown"}`);
+      }
+    }
 
-      // ===== PHASE 2: Days 8-30 - save immediately, no media =====
-      const phase2 = await fetchAllInsights(buildUrl(daysAgo(30), daysAgo(7)));
-      totalSynced += await saveInsightsToDB(phase2, organizationId, noMedia, noMedia, adAccountId);
+    // PHASE 3: Days 31-90 for ALL accounts
+    for (const adAccountId of accountIds) {
+      if (!hasTimeLeft()) break;
+      try {
+        const insights = await fetchAllInsights(buildUrl(adAccountId, daysAgo(90), daysAgo(30)));
+        totalSynced += await saveInsightsToDB(insights, organizationId, noMedia, noMedia, adAccountId);
+      } catch (err) {
+        accountErrors.push(`Phase3 act_${adAccountId}: ${err instanceof Error ? err.message : "Unknown"}`);
+      }
+    }
 
-      // ===== PHASE 3: Days 31-90 + fetch thumbnails for all recent ads =====
-      const phase3 = await fetchAllInsights(buildUrl(daysAgo(90), daysAgo(30)));
-      totalSynced += await saveInsightsToDB(phase3, organizationId, noMedia, noMedia, adAccountId);
-
-      // Now fetch thumbnails/videos for all synced ads and update records in background
-      const allRecentInsights = [...phase1, ...phase2, ...phase3];
-      const allAdIds = [...new Set(allRecentInsights.map((i) => i.ad_id).filter(Boolean))] as string[];
-      const [thumbnails, videoUrls] = await Promise.all([
-        fetchAdThumbnails(allAdIds, accessToken),
-        fetchAdVideoUrls(allAdIds, accessToken),
-      ]);
-
-      // Batch-update thumbnails/videos for already-saved records
-      if (Object.keys(thumbnails).length > 0 || Object.keys(videoUrls).length > 0) {
-        const updateBatchSize = 30;
-        for (let i = 0; i < allAdIds.length; i += updateBatchSize) {
-          const batch = allAdIds.slice(i, i + updateBatchSize);
-          await Promise.all(
-            batch
-              .filter((adId) => thumbnails[adId] || videoUrls[adId])
-              .map((adId) =>
-                prisma.adMetric.updateMany({
-                  where: { organizationId, platform: "FACEBOOK_ADS", adId },
-                  data: {
-                    ...(thumbnails[adId] ? { thumbnailUrl: thumbnails[adId] } : {}),
-                    ...(videoUrls[adId] ? { videoUrl: videoUrls[adId] } : {}),
-                  },
-                })
-              )
-          );
+    // PHASE 3.5: Fetch thumbnails/videos for ALL accounts (if time allows)
+    if (hasTimeLeft()) {
+      for (const adAccountId of accountIds) {
+        if (!hasTimeLeft()) break;
+        try {
+          const recentMetrics = await prisma.adMetric.findMany({
+            where: { organizationId, platform: "FACEBOOK_ADS", accountId: adAccountId, thumbnailUrl: null, adId: { not: null } },
+            select: { adId: true },
+            distinct: ["adId"],
+            take: 100,
+          });
+          const adIdsToFetch = recentMetrics.map((m) => m.adId).filter(Boolean) as string[];
+          if (adIdsToFetch.length > 0) {
+            const [thumbnails, videoUrls] = await Promise.all([
+              fetchAdThumbnails(adIdsToFetch, accessToken),
+              fetchAdVideoUrls(adIdsToFetch, accessToken),
+            ]);
+            const updateIds = adIdsToFetch.filter((id) => thumbnails[id] || videoUrls[id]);
+            for (let i = 0; i < updateIds.length; i += 30) {
+              if (!hasTimeLeft()) break;
+              const batch = updateIds.slice(i, i + 30);
+              await Promise.all(
+                batch.map((adId) =>
+                  prisma.adMetric.updateMany({
+                    where: { organizationId, platform: "FACEBOOK_ADS", adId },
+                    data: {
+                      ...(thumbnails[adId] ? { thumbnailUrl: thumbnails[adId] } : {}),
+                      ...(videoUrls[adId] ? { videoUrl: videoUrls[adId] } : {}),
+                    },
+                  })
+                )
+              );
+            }
+          }
+        } catch {
+          // Non-fatal: thumbnails can be fetched on next sync
         }
       }
+    }
 
-      // ===== PHASE 4: Older data 91-1095 days in parallel chunks =====
-      const olderChunks: { since: string; until: string }[] = [];
-      for (let offset = 90; offset < 1095; offset += 90) {
-        olderChunks.push({
-          since: daysAgo(Math.min(offset + 90, 1095)),
-          until: daysAgo(offset),
-        });
-      }
+    // PHASE 4: Older data 91-365 days for ALL accounts (if time allows)
+    if (hasTimeLeft()) {
+      for (const adAccountId of accountIds) {
+        if (!hasTimeLeft()) break;
+        const olderChunks: { since: string; until: string }[] = [];
+        for (let offset = 90; offset < 365; offset += 90) {
+          olderChunks.push({
+            since: daysAgo(Math.min(offset + 90, 365)),
+            until: daysAgo(offset),
+          });
+        }
 
-      const concurrency = 3;
-      for (let i = 0; i < olderChunks.length; i += concurrency) {
-        const batch = olderChunks.slice(i, i + concurrency);
-        const batchResults = await Promise.allSettled(
-          batch.map(async (chunk) => {
-            const insights = await fetchAllInsights(buildUrl(chunk.since, chunk.until));
-            return saveInsightsToDB(insights, organizationId, thumbnails, noMedia, adAccountId);
-          })
-        );
-
-        for (const result of batchResults) {
-          if (result.status === "fulfilled") {
-            totalSynced += result.value;
+        for (const chunk of olderChunks) {
+          if (!hasTimeLeft()) break;
+          try {
+            const insights = await fetchAllInsights(buildUrl(adAccountId, chunk.since, chunk.until));
+            totalSynced += await saveInsightsToDB(insights, organizationId, noMedia, noMedia, adAccountId);
+          } catch {
+            // Non-fatal for older data
           }
         }
       }
@@ -424,7 +456,11 @@ export async function syncFacebookAdsMetrics(organizationId: string) {
 
     await prisma.integration.update({
       where: { id: integration.id },
-      data: { syncStatus: "SUCCESS", lastSyncAt: new Date() },
+      data: {
+        syncStatus: "SUCCESS",
+        lastSyncAt: new Date(),
+        errorMessage: accountErrors.length > 0 ? `Partial errors: ${accountErrors.join("; ")}` : null,
+      },
     });
 
     await prisma.syncLog.update({
