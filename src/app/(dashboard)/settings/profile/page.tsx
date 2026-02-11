@@ -1,16 +1,22 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
+import { Camera, Trash2, Loader2 } from "lucide-react";
 import { getProfile, updateProfile, changePassword } from "@/actions/auth";
 
 export default function ProfilePage() {
+  const { data: session, update: updateSession } = useSession();
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [image, setImage] = useState<string | null>(null);
   const [profileMsg, setProfileMsg] = useState("");
   const [profileLoading, setProfileLoading] = useState(false);
 
@@ -19,6 +25,9 @@ export default function ProfilePage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordMsg, setPasswordMsg] = useState("");
   const [passwordLoading, setPasswordLoading] = useState(false);
+
+  const [avatarLoading, setAvatarLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadProfile();
@@ -29,7 +38,73 @@ export default function ProfilePage() {
     if (profile) {
       setName(profile.name || "");
       setEmail(profile.email);
+      setImage(profile.image || null);
     }
+  }
+
+  async function handleAvatarUpload(file: File) {
+    setAvatarLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/upload/avatar", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.error || "Erro ao enviar foto");
+        return;
+      }
+
+      setImage(data.image);
+      await updateSession({ image: data.image });
+      toast.success("Foto de perfil atualizada!");
+    } catch {
+      toast.error("Erro ao enviar foto");
+    } finally {
+      setAvatarLoading(false);
+    }
+  }
+
+  async function handleAvatarRemove() {
+    setAvatarLoading(true);
+    try {
+      const res = await fetch("/api/upload/avatar", { method: "DELETE" });
+      if (!res.ok) {
+        toast.error("Erro ao remover foto");
+        return;
+      }
+
+      setImage(null);
+      await updateSession({ image: null });
+      toast.success("Foto removida!");
+    } catch {
+      toast.error("Erro ao remover foto");
+    } finally {
+      setAvatarLoading(false);
+    }
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      toast.error("Formato inválido. Use JPG, PNG ou WebP.");
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Arquivo muito grande. Máximo: 2MB.");
+      return;
+    }
+
+    handleAvatarUpload(file);
+    e.target.value = "";
   }
 
   async function handleProfileSubmit(e: React.FormEvent) {
@@ -86,6 +161,70 @@ export default function ProfilePage() {
           Gerencie suas informacoes pessoais e senha.
         </p>
       </div>
+
+      {/* Avatar Upload Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Foto de perfil</CardTitle>
+          <CardDescription>
+            Sua foto aparece no menu e na barra lateral.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-6">
+            <div className="relative">
+              <Avatar className="h-24 w-24 border-2 border-border">
+                <AvatarImage src={image || ""} />
+                <AvatarFallback className="bg-primary/10 text-primary text-2xl font-bold">
+                  {name?.charAt(0)?.toUpperCase() || session?.user?.name?.charAt(0)?.toUpperCase() || "U"}
+                </AvatarFallback>
+              </Avatar>
+              {avatarLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-background/60 rounded-full">
+                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={avatarLoading}
+                >
+                  <Camera className="w-4 h-4 mr-2" />
+                  Alterar foto
+                </Button>
+                {image && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleAvatarRemove}
+                    disabled={avatarLoading}
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Remover
+                  </Button>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Recomendado: 200x200px. Formatos: JPG, PNG, WebP. Max: 2MB.
+              </p>
+            </div>
+          </div>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

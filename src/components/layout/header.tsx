@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { User, LogOut, Bell, Search, Sun, Moon } from "lucide-react";
+import { User, LogOut, Bell, Search } from "lucide-react";
+import { useSession } from "next-auth/react";
 import { logoutUser } from "@/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -17,6 +18,12 @@ import { MobileSidebar } from "@/components/layout/mobile-sidebar";
 import { Input } from "@/components/ui/input";
 
 export function Header() {
+  const { data: session } = useSession();
+
+  const userName = session?.user?.name || "Usuário";
+  const userImage = session?.user?.image;
+  const userInitial = userName.charAt(0).toUpperCase();
+
   return (
     <header className="sticky top-0 z-20 h-16 w-full flex items-center gap-4 border-b border-border/40 bg-background/80 backdrop-blur-xl px-6">
       <div className="flex items-center gap-3 md:hidden">
@@ -46,16 +53,19 @@ export function Header() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-9 w-9 rounded-full focus-visible:ring-offset-0">
               <Avatar className="h-9 w-9 border border-border/50">
+                <AvatarImage src={userImage || ""} />
                 <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
-                  U
+                  {userInitial}
                 </AvatarFallback>
               </Avatar>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56 rounded-xl shadow-floating border-border/50 bg-card/95 backdrop-blur-xl">
-            <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
-              Minha Conta
+            <div className="px-3 py-2">
+              <p className="text-sm font-medium">{userName}</p>
+              <p className="text-xs text-muted-foreground truncate">{session?.user?.email}</p>
             </div>
+            <DropdownMenuSeparator className="bg-border/50" />
             <DropdownMenuItem asChild className="rounded-lg cursor-pointer focus:bg-primary/10 focus:text-primary">
               <Link href="/settings/profile" className="flex items-center gap-2">
                 <User className="w-4 h-4" />

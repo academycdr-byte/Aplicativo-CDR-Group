@@ -14,6 +14,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async jwt({ token, user, trigger, session }) {
       if (user) {
         token.sub = user.id;
+        token.image = user.image || null;
 
         // Load user's first organization and role
         const membership = await prisma.membership.findFirst({
@@ -36,6 +37,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (session.role) {
           token.role = session.role;
         }
+        if (session.image !== undefined) {
+          token.image = session.image;
+        }
       }
 
       return token;
@@ -50,6 +54,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (token.role) {
         session.user.role = token.role as string;
       }
+      session.user.image = (token.image as string) || null;
       return session;
     },
   },
