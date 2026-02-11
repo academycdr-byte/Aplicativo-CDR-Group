@@ -1336,8 +1336,12 @@ function ClientFormDialog({
           </div>
           {groups.length > 0 ? (
             <Select
-              value={form.groupId}
+              value={form.groupId || "__none__"}
               onValueChange={(v) => {
+                if (v === "__none__") {
+                  setForm({ ...form, groupId: "", groupName: "" });
+                  return;
+                }
                 const group = groups.find((g) => g.id === v);
                 setForm({
                   ...form,
@@ -1350,7 +1354,7 @@ function ClientFormDialog({
                 <SelectValue placeholder="Selecione um grupo" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Nenhum (enviar direto)</SelectItem>
+                <SelectItem value="__none__">Nenhum (enviar direto)</SelectItem>
                 {groups.map((g) => (
                   <SelectItem key={g.id} value={g.id}>
                     {g.name}{g.participants > 0 ? ` (${g.participants})` : ""}
