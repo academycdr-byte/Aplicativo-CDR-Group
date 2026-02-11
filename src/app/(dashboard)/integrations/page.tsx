@@ -291,12 +291,14 @@ function IntegrationsContent() {
     while (hasMore && iteration < MAX_ITERATIONS && consecutiveErrors < MAX_CONSECUTIVE_ERRORS) {
       iteration++;
       try {
+        const isFirstCall = iteration === 1 && !nextPage && !syncLogId;
         const res = await fetch("/api/sync/nuvemshop", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             ...(nextPage ? { startPage: nextPage } : {}),
             ...(syncLogId ? { syncLogId } : {}),
+            ...(isFirstCall ? { forceFullSync: true } : {}),
           }),
         });
 

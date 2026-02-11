@@ -22,18 +22,33 @@ export async function POST(request: NextRequest) {
     const orgId = membership.organizationId;
 
     try {
-        // Parse continuation params from request body
-        let body: { startPage?: number; syncLogId?: string } = {};
+        let body: { startPage?: number; syncLogId?: string; forceFullSync?: boolean } = {};
         try {
             body = await request.json();
         } catch {
             // No body or invalid JSON — use defaults
         }
 
+        // Force full sync: clear any stale cursor and reset sync status
+        if (body.forceFullSync) {
+            const integration = await prisma.integration.findUnique({
+                where: { organizationId_platform: { organizationId: orgId, platform: "NUVEMSHOP" } },
+                select: { id: true, metadata: true },
+            });
+            if (integration) {
+                const meta = (integration.metadata as Record<string, unknown>) || {};
+                const { syncCursor: _, ...rest } = meta;
+                await prisma.integration.update({
+                    where: { id: integration.id },
+                    data: { syncStatus: "IDLE", metadata: rest as Record<string, string | number | boolean | null>, errorMessage: null },
+                });
+            }
+        }
+
         const result = await syncNuvemshopOrders(orgId, {
             startPage: body.startPage,
             syncLogId: body.syncLogId,
-            timeBudgetMs: 45000, // 45s budget — safe margin within 60s Vercel limit
+            timeBudgetMs: 45000,
         });
 
         return NextResponse.json({
