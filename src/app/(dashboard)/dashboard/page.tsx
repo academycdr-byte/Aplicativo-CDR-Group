@@ -248,13 +248,13 @@ export default function DashboardPage() {
             </div>
 
             {/* Filters/Toggles */}
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-1 sm:gap-1.5">
               {metricToggles.map((m) => (
                 <button
                   key={m.key}
                   onClick={() => toggleMetric(m.key)}
                   className={cn(
-                    "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] uppercase tracking-wide font-semibold border transition-all duration-200",
+                    "flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] uppercase tracking-wide font-semibold border transition-all duration-200",
                     activeMetrics.has(m.key)
                       ? "bg-primary/10 text-primary border-primary/20 hover:bg-primary/20"
                       : "bg-transparent text-muted-foreground border-transparent hover:bg-secondary"
@@ -405,7 +405,7 @@ export default function DashboardPage() {
         </Card>
 
         {/* Rates Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4">
           <RateCard
             title="Taxa de Pagamento"
             value={`${(rates?.paidRate || 0).toFixed(2)}%`}
@@ -441,10 +441,10 @@ function KPICard({ label, value, change, icon: Icon, trend }: {
   return (
     <Card className="shadow-sm group relative overflow-hidden">
       <div className="absolute right-0 top-0 p-3 opacity-5 group-hover:opacity-10 transition-opacity">
-        <Icon className="w-16 h-16" />
+        <Icon className="w-12 h-12 sm:w-16 sm:h-16" />
       </div>
-      <CardContent className="p-6">
-        <div className="flex items-start justify-between mb-4">
+      <CardContent className="p-4 sm:p-6">
+        <div className="flex items-start justify-between mb-3 sm:mb-4">
           <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
             <Icon className="w-5 h-5" />
           </div>
@@ -460,7 +460,7 @@ function KPICard({ label, value, change, icon: Icon, trend }: {
         </div>
         <div className="space-y-1">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
-          <h3 className="text-2xl font-bold tracking-tight text-foreground">{value}</h3>
+          <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">{value}</h3>
         </div>
       </CardContent>
     </Card>

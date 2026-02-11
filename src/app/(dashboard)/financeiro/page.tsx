@@ -136,7 +136,7 @@ export default function FinancePage() {
                         Gestao de lucro liquido e unit economics.
                     </p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                     <FinancialConfigDialog config={config} onSave={loadData} />
                     <PeriodSelector value={period} onChange={setPeriod} />
                 </div>
@@ -228,7 +228,7 @@ export default function FinancePage() {
                     </div>
 
                     {/* Bottom row: Net Profit + Margin */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         <FinancialCard
                             title="Lucro Liquido"
                             value={fmt(metrics.netProfit)}
@@ -255,7 +255,7 @@ export default function FinancePage() {
                     </div>
 
                     {/* Profit Breakdown Bar */}
-                    <Card className="border border-border shadow-none rounded-lg p-6">
+                    <Card className="border border-border shadow-none rounded-lg p-4 sm:p-6">
                         <h3 className="text-sm font-medium text-muted-foreground mb-4">Composicao da Receita</h3>
                         <div className="w-full h-8 flex rounded-md overflow-hidden bg-secondary">
                             {cogsPct > 0 && (

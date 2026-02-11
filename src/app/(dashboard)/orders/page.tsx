@@ -158,7 +158,7 @@ export default function OrdersPage() {
 
             <div className="flex flex-wrap gap-2 w-full lg:w-auto">
               <Select value={platformFilter} onValueChange={(val) => { setPlatformFilter(val); setPage(1); }}>
-                <SelectTrigger className="w-[150px]">
+                <SelectTrigger className="w-full sm:w-[150px]">
                   <SelectValue placeholder="Plataforma" />
                 </SelectTrigger>
                 <SelectContent>
@@ -171,7 +171,7 @@ export default function OrdersPage() {
               </Select>
 
               <Select value={statusFilter} onValueChange={(val) => { setStatusFilter(val); setPage(1); }}>
-                <SelectTrigger className="w-[140px]">
+                <SelectTrigger className="w-full sm:w-[140px]">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>

@@ -74,7 +74,7 @@ export default function SalesPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Vendas</h2>
           <p className="text-muted-foreground text-sm mt-1">
@@ -105,7 +105,7 @@ export default function SalesPage() {
       ) : (
       <>
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <Card className="transition-shadow hover:shadow-md">
           <CardContent className="pt-5">
             <div className="flex items-center justify-between mb-3">

@@ -174,7 +174,7 @@ export default function ProfilePage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center gap-6">
+          <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
             <div className="relative">
               <Avatar className="h-24 w-24 border-2 border-border">
                 <AvatarImage src={image || ""} />
@@ -190,7 +190,7 @@ export default function ProfilePage() {
             </div>
 
             <div className="space-y-3">
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   variant="outline"
                   size="sm"

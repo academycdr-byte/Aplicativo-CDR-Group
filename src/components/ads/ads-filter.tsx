@@ -75,7 +75,7 @@ export function AdsFilter({ onSearchChange, onExcludeChange, className }: AdsFil
                 </div>
 
                 {/* Exclude Field / Popover */}
-                <div className="w-full sm:w-[350px]">
+                <div className="w-full sm:w-[300px] md:w-[350px]">
                     <div className="relative">
                         <FilterX className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
@@ -104,7 +104,7 @@ export function AdsFilter({ onSearchChange, onExcludeChange, className }: AdsFil
 
             {/* Active Exclusion Tags */}
             {excludedTerms.length > 0 && (
-                <div className="flex flex-wrap gap-2 items-center">
+                <div className="flex flex-wrap gap-1.5 sm:gap-2 items-center">
                     <span className="text-xs text-muted-foreground mr-1">Excluindo:</span>
                     {excludedTerms.map((term) => (
                         <Badge key={term} variant="outline" className="border-primary/30 bg-primary/5 text-primary-foreground hover:bg-primary/10 flex items-center gap-1 pl-2 pr-1 py-0.5">

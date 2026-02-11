@@ -137,7 +137,7 @@ export default function BestSellersPage() {
                     </p>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                     {/* View Toggle */}
                     <div className="flex items-center rounded-lg border border-border/50 bg-background/50 p-1">
                         <button
@@ -162,7 +162,7 @@ export default function BestSellersPage() {
                     <div className="relative">
                         <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground z-10" />
                         <Select value={selectedCollection} onValueChange={setSelectedCollection}>
-                            <SelectTrigger className="w-[220px] pl-9 bg-background/50 backdrop-blur-sm border-border/50 hover:bg-accent/50 transition-colors">
+                            <SelectTrigger className="w-[180px] sm:w-[220px] pl-9 bg-background/50 backdrop-blur-sm border-border/50 hover:bg-accent/50 transition-colors">
                                 <SelectValue placeholder="Filtrar por Coleção" />
                             </SelectTrigger>
                             <SelectContent>
@@ -252,7 +252,7 @@ export default function BestSellersPage() {
                                 variants={container}
                                 initial="hidden"
                                 animate="show"
-                                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+                                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6"
                             >
                                 {sortedProducts.map((product, index) => (
                                     <motion.div key={product.id} variants={item}>

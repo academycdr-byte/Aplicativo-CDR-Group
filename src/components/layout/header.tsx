@@ -26,7 +26,7 @@ export function Header() {
   const userInitial = userName.charAt(0).toUpperCase();
 
   return (
-    <header className="sticky top-0 z-20 h-16 w-full flex items-center gap-4 border-b border-border/40 bg-background/80 backdrop-blur-xl px-6">
+    <header className="sticky top-0 z-20 h-14 md:h-16 w-full flex items-center gap-2 md:gap-4 border-b border-border/40 bg-background/80 backdrop-blur-xl px-3 sm:px-6">
       <div className="flex items-center gap-3 md:hidden">
         <MobileSidebar />
         <span className="text-sm font-semibold">CDR Group</span>

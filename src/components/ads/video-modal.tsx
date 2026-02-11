@@ -85,7 +85,7 @@ export function VideoModal({ isOpen, onClose, creative }: VideoModalProps) {
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="w-full sm:max-w-5xl h-[95vh] md:h-auto md:max-h-[85vh] p-4 md:p-6 overflow-y-auto bg-card border-border flex flex-col">
+            <DialogContent className="w-full sm:max-w-2xl md:max-w-5xl h-[95vh] md:h-auto md:max-h-[85vh] p-3 sm:p-4 md:p-6 overflow-y-auto bg-card border-border flex flex-col">
                 <DialogHeader>
                     <DialogTitle className="truncate pr-8">{creative.adName || "Detalhes do Criativo"}</DialogTitle>
                     <DialogDescription>
@@ -96,7 +96,7 @@ export function VideoModal({ isOpen, onClose, creative }: VideoModalProps) {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8 mt-2 h-full">
                     {/* Media Column */}
                     <div className="space-y-4 flex flex-col justify-center">
-                        <div className="relative w-full h-[50vh] md:h-[500px] lg:h-[600px] bg-black/90 rounded-lg overflow-hidden flex items-center justify-center border border-border/50 shadow-lg">
+                        <div className="relative w-full h-[35vh] sm:h-[45vh] md:h-[500px] lg:h-[600px] bg-black/90 rounded-lg overflow-hidden flex items-center justify-center border border-border/50 shadow-lg">
                             {isLoadingVideo ? (
                                 <div className="flex flex-col items-center gap-2 text-muted-foreground">
                                     <Loader2 className="w-8 h-8 animate-spin" />
@@ -160,7 +160,7 @@ export function VideoModal({ isOpen, onClose, creative }: VideoModalProps) {
 
                         <Separator />
 
-                        <div className="grid grid-cols-3 gap-y-6 gap-x-2">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-4 sm:gap-y-6 gap-x-2">
                             <div>
                                 <p className="text-xs text-muted-foreground uppercase tracking-wider">Receita</p>
                                 <p className="font-semibold mt-1">{fmt(creative.revenue)}</p>

@@ -101,7 +101,7 @@ export function MobileSidebar() {
           <Menu className="w-5 h-5" />
         </Button>
       </SheetTrigger>
-      <SheetContent side="left" className="w-64 p-0 bg-sidebar-bg text-sidebar-text overflow-y-auto">
+      <SheetContent side="left" className="w-[85vw] max-w-64 p-0 bg-sidebar-bg text-sidebar-text overflow-y-auto">
         <SheetHeader className="px-5 py-5 border-b border-white/5">
           <SheetTitle className="flex items-center gap-3 text-sidebar-text">
             <Image
@@ -117,7 +117,7 @@ export function MobileSidebar() {
             </div>
           </SheetTitle>
         </SheetHeader>
-        <nav className="px-3 pt-4 pb-4 space-y-6">
+        <nav className="px-3 pt-4 pb-4 space-y-4 sm:space-y-6">
           <div className="space-y-1">
             <p className="px-3 mb-3 text-[11px] font-semibold uppercase tracking-widest text-sidebar-text/40">
               CDR AI

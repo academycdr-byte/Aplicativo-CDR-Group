@@ -91,14 +91,14 @@ export function FunnelChart({ data, className }: FunnelChartProps) {
                     {steps.map((step, idx) => (
                         <div key={idx} className="relative group">
                             {/* Label Row */}
-                            <div className="flex items-center justify-between text-xs mb-1 px-1">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-xs mb-1 px-1 gap-0.5 sm:gap-0">
                                 <div className="flex gap-2 items-center">
-                                    <span className="font-medium text-foreground">{step.label}</span>
+                                    <span className="font-medium text-foreground text-[11px] sm:text-xs">{step.label}</span>
                                     <span className="text-muted-foreground scale-90 hidden sm:inline-block">({step.subLabel})</span>
                                 </div>
-                                <div className="flex gap-3 text-right">
+                                <div className="flex gap-2 sm:gap-3 text-right">
                                     <span className="font-bold">{fmt(step.value)}</span>
-                                    <span className="text-muted-foreground min-w-[70px]">{step.rateLabel}</span>
+                                    <span className="text-muted-foreground min-w-[60px] sm:min-w-[70px]">{step.rateLabel}</span>
                                 </div>
                             </div>
 

@@ -15,7 +15,7 @@ export default function DashboardLayout({
         <div className="flex-1 flex flex-col min-w-0">
           <Header />
           <BackgroundSync />
-          <main className="flex-1 px-6 py-6 md:px-8 md:py-8 overflow-y-auto"><div className="max-w-[1600px] mx-auto">{children}</div></main>
+          <main className="flex-1 px-3 py-4 sm:px-6 sm:py-6 md:px-8 md:py-8 overflow-y-auto"><div className="max-w-[1600px] mx-auto">{children}</div></main>
         </div>
       </div>
     </AvatarProvider>

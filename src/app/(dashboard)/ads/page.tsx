@@ -491,17 +491,17 @@ export default function AdsPage() {
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Anúncios</h2>
           <p className="text-muted-foreground text-sm mt-0.5">
             Gestão de performance Mídia Paga.
           </p>
         </div>
-        <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex flex-wrap sm:flex-nowrap gap-2 sm:gap-3">
           <PeriodSelector value={period} onChange={setPeriod} />
           <Select value={platformFilter} onValueChange={setPlatformFilter}>
-            <SelectTrigger className="w-full sm:w-[160px]">
+            <SelectTrigger className="w-[130px] sm:w-[160px]">
               <SelectValue placeholder="Plataforma" />
             </SelectTrigger>
             <SelectContent>
@@ -580,7 +580,7 @@ export default function AdsPage() {
             <CardHeader className="flex flex-row items-center justify-between border-b border-border/50 px-5 py-4">
               <CardTitle className="text-base font-semibold">Evolução Temporal</CardTitle>
               <Select value={chartMetric} onValueChange={(v) => setChartMetric(v as typeof chartMetric)}>
-                <SelectTrigger className="w-[180px] h-8 text-xs">
+                <SelectTrigger className="w-[140px] sm:w-[180px] h-8 text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -689,10 +689,10 @@ export default function AdsPage() {
         </div>
 
         {/* Creatives Toolbar */}
-        <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-start sm:items-center justify-between">
           <p className="text-sm text-muted-foreground">Exibindo {sortedCreatives.length} criativos</p>
 
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4 sm:gap-6">
             <div className="flex items-center gap-2">
               <Switch
                 id="unique-mode"
@@ -705,7 +705,7 @@ export default function AdsPage() {
             <div className="flex items-center gap-2">
               <ListFilter className="w-4 h-4 text-muted-foreground" />
               <Select value={creativesSortKey} onValueChange={setCreativesSortKey}>
-                <SelectTrigger className="w-[180px] h-8 text-xs">
+                <SelectTrigger className="w-[150px] sm:w-[180px] h-8 text-xs">
                   <SelectValue placeholder="Ordenar por" />
                 </SelectTrigger>
                 <SelectContent>
@@ -721,7 +721,7 @@ export default function AdsPage() {
         </div>
 
         {/* Creative Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
           {sortedCreatives
             .slice((creativesPage - 1) * creativesPerPage, creativesPage * creativesPerPage)
             .map((c) => (

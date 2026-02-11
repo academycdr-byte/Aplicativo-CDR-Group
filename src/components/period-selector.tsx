@@ -67,7 +67,7 @@ export function PeriodSelector({ value, onChange, onRefresh, refreshing }: Perio
   return (
     <div className="flex items-center gap-2">
       {/* Preset pills */}
-      <div className="flex items-center bg-muted rounded-lg p-0.5">
+      <div className="flex items-center flex-wrap bg-muted rounded-lg p-0.5">
         {presets.map((p) => (
           <button
             key={p.days}
@@ -101,7 +101,7 @@ export function PeriodSelector({ value, onChange, onRefresh, refreshing }: Perio
               )}
             </button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="end" sideOffset={8}>
+          <PopoverContent className="w-auto max-w-[95vw] p-0" align="end" sideOffset={8}>
             <div className="p-3 pb-0">
               <p className="text-sm font-medium mb-1">Selecione o periodo</p>
               <p className="text-xs text-muted-foreground">
@@ -118,7 +118,7 @@ export function PeriodSelector({ value, onChange, onRefresh, refreshing }: Perio
               mode="range"
               selected={range}
               onSelect={setRange}
-              numberOfMonths={2}
+              numberOfMonths={1}
               disabled={{ after: new Date() }}
               locale={ptBR}
               className="rounded-md"

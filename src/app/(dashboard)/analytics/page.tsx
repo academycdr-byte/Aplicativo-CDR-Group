@@ -182,7 +182,7 @@ export default function AnalyticsPage() {
                     </div>
 
                     {/* GA Secondary KPIs */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         <Card className="border border-border shadow-none rounded-lg p-4">
                             <span className="text-[11px] uppercase tracking-wider font-medium text-muted-foreground">Novos Usuarios</span>
                             <div className="text-lg font-bold mt-1">{fmtNum(gaData.totals.newUsers)}</div>
@@ -321,7 +321,7 @@ export default function AnalyticsPage() {
                                     <TableBody>
                                         {gaData.topPages.length > 0 ? gaData.topPages.map((p, i) => (
                                             <TableRow key={i} className="hover:bg-muted/50 border-b border-border/50">
-                                                <TableCell className="font-medium text-xs max-w-[200px] truncate">{p.path}</TableCell>
+                                                <TableCell className="font-medium text-xs max-w-[140px] sm:max-w-[200px] truncate">{p.path}</TableCell>
                                                 <TableCell className="text-right text-sm">{fmtNum(p.screenPageViews)}</TableCell>
                                                 <TableCell className="text-right text-sm">{fmtNum(p.activeUsers)}</TableCell>
                                             </TableRow>
