@@ -22,15 +22,24 @@ export async function POST() {
     const orgId = membership.organizationId;
 
     try {
-        const [ordersResult, funnelResult] = await Promise.allSettled([
-            syncNuvemshopOrders(orgId),
-            syncNuvemshopFunnel(orgId),
-        ]);
+        // Run orders sync FIRST (priority) — sequential to avoid doubling time
+        const ordersResult = await syncNuvemshopOrders(orgId);
 
-        const orders = ordersResult.status === "fulfilled" ? ordersResult.value : { error: String(ordersResult.reason) };
-        const funnel = funnelResult.status === "fulfilled" ? funnelResult.value : { error: String(funnelResult.reason) };
+        // Only run funnel if orders succeeded (and we have time left)
+        let funnelResult: unknown = { skipped: true };
+        if ("success" in ordersResult && ordersResult.success) {
+            try {
+                funnelResult = await syncNuvemshopFunnel(orgId);
+            } catch {
+                funnelResult = { error: "funnel sync failed" };
+            }
+        }
 
-        return NextResponse.json({ success: true, orders, funnel });
+        return NextResponse.json({
+            success: !("error" in ordersResult && ordersResult.error),
+            orders: ordersResult,
+            funnel: funnelResult,
+        });
     } catch (error: unknown) {
         return NextResponse.json({
             success: false,

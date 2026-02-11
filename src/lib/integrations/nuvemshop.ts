@@ -11,9 +11,10 @@ export async function syncNuvemshopOrders(organizationId: string) {
     return { error: "Nuvemshop not connected" };
   }
 
+  // Reset stuck SYNCING before starting
   await prisma.integration.update({
     where: { id: integration.id },
-    data: { syncStatus: "SYNCING" },
+    data: { syncStatus: "SYNCING", errorMessage: null },
   });
 
   const syncLog = await prisma.syncLog.create({
@@ -24,19 +25,26 @@ export async function syncNuvemshopOrders(organizationId: string) {
     const accessToken = decrypt(integration.accessToken);
     const storeId = integration.externalStoreId || "";
 
-    // Only sync orders from last 90 days to avoid Vercel timeout
-    const sinceDate = new Date();
-    sinceDate.setDate(sinceDate.getDate() - 90);
-    const sinceISO = sinceDate.toISOString();
+    // Incremental sync: if we have a lastSyncAt, only fetch orders since then.
+    // First sync: fetch only 1 page of 200 (most recent orders) to stay within timeout.
+    const hasLastSync = !!integration.lastSyncAt;
+    let sinceParam = "";
 
-    // Fetch orders with pagination (newest first, last 90 days)
+    if (hasLastSync) {
+      // Subtract 1 hour buffer to catch late-arriving orders
+      const since = new Date(integration.lastSyncAt!.getTime() - 60 * 60 * 1000);
+      sinceParam = `&created_at_min=${since.toISOString()}`;
+    }
+
+    // Fetch orders — limit pages to avoid timeout
+    // First sync: 1 page (200 orders). Subsequent: up to 3 pages (600 new orders).
+    const maxPages = hasLastSync ? 3 : 1;
     let allOrders: Record<string, unknown>[] = [];
     let page = 1;
     let hasMore = true;
-    const MAX_PAGES = 10; // Safety: max 2000 orders per sync
 
-    while (hasMore && page <= MAX_PAGES) {
-      const url = `https://api.nuvemshop.com.br/v1/${storeId}/orders?per_page=200&page=${page}&created_at_min=${sinceISO}`;
+    while (hasMore && page <= maxPages) {
+      const url = `https://api.nuvemshop.com.br/v1/${storeId}/orders?per_page=200&page=${page}${sinceParam}`;
       const response = await fetch(url, {
         headers: {
           Authentication: `bearer ${accessToken}`,
@@ -60,8 +68,8 @@ export async function syncNuvemshopOrders(organizationId: string) {
       page++;
     }
 
-    // Batch upsert in chunks of 25 using transactions
-    const CHUNK_SIZE = 25;
+    // Batch upsert in a single transaction (fast: one DB round-trip per chunk)
+    const CHUNK_SIZE = 50;
     let synced = 0;
 
     for (let i = 0; i < allOrders.length; i += CHUNK_SIZE) {
@@ -134,12 +142,12 @@ export async function syncNuvemshopOrders(organizationId: string) {
     await prisma.integration.update({
       where: { id: integration.id },
       data: { syncStatus: "FAILED", errorMessage: errorMsg },
-    });
+    }).catch(() => {});
 
     await prisma.syncLog.update({
       where: { id: syncLog.id },
       data: { status: "FAILED", errorMessage: errorMsg, completedAt: new Date() },
-    });
+    }).catch(() => {});
 
     return { error: errorMsg };
   }
@@ -314,10 +322,12 @@ async function fetchNuvemshopAbandonedCheckouts(
 
   try {
     const sinceISO = since.toISOString();
+    // Limit to 2 pages max to avoid timeout
+    const MAX_PAGES = 2;
     let page = 1;
     let hasMore = true;
 
-    while (hasMore) {
+    while (hasMore && page <= MAX_PAGES) {
       const url = `https://api.nuvemshop.com.br/v1/${storeId}/checkouts?created_at_min=${sinceISO}&per_page=200&page=${page}`;
 
       const response = await fetch(url, {
@@ -329,7 +339,6 @@ async function fetchNuvemshopAbandonedCheckouts(
       });
 
       if (!response.ok) {
-        console.warn("[Nuvemshop] Abandoned checkouts fetch failed:", response.status);
         break;
       }
 
