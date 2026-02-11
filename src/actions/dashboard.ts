@@ -195,11 +195,10 @@ export async function getMetricsAnalysis(days: number = 30, from?: string, to?: 
 }
 
 /**
- * E-commerce funnel: Sessoes → Add Carrinho → Chegou ao Checkout → Checkout Concluido
+ * E-commerce funnel: Cliques → Add Carrinho → Checkout Iniciado → Compras
  *
- * Shopify: full funnel via ShopifyQL sessions data (sessions > 0).
- * Nuvemshop: partial funnel using abandoned checkouts + orders (no session/ATC data).
- * Falls back to Facebook Ads clicks as "sessions" when no store session data.
+ * All funnel data comes exclusively from Facebook Ads metrics,
+ * regardless of the connected e-commerce platform (Shopify, Nuvemshop, etc.).
  */
 export async function getFunnelData(days: number = 30, from?: string, to?: string) {
   const ctx = await getSessionWithOrg();
@@ -208,82 +207,27 @@ export async function getFunnelData(days: number = 30, from?: string, to?: strin
   const orgId = ctx.organization.id;
   const dateFilter = buildDateFilter(getDateRange(days, from, to));
 
-  // Check which e-commerce platforms are connected
-  const ecommerceIntegrations = await prisma.integration.findMany({
-    where: {
-      organizationId: orgId,
-      status: "CONNECTED",
-      platform: { in: ["SHOPIFY", "NUVEMSHOP"] },
-    },
-    select: { platform: true },
-  });
+  const adAgg = await prisma.adMetric.aggregate({
+    where: { organizationId: orgId, date: dateFilter },
+    _sum: { clicks: true, addToCart: true, initiateCheckout: true, conversions: true, impressions: true, reach: true },
+  }).catch(() => null);
 
-  const hasShopify = ecommerceIntegrations.some((i) => i.platform === "SHOPIFY");
-  const hasNuvemshop = ecommerceIntegrations.some((i) => i.platform === "NUVEMSHOP");
+  if (!adAgg) return null;
 
-  // Query StoreFunnel separately per platform to avoid mixing Shopify bad records
-  // with valid Nuvemshop data. Shopify: filter sessions > 0 (exclude Strategy 2 fallback).
-  // Nuvemshop: no sessions filter (Nuvemshop always has sessions=0).
-  const [
-    totalOrders,
-    paidOrders,
-    shippedOrders,
-    deliveredOrders,
-    shopifyFunnel,
-    nuvemshopFunnel,
-  ] = await Promise.all([
-    prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter } }),
-    prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter, status: "paid" } }),
-    prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter, status: { in: ["shipped", "delivered"] } } }),
-    prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter, status: "delivered" } }),
-    hasShopify
-      ? prisma.storeFunnel.aggregate({
-          where: { organizationId: orgId, date: dateFilter, platform: "SHOPIFY", sessions: { gt: 0 } },
-          _sum: { sessions: true, addToCart: true, checkoutsInitiated: true, ordersGenerated: true },
-        }).catch(() => null)
-      : Promise.resolve(null),
-    hasNuvemshop
-      ? prisma.storeFunnel.aggregate({
-          where: { organizationId: orgId, date: dateFilter, platform: "NUVEMSHOP" },
-          _sum: { sessions: true, addToCart: true, checkoutsInitiated: true, ordersGenerated: true },
-        }).catch(() => null)
-      : Promise.resolve(null),
-  ]);
-
-  const storeSessions = Number(shopifyFunnel?._sum?.sessions || 0) + Number(nuvemshopFunnel?._sum?.sessions || 0);
-  const storeAddToCart = Number(shopifyFunnel?._sum?.addToCart || 0) + Number(nuvemshopFunnel?._sum?.addToCart || 0);
-  const storeCheckouts = Number(shopifyFunnel?._sum?.checkoutsInitiated || 0) + Number(nuvemshopFunnel?._sum?.checkoutsInitiated || 0);
-  const storeOrders = Number(shopifyFunnel?._sum?.ordersGenerated || 0) + Number(nuvemshopFunnel?._sum?.ordersGenerated || 0);
-
-  let sessoes = storeSessions;
-  let adicoesCarrinho = storeAddToCart;
-  let checkoutsIniciados = storeCheckouts;
-  let pedidosGerados = storeOrders > 0 ? storeOrders : totalOrders;
-
-  // If no store funnel data, try Facebook Ads as fallback
-  if (sessoes === 0) {
-    const adAgg = await prisma.adMetric.aggregate({
-      where: { organizationId: orgId, date: dateFilter },
-      _sum: { clicks: true, addToCart: true, initiateCheckout: true },
-    }).catch(() => ({ _sum: { clicks: 0, addToCart: 0, initiateCheckout: 0 } }));
-
-    sessoes = Number(adAgg._sum.clicks || 0);
-    if (adicoesCarrinho === 0) adicoesCarrinho = Number(adAgg._sum.addToCart || 0);
-    if (checkoutsIniciados === 0) checkoutsIniciados = Number(adAgg._sum.initiateCheckout || 0) || totalOrders;
-  }
-
-  // hasSessionData: true when Shopify sessions or Facebook Ads clicks provide top-of-funnel data
-  const hasSessionData = sessoes > 0;
+  const cliques = Number(adAgg._sum.clicks || 0);
+  const adicoesCarrinho = Number(adAgg._sum.addToCart || 0);
+  const checkoutsIniciados = Number(adAgg._sum.initiateCheckout || 0);
+  const compras = Number(adAgg._sum.conversions || 0);
+  const impressoes = Number(adAgg._sum.impressions || 0);
+  const alcance = Number(adAgg._sum.reach || 0);
 
   return {
-    sessoes,
+    impressoes,
+    alcance,
+    cliques,
     adicoesCarrinho,
     checkoutsIniciados,
-    pedidosGerados,
-    pedidosPagos: paidOrders,
-    pedidosEnviados: shippedOrders,
-    pedidosEntregues: deliveredOrders,
-    hasSessionData,
+    compras,
   };
 }
 
