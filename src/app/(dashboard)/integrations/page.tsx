@@ -48,29 +48,6 @@ const platforms: PlatformConfig[] = [
     fields: [],
   },
   {
-    name: "Cartpanda",
-    platform: "CARTPANDA",
-    description: "Conecte sua Cartpanda usando sua API Key.",
-    authType: "apikey",
-    color: "#FF6B35",
-    fields: [
-      { key: "apiKey", label: "Token", placeholder: "Cole o Token do perfil da Cartpanda" },
-      { key: "externalStoreId", label: "Slug da loja", placeholder: "ex: minha-loja (parte antes de .mycartpanda.com)" },
-    ],
-  },
-  {
-    name: "Yampi",
-    platform: "YAMPI",
-    description: "Conecte sua Yampi usando suas credenciais de API.",
-    authType: "apikey",
-    color: "#7C3AED",
-    fields: [
-      { key: "apiKey", label: "Token", placeholder: "Token de API da Yampi" },
-      { key: "apiSecret", label: "Secret Key", placeholder: "Secret Key da Yampi" },
-      { key: "externalStoreId", label: "Alias da loja", placeholder: "alias-da-sua-loja" },
-    ],
-  },
-  {
     name: "Facebook Ads",
     platform: "FACEBOOK_ADS",
     description: "Conecte sua conta de anuncios do Facebook/Meta.",
