@@ -17,6 +17,27 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [loginType, setLoginType] = useState<"CLIENT" | "ADMIN">("CLIENT");
 
+  const [loadingMessage, setLoadingMessage] = useState("");
+
+  async function attemptLogin(email: string, password: string): Promise<{ error?: string }> {
+    return new Promise((resolve) => {
+      const timeout = setTimeout(() => {
+        resolve({ error: "__TIMEOUT__" });
+      }, 30000);
+
+      loginUser({ email, password, loginType })
+        .then((result) => {
+          clearTimeout(timeout);
+          resolve(result || {});
+        })
+        .catch(() => {
+          clearTimeout(timeout);
+          // signIn redirects on success — catch is expected
+          resolve({});
+        });
+    });
+  }
+
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
@@ -33,24 +54,32 @@ export default function LoginPage() {
     }
 
     setLoading(true);
+    setLoadingMessage("Conectando...");
 
-    // Safety timeout: if login takes too long, stop loading
-    const timeout = setTimeout(() => {
-      setLoading(false);
-      setError("Tempo de conexão esgotado. Tente novamente.");
-    }, 15000);
+    // First attempt
+    const result = await attemptLogin(email, password);
 
-    try {
-      const result = await loginUser({ email, password, loginType });
-      if (result?.error) {
-        setError(result.error);
+    if (result?.error === "__TIMEOUT__") {
+      // Auto-retry once — cold start should be resolved by now
+      setLoadingMessage("Reconectando...");
+      const retry = await attemptLogin(email, password);
+
+      if (retry?.error === "__TIMEOUT__") {
+        setError("Servidor demorou para responder. Tente novamente em alguns segundos.");
+        setLoading(false);
+        setLoadingMessage("");
+        return;
       }
-    } catch {
-      // signIn redirects on success
-    } finally {
-      clearTimeout(timeout);
-      setLoading(false);
+
+      if (retry?.error) {
+        setError(retry.error);
+      }
+    } else if (result?.error) {
+      setError(result.error);
     }
+
+    setLoading(false);
+    setLoadingMessage("");
   }
 
   return (
@@ -146,7 +175,7 @@ export default function LoginPage() {
             {loading ? (
               <>
                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                Entrando...
+                {loadingMessage || "Entrando..."}
               </>
             ) : (
               <>
