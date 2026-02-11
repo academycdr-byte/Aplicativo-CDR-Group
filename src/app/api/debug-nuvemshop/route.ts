@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { decrypt } from "@/lib/encryption";
-import { parseOrderDate } from "@/lib/date-utils";
+import { syncNuvemshopOrders, syncNuvemshopFunnel } from "@/lib/integrations/nuvemshop";
 
 export const maxDuration = 60;
 
@@ -21,95 +21,152 @@ export async function GET() {
     }
 
     const orgId = membership.organizationId;
+    const steps: Record<string, unknown> = {};
 
-    // 1. Get integration
+    // STEP 1: Integration record
     const integration = await prisma.integration.findUnique({
         where: { organizationId_platform: { organizationId: orgId, platform: "NUVEMSHOP" } },
     });
 
+    steps.integration = integration
+        ? {
+            id: integration.id,
+            status: integration.status,
+            syncStatus: integration.syncStatus,
+            lastSyncAt: integration.lastSyncAt,
+            errorMessage: integration.errorMessage,
+            externalStoreId: integration.externalStoreId,
+            hasAccessToken: !!integration.accessToken,
+        }
+        : "NOT FOUND";
+
     if (!integration || !integration.accessToken) {
-        return NextResponse.json({ error: "No integration" });
+        return NextResponse.json({ steps, error: "No integration or token" });
     }
 
-    // 2. Decrypt + fetch 3 orders
-    const accessToken = decrypt(integration.accessToken);
+    // STEP 2: Decrypt token
+    let accessToken: string;
+    try {
+        accessToken = decrypt(integration.accessToken);
+        steps.tokenDecrypt = "OK";
+    } catch (err) {
+        steps.tokenDecrypt = `FAILED: ${err instanceof Error ? err.message : "unknown"}`;
+        return NextResponse.json({ steps });
+    }
+
     const storeId = integration.externalStoreId || "";
 
-    const res = await fetch(
-        `https://api.nuvemshop.com.br/v1/${storeId}/orders?per_page=3&page=1`,
-        {
-            headers: {
-                Authentication: `bearer ${accessToken}`,
-                "User-Agent": "CDR Group Hub (cdrgroup.com)",
-                "Content-Type": "application/json",
-            },
-        }
-    );
+    // STEP 3: Fetch ALL orders from Nuvemshop API (same as sync)
+    let allApiOrders: Record<string, unknown>[] = [];
+    let page = 1;
+    let hasMore = true;
+    let apiError: string | null = null;
 
-    if (!res.ok) {
-        return NextResponse.json({ error: `API ${res.status}`, body: await res.text() });
-    }
-
-    const orders = await res.json();
-    if (!Array.isArray(orders) || orders.length === 0) {
-        return NextResponse.json({ result: "0 orders from API" });
-    }
-
-    // 3. Try writing each order
-    const results: Record<string, unknown>[] = [];
-    for (const raw of orders) {
-        const customer = raw.customer as Record<string, unknown> | null;
-        const products = raw.products as Array<Record<string, unknown>> | undefined;
-        const lineItems = (products || []).map((p: Record<string, unknown>) => ({
-            product_id: String(p.product_id ?? ""),
-            variant_id: String(p.variant_id ?? ""),
-            name: String(p.name ?? ""),
-            quantity: Number(p.quantity ?? 0),
-            price: String(p.price ?? "0"),
-            sku: String(p.sku ?? ""),
-        }));
-
+    while (hasMore) {
         try {
-            const written = await prisma.order.upsert({
-                where: {
-                    organizationId_platform_externalOrderId: {
-                        organizationId: orgId,
-                        platform: "NUVEMSHOP",
-                        externalOrderId: String(raw.id),
-                    },
-                },
-                create: {
-                    organizationId: orgId,
-                    platform: "NUVEMSHOP",
-                    externalOrderId: String(raw.id),
-                    status: raw.payment_status || "pending",
-                    customerName: (customer?.name as string) || null,
-                    customerEmail: (customer?.email as string) || null,
-                    totalAmount: parseFloat(String(raw.total || "0")),
-                    currency: raw.currency || "BRL",
-                    itemCount: products?.length || 0,
-                    orderDate: parseOrderDate(String(raw.created_at)),
-                    rawData: { ...raw, line_items: lineItems } as object,
-                },
-                update: {
-                    status: raw.payment_status || "pending",
-                    totalAmount: parseFloat(String(raw.total || "0")),
+            const url = `https://api.nuvemshop.com.br/v1/${storeId}/orders?per_page=200&page=${page}`;
+            const res = await fetch(url, {
+                headers: {
+                    Authentication: `bearer ${accessToken}`,
+                    "User-Agent": "CDR Group Hub (cdrgroup.com)",
+                    "Content-Type": "application/json",
                 },
             });
-            results.push({ id: raw.id, dbId: written.id, ok: true });
-        } catch (err: unknown) {
-            results.push({
-                id: raw.id,
-                ok: false,
-                error: err instanceof Error ? err.message : "unknown",
-            });
+
+            if (!res.ok) {
+                const body = await res.text();
+                apiError = `HTTP ${res.status}: ${body}`;
+                break;
+            }
+
+            const orders = await res.json();
+            if (!Array.isArray(orders) || orders.length === 0) {
+                hasMore = false;
+                break;
+            }
+
+            allApiOrders = allApiOrders.concat(orders);
+            hasMore = orders.length === 200;
+            page++;
+        } catch (err) {
+            apiError = err instanceof Error ? err.message : "unknown";
+            break;
         }
     }
 
-    // 4. Count
-    const count = await prisma.order.count({
-        where: { organizationId: orgId, platform: "NUVEMSHOP" },
-    });
+    steps.apiResult = {
+        totalFromApi: allApiOrders.length,
+        pagesRead: page,
+        error: apiError,
+        orders: allApiOrders.map((o) => ({
+            id: o.id,
+            number: o.number,
+            status: o.status,
+            payment_status: o.payment_status,
+            shipping_status: o.shipping_status,
+            total: o.total,
+            currency: o.currency,
+            created_at: o.created_at,
+            customer: (o.customer as Record<string, unknown>)?.name || null,
+            productsCount: Array.isArray(o.products) ? (o.products as unknown[]).length : 0,
+        })),
+    };
 
-    return NextResponse.json({ ordersFromApi: orders.length, writeResults: results, totalInDb: count });
+    // STEP 4: Run the FULL sync
+    let syncResult: unknown;
+    let funnelResult: unknown;
+    try {
+        const [ordersRes, funnelRes] = await Promise.allSettled([
+            syncNuvemshopOrders(orgId),
+            syncNuvemshopFunnel(orgId),
+        ]);
+        syncResult = ordersRes.status === "fulfilled" ? ordersRes.value : { error: String(ordersRes.reason) };
+        funnelResult = funnelRes.status === "fulfilled" ? funnelRes.value : { error: String(funnelRes.reason) };
+    } catch (err) {
+        syncResult = { error: err instanceof Error ? err.message : "unknown" };
+        funnelResult = { error: "skipped" };
+    }
+
+    steps.syncResult = syncResult;
+    steps.funnelResult = funnelResult;
+
+    // STEP 5: DB state after sync
+    const [orderCount, orderSample, syncLogs] = await Promise.all([
+        prisma.order.count({ where: { organizationId: orgId, platform: "NUVEMSHOP" } }),
+        prisma.order.findMany({
+            where: { organizationId: orgId, platform: "NUVEMSHOP" },
+            select: {
+                externalOrderId: true,
+                status: true,
+                totalAmount: true,
+                customerName: true,
+                orderDate: true,
+                itemCount: true,
+            },
+            orderBy: { orderDate: "desc" },
+            take: 20,
+        }),
+        prisma.syncLog.findMany({
+            where: { organizationId: orgId, platform: "NUVEMSHOP" },
+            orderBy: { startedAt: "desc" },
+            take: 5,
+        }),
+    ]);
+
+    steps.dbAfterSync = {
+        totalOrders: orderCount,
+        orders: orderSample.map((o) => ({
+            ...o,
+            totalAmount: Number(o.totalAmount),
+        })),
+        recentSyncLogs: syncLogs.map((l) => ({
+            status: l.status,
+            recordsSynced: l.recordsSynced,
+            errorMessage: l.errorMessage,
+            startedAt: l.startedAt,
+            completedAt: l.completedAt,
+        })),
+    };
+
+    return NextResponse.json(steps);
 }
