@@ -103,6 +103,7 @@ export async function GET() {
             syncStatus: integration.syncStatus,
             lastSyncAt: integration.lastSyncAt,
             errorMessage: integration.errorMessage,
+            syncCursor: (integration.metadata as Record<string, unknown>)?.syncCursor || null,
         },
         api: {
             totalHint: apiTotalHint,

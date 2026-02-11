@@ -37,7 +37,8 @@ async function withRetry<T>(
 export async function syncAllPlatforms(organizationId: string): Promise<SyncResult[]> {
   const results: SyncResult[] = [];
 
-  const syncTasks = [
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const syncTasks: Array<{ platform: string; fn: () => Promise<any> }> = [
     { platform: "SHOPIFY", fn: () => syncShopifyOrders(organizationId) },
     { platform: "CARTPANDA", fn: () => syncCartpandaOrders(organizationId) },
     { platform: "YAMPI", fn: () => syncYampiOrders(organizationId) },

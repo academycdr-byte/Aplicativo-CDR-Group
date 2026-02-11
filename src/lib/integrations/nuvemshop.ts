@@ -1,14 +1,166 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { encrypt, decrypt } from "@/lib/encryption";
 import { parseOrderDate, toDateKeyBrasilia } from "@/lib/date-utils";
 
-export async function syncNuvemshopOrders(organizationId: string) {
+// ─── TYPES ────────────────────────────────────────
+
+interface SyncOptions {
+  startPage?: number;
+  syncLogId?: string;
+  timeBudgetMs?: number;
+}
+
+export interface SyncResult {
+  success: boolean;
+  error?: string;
+  synced: number;
+  hasMore: boolean;
+  nextPage?: number;
+  syncLogId?: string;
+}
+
+interface SyncCursor {
+  nextPage: number;
+  syncLogId: string;
+}
+
+// ─── CURSOR HELPERS ───────────────────────────────
+
+async function saveSyncCursor(integrationId: string, cursor: SyncCursor) {
+  const integration = await prisma.integration.findUnique({
+    where: { id: integrationId },
+    select: { metadata: true },
+  });
+  const existing = (integration?.metadata as Record<string, string | number | boolean | null | object>) || {};
+  const merged = { ...existing, syncCursor: { nextPage: cursor.nextPage, syncLogId: cursor.syncLogId } };
+  await prisma.integration.update({
+    where: { id: integrationId },
+    data: { metadata: merged },
+  });
+}
+
+async function clearSyncCursor(integrationId: string) {
+  const integration = await prisma.integration.findUnique({
+    where: { id: integrationId },
+    select: { metadata: true },
+  });
+  const existing = (integration?.metadata as Record<string, string | number | boolean | null | object>) || {};
+  const { syncCursor: _, ...rest } = existing;
+  await prisma.integration.update({
+    where: { id: integrationId },
+    data: { metadata: Object.keys(rest).length > 0 ? rest : Prisma.JsonNull },
+  });
+}
+
+// ─── ORDER UPSERT BUILDER ─────────────────────────
+
+function buildOrderUpsert(organizationId: string, order: Record<string, unknown>) {
+  const customer = order.customer as Record<string, unknown> | null;
+  const products = order.products as Array<Record<string, unknown>> | undefined;
+  const lineItems = (products || []).map((p) => ({
+    product_id: String(p.product_id ?? ""),
+    variant_id: String(p.variant_id ?? ""),
+    name: String(p.name ?? ""),
+    quantity: Number(p.quantity ?? 0),
+    price: String(p.price ?? "0"),
+    sku: String(p.sku ?? ""),
+  }));
+
+  return prisma.order.upsert({
+    where: {
+      organizationId_platform_externalOrderId: {
+        organizationId,
+        platform: "NUVEMSHOP",
+        externalOrderId: String(order.id),
+      },
+    },
+    create: {
+      organizationId,
+      platform: "NUVEMSHOP",
+      externalOrderId: String(order.id),
+      status: mapNuvemshopStatus(String(order.payment_status || "")),
+      customerName: (customer?.name as string) || null,
+      customerEmail: (customer?.email as string) || null,
+      totalAmount: parseFloat(String(order.total || "0")),
+      currency: (order.currency as string) || "BRL",
+      itemCount: products?.length || 0,
+      orderDate: parseOrderDate(String(order.created_at)),
+      rawData: { ...order, line_items: lineItems },
+    },
+    update: {
+      status: mapNuvemshopStatus(String(order.payment_status || "")),
+      totalAmount: parseFloat(String(order.total || "0")),
+      customerName: (customer?.name as string) || null,
+      customerEmail: (customer?.email as string) || null,
+      itemCount: products?.length || 0,
+      orderDate: parseOrderDate(String(order.created_at)),
+      rawData: { ...order, line_items: lineItems },
+    },
+  });
+}
+
+// ─── MAIN SYNC FUNCTION ──────────────────────────
+
+export async function syncNuvemshopOrders(
+  organizationId: string,
+  options: SyncOptions = {}
+): Promise<SyncResult> {
+  const {
+    startPage: optStartPage,
+    syncLogId: optSyncLogId,
+    timeBudgetMs = 50000,
+  } = options;
+
+  const startTime = Date.now();
+  const PER_PAGE = 50;
+
+  // 1. Load integration
   const integration = await prisma.integration.findUnique({
     where: { organizationId_platform: { organizationId, platform: "NUVEMSHOP" } },
   });
 
   if (!integration || integration.status !== "CONNECTED" || !integration.accessToken) {
-    return { error: "Nuvemshop not connected" };
+    return { success: false, error: "Nuvemshop not connected", synced: 0, hasMore: false };
+  }
+
+  // 2. Concurrency guard
+  if (integration.syncStatus === "SYNCING" && !optSyncLogId) {
+    const timeSinceUpdate = Date.now() - integration.updatedAt.getTime();
+    if (timeSinceUpdate < 2 * 60 * 1000) {
+      return { success: false, error: "Sync already in progress", synced: 0, hasMore: false };
+    }
+  }
+
+  // 3. Auto-resume from saved cursor (if no explicit params)
+  let currentPage = optStartPage || 1;
+  let logId = optSyncLogId || "";
+
+  if (!optStartPage && !optSyncLogId) {
+    const savedCursor = (integration.metadata as Record<string, unknown>)?.syncCursor as SyncCursor | undefined;
+    if (savedCursor?.nextPage && savedCursor?.syncLogId) {
+      currentPage = savedCursor.nextPage;
+      logId = savedCursor.syncLogId;
+    }
+  }
+
+  // 4. First call of a sync session: set SYNCING + create SyncLog
+  const isFirstCall = currentPage === 1 && !logId;
+  if (isFirstCall) {
+    await prisma.integration.update({
+      where: { id: integration.id },
+      data: { syncStatus: "SYNCING", errorMessage: null },
+    });
+    const log = await prisma.syncLog.create({
+      data: { organizationId, platform: "NUVEMSHOP", status: "SYNCING", recordsSynced: 0 },
+    });
+    logId = log.id;
+  } else if (logId) {
+    // Continuation call: touch updatedAt to keep concurrency guard happy
+    await prisma.integration.update({
+      where: { id: integration.id },
+      data: { syncStatus: "SYNCING" },
+    });
   }
 
   try {
@@ -16,102 +168,105 @@ export async function syncNuvemshopOrders(organizationId: string) {
     const storeId = integration.externalStoreId || "";
 
     // Incremental sync: only fetch new orders since last sync
-    const hasLastSync = !!integration.lastSyncAt;
     let sinceParam = "";
-    if (hasLastSync) {
-      const since = new Date(integration.lastSyncAt!.getTime() - 60 * 60 * 1000);
+    if (integration.lastSyncAt) {
+      const since = new Date(integration.lastSyncAt.getTime() - 60 * 60 * 1000);
       sinceParam = `&created_at_min=${since.toISOString()}`;
     }
 
-    // Fetch ONLY 50 orders per call to fit within Vercel Hobby 10s timeout
-    const url = `https://api.nuvemshop.com.br/v1/${storeId}/orders?per_page=50&page=1${sinceParam}`;
-    const response = await fetch(url, {
-      headers: {
-        Authentication: `bearer ${accessToken}`,
-        "User-Agent": "CDR Group Hub (cdrgroup.com)",
-        "Content-Type": "application/json",
-      },
-    });
+    let totalSyncedThisCall = 0;
+    let hasMore = true;
 
-    if (!response.ok) {
-      throw new Error(`Nuvemshop API error: ${response.status}`);
-    }
+    while (hasMore) {
+      // 5. Time budget check BEFORE fetching next page
+      const elapsed = Date.now() - startTime;
+      if (elapsed > timeBudgetMs) {
+        // Save cursor for continuation
+        if (logId) {
+          await saveSyncCursor(integration.id, { nextPage: currentPage, syncLogId: logId });
+          await prisma.syncLog.update({
+            where: { id: logId },
+            data: { recordsSynced: { increment: totalSyncedThisCall } },
+          }).catch(() => {});
+        }
+        return {
+          success: true,
+          synced: totalSyncedThisCall,
+          hasMore: true,
+          nextPage: currentPage,
+          syncLogId: logId || undefined,
+        };
+      }
 
-    const orders = await response.json();
-    if (!Array.isArray(orders) || orders.length === 0) {
-      // No orders but API works — mark success
-      await prisma.integration.update({
-        where: { id: integration.id },
-        data: { syncStatus: "SUCCESS", lastSyncAt: new Date(), errorMessage: null },
-      });
-      return { success: true, synced: 0 };
-    }
-
-    // Build all upsert operations and run in ONE single transaction
-    const operations = orders.map((order: Record<string, unknown>) => {
-      const customer = order.customer as Record<string, unknown> | null;
-      const products = order.products as Array<Record<string, unknown>> | undefined;
-      const lineItems = (products || []).map((p) => ({
-        product_id: String(p.product_id ?? ""),
-        variant_id: String(p.variant_id ?? ""),
-        name: String(p.name ?? ""),
-        quantity: Number(p.quantity ?? 0),
-        price: String(p.price ?? "0"),
-        sku: String(p.sku ?? ""),
-      }));
-
-      return prisma.order.upsert({
-        where: {
-          organizationId_platform_externalOrderId: {
-            organizationId,
-            platform: "NUVEMSHOP",
-            externalOrderId: String(order.id),
-          },
-        },
-        create: {
-          organizationId,
-          platform: "NUVEMSHOP",
-          externalOrderId: String(order.id),
-          status: mapNuvemshopStatus(String(order.payment_status || "")),
-          customerName: customer?.name as string || null,
-          customerEmail: customer?.email as string || null,
-          totalAmount: parseFloat(String(order.total || "0")),
-          currency: (order.currency as string) || "BRL",
-          itemCount: products?.length || 0,
-          orderDate: parseOrderDate(String(order.created_at)),
-          rawData: { ...order, line_items: lineItems },
-        },
-        update: {
-          status: mapNuvemshopStatus(String(order.payment_status || "")),
-          totalAmount: parseFloat(String(order.total || "0")),
-          customerName: customer?.name as string || null,
-          customerEmail: customer?.email as string || null,
-          itemCount: products?.length || 0,
-          orderDate: parseOrderDate(String(order.created_at)),
-          rawData: { ...order, line_items: lineItems },
+      // 6. Fetch one page from Nuvemshop API
+      const url = `https://api.nuvemshop.com.br/v1/${storeId}/orders?per_page=${PER_PAGE}&page=${currentPage}${sinceParam}`;
+      const response = await fetch(url, {
+        headers: {
+          Authentication: `bearer ${accessToken}`,
+          "User-Agent": "CDR Group Hub (cdrgroup.com)",
+          "Content-Type": "application/json",
         },
       });
-    });
 
-    // Single transaction: 1 API call to fetch + 1 DB transaction to write
-    await prisma.$transaction(operations);
+      if (!response.ok) {
+        throw new Error(`Nuvemshop API error: ${response.status}`);
+      }
 
-    // Mark success + update lastSyncAt
+      const orders = await response.json();
+      if (!Array.isArray(orders) || orders.length === 0) {
+        hasMore = false;
+        break;
+      }
+
+      // 7. Save this page to DB IMMEDIATELY
+      const operations = orders.map((order: Record<string, unknown>) =>
+        buildOrderUpsert(organizationId, order)
+      );
+      await prisma.$transaction(operations);
+      totalSyncedThisCall += orders.length;
+
+      // Less than PER_PAGE means last page
+      if (orders.length < PER_PAGE) {
+        hasMore = false;
+      } else {
+        currentPage++;
+      }
+    }
+
+    // 8. ALL PAGES COMPLETE — mark success
+    await clearSyncCursor(integration.id).catch(() => {});
+
     await prisma.integration.update({
       where: { id: integration.id },
       data: { syncStatus: "SUCCESS", lastSyncAt: new Date(), errorMessage: null },
     });
 
-    return { success: true, synced: orders.length };
+    if (logId) {
+      await prisma.syncLog.update({
+        where: { id: logId },
+        data: { status: "SUCCESS", recordsSynced: { increment: totalSyncedThisCall }, completedAt: new Date() },
+      }).catch(() => {});
+    }
+
+    return { success: true, synced: totalSyncedThisCall, hasMore: false, syncLogId: logId || undefined };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : "Unknown error";
+
+    await clearSyncCursor(integration.id).catch(() => {});
 
     await prisma.integration.update({
       where: { id: integration.id },
       data: { syncStatus: "FAILED", errorMessage: errorMsg },
     }).catch(() => {});
 
-    return { error: errorMsg };
+    if (logId) {
+      await prisma.syncLog.update({
+        where: { id: logId },
+        data: { status: "FAILED", errorMessage: errorMsg, completedAt: new Date() },
+      }).catch(() => {});
+    }
+
+    return { success: false, error: errorMsg, synced: 0, hasMore: false };
   }
 }
 

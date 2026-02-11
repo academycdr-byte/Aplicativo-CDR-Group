@@ -174,19 +174,7 @@ function IntegrationsContent() {
       toast.error(`Erro ao conectar Google Analytics${detail ? `: ${detail}` : ""}`, { duration: 10000 });
     } else if (success === "nuvemshop") {
       toast.success("Nuvemshop conectada com sucesso! Sincronizando pedidos...");
-      fetch("/api/sync/nuvemshop", { method: "POST" })
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.success) {
-            toast.success("Pedidos da Nuvemshop sincronizados!");
-            loadIntegrations();
-          } else {
-            toast.error(`Erro ao sincronizar Nuvemshop: ${data.error || "Erro desconhecido"}`);
-          }
-        })
-        .catch(() => {
-          toast.error("Erro ao sincronizar Nuvemshop");
-        });
+      syncNuvemshopWithContinuation();
     } else if (error === "nuvemshop_oauth_failed") {
       toast.error(`Erro ao conectar Nuvemshop${detail ? `: ${detail}` : ""}`, { duration: 10000 });
     } else if (error === "missing_params") {
@@ -290,23 +278,60 @@ function IntegrationsContent() {
     window.location.href = `/api/integrations/shopify?shop=${encodeURIComponent(normalizedDomain)}`;
   }
 
-  async function handleSync(platform: Platform) {
-    setSyncing(platform);
+  async function syncNuvemshopWithContinuation() {
+    let hasMore = true;
+    let nextPage: number | undefined;
+    let syncLogId: string | undefined;
+    let totalSynced = 0;
+    let iteration = 0;
+    const MAX_ITERATIONS = 20;
 
-    // Use dedicated API route for Nuvemshop (needs longer timeout)
-    if (platform === "NUVEMSHOP") {
+    while (hasMore && iteration < MAX_ITERATIONS) {
+      iteration++;
       try {
-        const res = await fetch("/api/sync/nuvemshop", { method: "POST" });
+        const res = await fetch("/api/sync/nuvemshop", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...(nextPage ? { startPage: nextPage } : {}),
+            ...(syncLogId ? { syncLogId } : {}),
+          }),
+        });
         const data = await res.json();
-        if (data.success) {
-          toast.success("Sincronizacao concluida!");
-          loadIntegrations();
-        } else {
-          toast.error(`Erro ao sincronizar: ${data.error || "Erro desconhecido"}`);
+
+        if (!data.success) {
+          toast.error(`Erro ao sincronizar: ${data.error || data.orders?.error || "Erro desconhecido"}`);
+          return totalSynced;
+        }
+
+        totalSynced += data.orders?.synced || 0;
+        hasMore = data.hasMore === true;
+        nextPage = data.nextPage;
+        syncLogId = data.syncLogId;
+
+        if (hasMore) {
+          toast.info(`Sincronizando... ${totalSynced} pedidos importados, continuando...`);
         }
       } catch {
         toast.error("Erro ao sincronizar Nuvemshop");
+        return totalSynced;
       }
+    }
+
+    if (totalSynced > 0) {
+      toast.success(`Sincronizacao concluida! ${totalSynced} pedidos sincronizados.`);
+    } else {
+      toast.success("Sincronizacao concluida! Nenhum pedido novo.");
+    }
+    loadIntegrations();
+    return totalSynced;
+  }
+
+  async function handleSync(platform: Platform) {
+    setSyncing(platform);
+
+    if (platform === "NUVEMSHOP") {
+      await syncNuvemshopWithContinuation();
       setSyncing(null);
       return;
     }
