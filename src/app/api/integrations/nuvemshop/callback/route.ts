@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { encrypt } from "@/lib/encryption";
-import { exchangeNuvemshopToken } from "@/lib/integrations/nuvemshop";
+import { exchangeNuvemshopToken, syncNuvemshopOrders, syncNuvemshopFunnel } from "@/lib/integrations/nuvemshop";
 import { auth } from "@/auth";
 import { checkRateLimit } from "@/lib/rate-limit";
 
@@ -57,6 +57,14 @@ export async function GET(request: NextRequest) {
         externalStoreId: String(tokenData.user_id),
         errorMessage: null,
       },
+    });
+
+    // Trigger initial sync in the background (don't wait for it)
+    syncNuvemshopOrders(organizationId).catch((err) => {
+      console.error("[Nuvemshop OAuth] Initial order sync failed:", err);
+    });
+    syncNuvemshopFunnel(organizationId).catch((err) => {
+      console.error("[Nuvemshop OAuth] Initial funnel sync failed:", err);
     });
 
     return NextResponse.redirect(
