@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -20,7 +20,6 @@ import {
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAvatar } from "@/contexts/avatar-context";
-import { checkIsAppAdmin } from "@/actions/auth";
 
 type NavItem = {
   name: string;
@@ -57,22 +56,13 @@ export function Sidebar() {
   const { data: session } = useSession();
 
   const { avatarUrl } = useAvatar();
-  const [isAdmin, setIsAdmin] = useState(false);
 
   const userRole = session?.user?.role;
   const isInternal = userRole === "OWNER" || userRole === "ADMIN" || userRole === "MEMBER";
 
-  // Server-side admin check — bypasses JWT, reads email from DB directly
-  useEffect(() => {
-    if (session?.user?.id) {
-      checkIsAppAdmin().then(setIsAdmin);
-    }
-  }, [session?.user?.id]);
-
   const { filteredAiNav, filteredPlatformNav, filteredManagementNav } = useMemo(() => {
     const filterNav = (items: NavItem[]) =>
       items.filter((item) => {
-        if (item.adminOnly) return isAdmin;
         if (item.internalOnly) return isInternal;
         return true;
       });
@@ -86,7 +76,7 @@ export function Sidebar() {
       { name: "Anuncios", href: "/ads", icon: Megaphone },
       { name: "Financeiro", href: "/financeiro", icon: Wallet },
       { name: "Analytics", href: "/analytics", icon: BarChart3 },
-      ...(isAdmin ? [{ name: "Relatórios", href: "/reports", icon: FileText }] : []),
+      { name: "Relatórios", href: "/reports", icon: FileText },
     ];
 
     const managementNavItems: NavItem[] = [
@@ -99,7 +89,7 @@ export function Sidebar() {
       filteredPlatformNav: filterNav(platformNavItems),
       filteredManagementNav: filterNav(managementNavItems),
     };
-  }, [isAdmin, isInternal]);
+  }, [isInternal]);
 
   return (
     <aside className="hidden md:flex md:w-[260px] md:flex-col bg-sidebar-bg border-r border-sidebar-border h-screen sticky top-0 z-30">

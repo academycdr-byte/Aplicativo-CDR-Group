@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -26,7 +26,6 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useSession } from "next-auth/react";
-import { checkIsAppAdmin } from "@/actions/auth";
 
 type NavItem = {
   name: string;
@@ -41,17 +40,8 @@ export function MobileSidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
 
-  const [isAdmin, setIsAdmin] = useState(false);
-
   const userRole = session?.user?.role;
   const isInternal = userRole === "OWNER" || userRole === "ADMIN" || userRole === "MEMBER";
-
-  // Server-side admin check — bypasses JWT, reads email from DB directly
-  useEffect(() => {
-    if (session?.user?.id) {
-      checkIsAppAdmin().then(setIsAdmin);
-    }
-  }, [session?.user?.id]);
 
   // Same structure as Sidebar
   const aiNavItems = [
@@ -63,7 +53,7 @@ export function MobileSidebar() {
     { name: "Anuncios", href: "/ads", icon: Megaphone },
     { name: "Financeiro", href: "/financeiro", icon: Wallet },
     { name: "Analytics", href: "/analytics", icon: BarChart3 },
-    ...(isAdmin ? [{ name: "Relatórios", href: "/reports", icon: FileText }] : []),
+    { name: "Relatórios", href: "/reports", icon: FileText },
   ];
 
   const managementNavItems = [
@@ -73,7 +63,6 @@ export function MobileSidebar() {
 
   const filterNav = (items: NavItem[]) => {
     return items.filter(item => {
-      if (item.adminOnly) return isAdmin;
       if (item.internalOnly) return isInternal;
       return true;
     });
