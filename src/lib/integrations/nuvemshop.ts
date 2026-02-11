@@ -531,7 +531,7 @@ export async function exchangeNuvemshopToken(code: string) {
 }
 
 /**
- * Fetch products from Nuvemshop.
+ * Fetch products from Nuvemshop (paginated — fetches all pages).
  * Supports filtering by category (collection).
  */
 export async function fetchNuvemshopProducts(
@@ -549,35 +549,39 @@ export async function fetchNuvemshopProducts(
   const accessToken = decrypt(integration.accessToken);
   const storeId = integration.externalStoreId;
 
-  let url = `https://api.nuvemshop.com.br/v1/${storeId}/products?per_page=50&published=true`;
+  const PER_PAGE = 200;
+  const MAX_PAGES = 10; // Safety limit: 2000 products max
+  const allProducts: any[] = [];
 
-  if (collectionId && collectionId !== 'all') {
-    url += `&category_id=${collectionId}`;
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    let url = `https://api.nuvemshop.com.br/v1/${storeId}/products?per_page=${PER_PAGE}&page=${page}`;
+
+    if (collectionId && collectionId !== 'all') {
+      url += `&category_id=${collectionId}`;
+    }
+
+    const response = await fetch(url, {
+      headers: {
+        Authentication: `bearer ${accessToken}`,
+        "User-Agent": "CDR Group Hub (cdrgroup.com)",
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      console.error("[Nuvemshop API] Products fetch failed:", response.status);
+      throw new Error(`Failed to fetch products from Nuvemshop: ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (!Array.isArray(data) || data.length === 0) break;
+
+    allProducts.push(...data);
+
+    if (data.length < PER_PAGE) break; // Last page
   }
 
-  // Nuvemshop allows sorting by 'total_sold_amount', 'created_at', etc.
-  // For "Best Sellers", 'total_sold_amount' (desc) is ideal if available, 
-  // but often 'sort_by=popular' or manual sorting is needed.
-  // The API doc isn't explicit on "best seller" sort param for public API, 
-  // checking standard params: sort_by=sell_count_desc?
-  // We'll stick to default for now and sort if needed.
-
-  const response = await fetch(url, {
-    headers: {
-      Authentication: `bearer ${accessToken}`,
-      "User-Agent": "CDR Group Hub (cdrgroup.com)",
-      "Content-Type": "application/json",
-    },
-    next: { revalidate: 300 }
-  });
-
-  if (!response.ok) {
-    console.error("[Nuvemshop API] Products fetch failed:", response.status);
-    throw new Error(`Failed to fetch products from Nuvemshop: ${response.status}`);
-  }
-
-  const data = await response.json();
-  return Array.isArray(data) ? data : [];
+  return allProducts;
 }
 
 /**

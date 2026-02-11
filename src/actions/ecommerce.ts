@@ -83,6 +83,8 @@ export async function getBestSellersAction(
         const salesMap = new Map<string, number>();
         const revenueMap = new Map<string, number>();
         const productIds = new Set<string>();
+        // Collect product info from order rawData (name, image) as fallback
+        const productInfoFromOrders = new Map<string, { name: string; imageUrl: string }>();
 
         for (const order of orders) {
             const raw = order.rawData as Record<string, unknown>;
@@ -116,6 +118,14 @@ export async function getBestSellersAction(
                             salesMap.set(pid, (salesMap.get(pid) || 0) + qty);
                             revenueMap.set(pid, (revenueMap.get(pid) || 0) + (itemPrice * qty));
                             productIds.add(pid);
+
+                            // Collect product info from rawData (first occurrence wins)
+                            if (!productInfoFromOrders.has(pid)) {
+                                const name = extractI18nName(li.name);
+                                const imageObj = li.image as Record<string, unknown> | undefined;
+                                const imageUrl = imageObj?.src ? String(imageObj.src) : "";
+                                productInfoFromOrders.set(pid, { name, imageUrl });
+                            }
                         }
                     }
                 }
@@ -135,6 +145,7 @@ export async function getBestSellersAction(
         const topProductIds = sortedProducts.map(p => p[0]);
 
         // 5. Fetch details only for these top products
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let productsDetails: any[] = [];
 
         if (integration.platform === "SHOPIFY") {
@@ -156,24 +167,28 @@ export async function getBestSellersAction(
                 productsDetails = data.products || [];
             }
         } else {
-            // Nuvemshop might not support bulk ID fetch easily, or we implement similar logic if needed.
-            // For now, if Nuvemshop, likely need another strategy or just fetch all and filter.
-            // Fallback: Fetch standard products list (cached) and join.
-            // Note: Implementing efficient Nuvemshop fetch is out of scope for this quick fix unless requested.
-            // We will try standard fetch and filter.
-            productsDetails = await fetchNuvemshopProducts(integration.id);
+            // Nuvemshop: fetch all products (paginated) and filter
+            try {
+                productsDetails = await fetchNuvemshopProducts(integration.id);
+            } catch {
+                // If Products API fails, we still have rawData info
+                productsDetails = [];
+            }
         }
 
         // 6. Join details with sales count
         const result: Product[] = [];
 
         for (const [id, qty] of sortedProducts) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const details = productsDetails.find((p: any) => String(p.id) === id);
+            const rawInfo = productInfoFromOrders.get(id);
 
-            // If product details not found (deleted? or Nuvemshop missing), we might skip or show basic info if available
-            if (!details) continue;
+            // Skip only if we have neither API details nor rawData info
+            if (!details && !rawInfo) continue;
 
             if (integration.platform === "SHOPIFY") {
+                if (!details) continue;
                 const imageUrl = details.image?.src || details.images?.[0]?.src || "";
                 const price = details.variants?.[0]?.price || "0.00";
                 const rev = revenueMap.get(id) || 0;
@@ -190,18 +205,32 @@ export async function getBestSellersAction(
                     totalRevenue: rev
                 });
             } else {
-                // Nuvemshop mapping
-                const imageUrl = details.images?.[0]?.src || "";
-                const price = details.variants?.[0]?.price || "0.00";
+                // Nuvemshop mapping — use Products API details with rawData fallback
+                let imageUrl = "";
+                let title = "Produto";
+                let price = "0.00";
+                let vendor = "";
+
+                if (details) {
+                    imageUrl = details.images?.[0]?.src || "";
+                    title = extractI18nName(details.name);
+                    price = details.variants?.[0]?.price || "0.00";
+                    vendor = details.brand || "";
+                }
+
+                // Fallback to rawData info when Products API doesn't have this product
+                if (!imageUrl && rawInfo?.imageUrl) imageUrl = rawInfo.imageUrl;
+                if (title === "Produto" && rawInfo?.name) title = rawInfo.name;
+
                 const rev = revenueMap.get(id) || 0;
                 result.push({
-                    id: String(details.id),
-                    title: details.name?.pt || details.name || "Produto",
+                    id,
+                    title,
                     price: parseFloat(price),
                     currency: "BRL",
-                    imageUrl: imageUrl,
+                    imageUrl,
                     collection: "all",
-                    vendor: details.brand,
+                    vendor,
                     totalSold: qty,
                     totalRevenue: rev
                 });
@@ -214,6 +243,16 @@ export async function getBestSellersAction(
         console.error("Error in getBestSellersAction:", error);
         return [];
     }
+}
+
+/** Extract a display string from a Nuvemshop multilingual name field */
+function extractI18nName(nameField: unknown): string {
+    if (typeof nameField === "string") return nameField || "Produto";
+    if (nameField && typeof nameField === "object") {
+        const obj = nameField as Record<string, string>;
+        return obj.pt || obj.es || obj.en || Object.values(obj).find(v => typeof v === "string" && v) || "Produto";
+    }
+    return "Produto";
 }
 
 /**

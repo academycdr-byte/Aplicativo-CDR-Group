@@ -43,15 +43,23 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: "https",
-        hostname: "*.d17oa795e.app-domen.com" // Nuvemshop generic, might need more specific if known
+        hostname: "**.cloudfront.net",
       },
       {
         protocol: "https",
-        hostname: "imgur.com"
+        hostname: "**.tiendanube.com",
       },
       {
         protocol: "https",
-        hostname: "*.imgur.com"
+        hostname: "**.nuvemshop.com.br",
+      },
+      {
+        protocol: "https",
+        hostname: "imgur.com",
+      },
+      {
+        protocol: "https",
+        hostname: "*.imgur.com",
       }
     ],
   },
