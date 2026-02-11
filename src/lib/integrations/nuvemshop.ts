@@ -55,7 +55,7 @@ async function clearSyncCursor(integrationId: string) {
 
 // ─── ORDER UPSERT BUILDER ─────────────────────────
 
-function buildOrderUpsert(organizationId: string, order: Record<string, unknown>) {
+function buildOrderUpsertArgs(organizationId: string, order: Record<string, unknown>) {
   const customer = order.customer as Record<string, unknown> | null;
   const products = order.products as Array<Record<string, unknown>> | undefined;
   const lineItems = (products || []).map((p) => ({
@@ -67,17 +67,17 @@ function buildOrderUpsert(organizationId: string, order: Record<string, unknown>
     sku: String(p.sku ?? ""),
   }));
 
-  return prisma.order.upsert({
+  return {
     where: {
       organizationId_platform_externalOrderId: {
         organizationId,
-        platform: "NUVEMSHOP",
+        platform: "NUVEMSHOP" as const,
         externalOrderId: String(order.id),
       },
     },
     create: {
       organizationId,
-      platform: "NUVEMSHOP",
+      platform: "NUVEMSHOP" as const,
       externalOrderId: String(order.id),
       status: mapNuvemshopStatus(String(order.payment_status || "")),
       customerName: (customer?.name as string) || null,
@@ -97,26 +97,28 @@ function buildOrderUpsert(organizationId: string, order: Record<string, unknown>
       orderDate: parseOrderDate(String(order.created_at)),
       rawData: { ...order, line_items: lineItems },
     },
-  });
+  };
 }
 
 // ─── HELPERS ─────────────────────────────────────
 
-/** Upsert a batch of orders with retry on transient DB errors */
-async function upsertChunkWithRetry(
-  operations: Prisma.PrismaPromise<unknown>[],
-  maxRetries = 2
-): Promise<void> {
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      await prisma.$transaction(operations);
-      return;
-    } catch (err) {
-      if (attempt === maxRetries) throw err;
-      // Wait briefly before retry (200ms, 500ms)
-      await new Promise((r) => setTimeout(r, (attempt + 1) * 250));
-    }
+/** Upsert orders in parallel with concurrency limit */
+async function upsertOrdersParallel(
+  organizationId: string,
+  orders: Record<string, unknown>[],
+  concurrency = 5
+): Promise<number> {
+  let saved = 0;
+  for (let i = 0; i < orders.length; i += concurrency) {
+    const batch = orders.slice(i, i + concurrency);
+    const results = await Promise.allSettled(
+      batch.map((order) =>
+        prisma.order.upsert(buildOrderUpsertArgs(organizationId, order))
+      )
+    );
+    saved += results.filter((r) => r.status === "fulfilled").length;
   }
+  return saved;
 }
 
 /** Fetch a single page from Nuvemshop API with retry */
@@ -171,8 +173,7 @@ export async function syncNuvemshopOrders(
   } = options;
 
   const startTime = Date.now();
-  const PER_PAGE = 50;
-  const CHUNK_SIZE = 10;
+  const PER_PAGE = 200; // Max allowed by Nuvemshop API — fewer pages = faster sync
 
   // 1. Load integration
   const integration = await prisma.integration.findUnique({
@@ -271,26 +272,9 @@ export async function syncNuvemshopOrders(
         break;
       }
 
-      // 7. Save in mini-batches with retry
-      for (let i = 0; i < orders.length; i += CHUNK_SIZE) {
-        if (Date.now() - startTime > timeBudgetMs) {
-          if (logId) {
-            await saveSyncCursor(integration.id, { nextPage: currentPage, syncLogId: logId });
-            await prisma.syncLog.update({
-              where: { id: logId },
-              data: { recordsSynced: { increment: totalSyncedThisCall } },
-            }).catch(() => {});
-          }
-          return { success: true, synced: totalSyncedThisCall, hasMore: true, nextPage: currentPage, syncLogId: logId || undefined };
-        }
-
-        const chunk = orders.slice(i, i + CHUNK_SIZE);
-        const operations = chunk.map((order: Record<string, unknown>) =>
-          buildOrderUpsert(organizationId, order)
-        );
-        await upsertChunkWithRetry(operations);
-        totalSyncedThisCall += chunk.length;
-      }
+      // 7. Save orders in parallel (5 concurrent upserts) — much faster than sequential $transaction
+      const saved = await upsertOrdersParallel(organizationId, orders, 5);
+      totalSyncedThisCall += saved;
 
       if (orders.length < PER_PAGE) {
         hasMore = false;
