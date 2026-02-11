@@ -2,6 +2,46 @@ import { prisma } from "@/lib/prisma";
 import { decrypt } from "@/lib/encryption";
 import { parseOrderDate, toDateKeyBrasilia } from "@/lib/date-utils";
 
+/**
+ * Validate Cartpanda API credentials by making a test request.
+ * Returns { valid: true } or { valid: false, error: string }.
+ */
+export async function validateCartpandaCredentials(
+  apiKey: string,
+  storeId: string
+): Promise<{ valid: boolean; error?: string }> {
+  try {
+    const response = await fetch(
+      `https://api.cartpanda.com/v1/stores/${storeId}/orders?page=1&limit=1`,
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    if (response.status === 401 || response.status === 403) {
+      return { valid: false, error: "Token invalido ou sem permissao. Verifique sua API Key." };
+    }
+
+    if (response.status === 404) {
+      return { valid: false, error: "Loja nao encontrada. Verifique o Store ID (Nome da Loja)." };
+    }
+
+    if (!response.ok) {
+      return { valid: false, error: `Erro na API da Cartpanda: ${response.status}` };
+    }
+
+    return { valid: true };
+  } catch (error) {
+    return {
+      valid: false,
+      error: `Nao foi possivel conectar a Cartpanda: ${error instanceof Error ? error.message : "Erro desconhecido"}`,
+    };
+  }
+}
+
 export async function syncCartpandaOrders(organizationId: string) {
   const integration = await prisma.integration.findUnique({
     where: { organizationId_platform: { organizationId, platform: "CARTPANDA" } },
@@ -24,61 +64,83 @@ export async function syncCartpandaOrders(organizationId: string) {
     const apiKey = decrypt(integration.apiKey);
     const storeId = integration.externalStoreId || "";
 
-    const response = await fetch(`https://api.cartpanda.com/v1/stores/${storeId}/orders`, {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-    });
+    // Fetch all orders with pagination
+    let allOrders: Record<string, unknown>[] = [];
+    let page = 1;
+    let hasMore = true;
 
-    if (!response.ok) {
-      throw new Error(`Cartpanda API error: ${response.status}`);
+    while (hasMore) {
+      const response = await fetch(
+        `https://api.cartpanda.com/v1/stores/${storeId}/orders?page=${page}&limit=100`,
+        {
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Cartpanda API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const orders = data.data || data.orders || [];
+
+      if (orders.length === 0) {
+        hasMore = false;
+        break;
+      }
+
+      allOrders = allOrders.concat(orders);
+      hasMore = orders.length >= 100 && (data.meta?.last_page ? page < data.meta.last_page : true);
+      page++;
     }
 
-    const data = await response.json();
-    const orders = data.data || data.orders || [];
     let synced = 0;
 
-    for (const order of orders) {
-      const items = order.items || [];
-      const lineItems = items.map((item: Record<string, unknown>) => ({
-        product_id: item.product_id || item.id,
-        variant_id: item.variant_id,
-        name: item.name || item.title,
-        quantity: item.quantity,
-        price: item.price,
-        sku: item.sku,
+    for (const raw of allOrders) {
+      const items = (raw.items as Array<Record<string, unknown>>) || [];
+      const lineItems = items.map((item) => ({
+        product_id: String(item.product_id || item.id || ""),
+        variant_id: String(item.variant_id || ""),
+        name: String(item.name || item.title || ""),
+        quantity: Number(item.quantity || 0),
+        price: String(item.price || "0"),
+        sku: String(item.sku || ""),
       }));
+
+      const customer = raw.customer as Record<string, unknown> | undefined;
 
       await prisma.order.upsert({
         where: {
           organizationId_platform_externalOrderId: {
             organizationId,
             platform: "CARTPANDA",
-            externalOrderId: String(order.id),
+            externalOrderId: String(raw.id),
           },
         },
         create: {
           organizationId,
           platform: "CARTPANDA",
-          externalOrderId: String(order.id),
-          status: mapCartpandaStatus(order.status),
-          customerName: order.customer?.name || null,
-          customerEmail: order.customer?.email || null,
-          totalAmount: parseFloat(order.total || "0"),
-          currency: order.currency || "BRL",
+          externalOrderId: String(raw.id),
+          status: mapCartpandaStatus(String(raw.status || "")),
+          customerName: (customer?.name as string) || null,
+          customerEmail: (customer?.email as string) || null,
+          totalAmount: parseFloat(String(raw.total || "0")),
+          currency: String(raw.currency || "BRL"),
           itemCount: items.length,
-          orderDate: parseOrderDate(order.created_at),
-          rawData: { ...order, line_items: lineItems },
+          orderDate: parseOrderDate(String(raw.created_at || "")),
+          rawData: JSON.parse(JSON.stringify({ ...raw, line_items: lineItems })),
         },
         update: {
-          status: mapCartpandaStatus(order.status),
-          totalAmount: parseFloat(order.total || "0"),
-          customerName: order.customer?.name || null,
-          customerEmail: order.customer?.email || null,
+          status: mapCartpandaStatus(String(raw.status || "")),
+          totalAmount: parseFloat(String(raw.total || "0")),
+          customerName: (customer?.name as string) || null,
+          customerEmail: (customer?.email as string) || null,
           itemCount: items.length,
-          orderDate: parseOrderDate(order.created_at),
-          rawData: { ...order, line_items: lineItems },
+          orderDate: parseOrderDate(String(raw.created_at || "")),
+          rawData: JSON.parse(JSON.stringify({ ...raw, line_items: lineItems })),
         },
       });
       synced++;

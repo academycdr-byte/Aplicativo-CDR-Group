@@ -5,6 +5,7 @@ import { getSessionWithOrg } from "@/lib/session";
 import { encrypt, decrypt } from "@/lib/encryption";
 import { Platform, Prisma } from "@prisma/client";
 import { validateShopifyAccessToken } from "@/lib/integrations/shopify";
+import { validateCartpandaCredentials } from "@/lib/integrations/cartpanda";
 
 export async function getIntegrations() {
   const ctx = await getSessionWithOrg();
@@ -38,6 +39,14 @@ export async function connectApiKeyIntegration(data: {
 
   if (ctx.role !== "OWNER" && ctx.role !== "ADMIN") {
     return { error: "Voce nao tem permissao para gerenciar integracoes." };
+  }
+
+  // Validate Cartpanda credentials before saving
+  if (data.platform === "CARTPANDA" && data.apiKey && data.externalStoreId) {
+    const validation = await validateCartpandaCredentials(data.apiKey, data.externalStoreId);
+    if (!validation.valid) {
+      return { error: validation.error || "Credenciais da Cartpanda invalidas." };
+    }
   }
 
   // Check if integration already exists
@@ -78,6 +87,50 @@ export async function connectApiKeyIntegration(data: {
   }
 
   return { success: true };
+}
+
+export async function saveShopifyCredentials(shop: string, clientId: string, clientSecret: string) {
+  const ctx = await getSessionWithOrg();
+  if (!ctx) return { error: "Nao autenticado." };
+
+  if (ctx.role !== "OWNER" && ctx.role !== "ADMIN") {
+    return { error: "Voce nao tem permissao para gerenciar integracoes." };
+  }
+
+  let domain = shop.trim().toLowerCase();
+  if (!domain.includes(".myshopify.com")) {
+    domain = `${domain}.myshopify.com`;
+  }
+
+  if (!clientId.trim() || !clientSecret.trim()) {
+    return { error: "Client ID e Client Secret sao obrigatorios." };
+  }
+
+  await prisma.integration.upsert({
+    where: {
+      organizationId_platform: {
+        organizationId: ctx.organization.id,
+        platform: "SHOPIFY",
+      },
+    },
+    create: {
+      organizationId: ctx.organization.id,
+      platform: "SHOPIFY",
+      status: "PENDING",
+      apiKey: encrypt(clientId.trim()),
+      apiSecret: encrypt(clientSecret.trim()),
+      externalStoreId: domain,
+    },
+    update: {
+      status: "PENDING",
+      apiKey: encrypt(clientId.trim()),
+      apiSecret: encrypt(clientSecret.trim()),
+      externalStoreId: domain,
+      errorMessage: null,
+    },
+  });
+
+  return { success: true, domain };
 }
 
 export async function connectShopifyDirect(shop: string, accessToken: string) {

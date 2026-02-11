@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Link2, Unlink, RefreshCw, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
-import { getIntegrations, connectApiKeyIntegration, connectShopifyDirect, disconnectIntegration, selectFacebookAdAccount, selectMultipleFacebookAdAccounts, selectGoogleAnalyticsProperty } from "@/actions/integrations";
+import { getIntegrations, connectApiKeyIntegration, saveShopifyCredentials, disconnectIntegration, selectFacebookAdAccount, selectMultipleFacebookAdAccounts, selectGoogleAnalyticsProperty } from "@/actions/integrations";
 import { syncPlatform } from "@/actions/sync";
 import { Platform } from "@prisma/client";
 
@@ -131,7 +131,8 @@ function IntegrationsContent() {
   const [connectDialog, setConnectDialog] = useState<PlatformConfig | null>(null);
   const [shopifyDialog, setShopifyDialog] = useState(false);
   const [shopDomain, setShopDomain] = useState("");
-  const [shopifyToken, setShopifyToken] = useState("");
+  const [shopifyClientId, setShopifyClientId] = useState("");
+  const [shopifyClientSecret, setShopifyClientSecret] = useState("");
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState<string | null>(null);
@@ -263,7 +264,8 @@ function IntegrationsContent() {
   function openConnect(platform: PlatformConfig) {
     if (platform.platform === "SHOPIFY") {
       setShopDomain("");
-      setShopifyToken("");
+      setShopifyClientId("");
+      setShopifyClientSecret("");
       setMsg("");
       setShopifyDialog(true);
       return;
@@ -287,25 +289,28 @@ function IntegrationsContent() {
     setConnectDialog(platform);
   }
 
-  async function handleShopifyToken(e: React.FormEvent) {
+  async function handleShopifyConnect(e: React.FormEvent) {
     e.preventDefault();
     const domain = shopDomain.trim().toLowerCase();
-    const token = shopifyToken.trim();
-    if (!domain || !token) return;
+    const clientId = shopifyClientId.trim();
+    const clientSecret = shopifyClientSecret.trim();
+    if (!domain || !clientId || !clientSecret) return;
 
     setLoading(true);
     setMsg("");
 
-    const result = await connectShopifyDirect(domain, token);
+    // Step 1: Save credentials to DB
+    const result = await saveShopifyCredentials(domain, clientId, clientSecret);
 
     if (result.error) {
       setMsg(result.error);
-    } else {
-      setShopifyDialog(false);
-      toast.success(`Shopify conectada com sucesso!${result.shopName ? ` Loja: ${result.shopName}` : ""}`);
-      loadIntegrations();
+      setLoading(false);
+      return;
     }
-    setLoading(false);
+
+    // Step 2: Redirect to OAuth flow
+    const normalizedDomain = result.domain || domain;
+    window.location.href = `/api/integrations/shopify?shop=${encodeURIComponent(normalizedDomain)}`;
   }
 
   async function handleSync(platform: Platform) {
@@ -355,9 +360,24 @@ function IntegrationsContent() {
     if (result.error) {
       setMsg(result.error);
     } else {
+      const connectedPlatform = connectDialog.platform;
       setConnectDialog(null);
       toast.success("Plataforma conectada com sucesso!");
       loadIntegrations();
+
+      // Auto-sync after successful connection for order platforms
+      const orderPlatforms: Platform[] = ["CARTPANDA", "YAMPI", "REPORTANA"];
+      if (orderPlatforms.includes(connectedPlatform)) {
+        toast.info("Sincronizando dados...");
+        syncPlatform(connectedPlatform).then((syncResult) => {
+          if ("error" in syncResult && syncResult.error) {
+            toast.error(`Erro ao sincronizar: ${syncResult.error}`);
+          } else {
+            toast.success("Dados sincronizados com sucesso!");
+            loadIntegrations();
+          }
+        });
+      }
     }
     setLoading(false);
   }
@@ -548,7 +568,7 @@ function IntegrationsContent() {
           <DialogHeader>
             <DialogTitle>Conectar Shopify</DialogTitle>
             <DialogDescription>
-              Conecte sua loja Shopify usando o Access Token do admin.
+              Insira as credenciais do seu app no Dev Dashboard da Shopify.
             </DialogDescription>
           </DialogHeader>
 
@@ -561,17 +581,16 @@ function IntegrationsContent() {
           <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-200 text-sm rounded-lg p-3 space-y-2">
             <div className="flex gap-2">
               <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-              <span className="text-xs font-semibold">Como obter o Access Token:</span>
+              <span className="text-xs font-semibold">Como obter as credenciais:</span>
             </div>
             <ol className="text-xs space-y-1 ml-6 list-decimal">
-              <li>No admin da Shopify, va em <strong>Configuracoes &gt; Apps</strong></li>
-              <li>Clique em <strong>Desenvolver apps</strong></li>
-              <li>Selecione um app existente ou crie um novo</li>
-              <li>Configure os escopos: <strong>read_orders</strong>, <strong>read_products</strong>, <strong>read_customers</strong></li>
-              <li>Instale o app e copie o <strong>Admin API access token</strong></li>
+              <li>Acesse o <strong>Dev Dashboard</strong> da Shopify (dev.shopify.com)</li>
+              <li>Selecione ou crie um app para a loja</li>
+              <li>Va em <strong>Configuracoes</strong> do app</li>
+              <li>Copie o <strong>ID do cliente</strong> e a <strong>Chave secreta</strong></li>
             </ol>
           </div>
-          <form onSubmit={handleShopifyToken} className="space-y-4">
+          <form onSubmit={handleShopifyConnect} className="space-y-4">
             <div className="space-y-2">
               <Label>Dominio da loja</Label>
               <Input
@@ -582,24 +601,30 @@ function IntegrationsContent() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Admin API Access Token</Label>
+              <Label>Client ID (ID do cliente)</Label>
               <Input
-                value={shopifyToken}
-                onChange={(e) => setShopifyToken(e.target.value)}
-                placeholder="shpat_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                value={shopifyClientId}
+                onChange={(e) => setShopifyClientId(e.target.value)}
+                placeholder="9617a8cf3979b4ffc5db7c699a8eb1b8"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Client Secret (Chave secreta)</Label>
+              <Input
+                value={shopifyClientSecret}
+                onChange={(e) => setShopifyClientSecret(e.target.value)}
+                placeholder="shpss_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                 required
                 type="password"
               />
-              <p className="text-xs text-muted-foreground">
-                Token comeca com shpat_. Funciona com apps legados e novos.
-              </p>
             </div>
             <div className="flex justify-end gap-3">
               <Button type="button" variant="outline" onClick={() => setShopifyDialog(false)}>
                 Cancelar
               </Button>
               <Button type="submit" disabled={loading}>
-                {loading ? "Validando..." : "Conectar com Token"}
+                {loading ? "Conectando..." : "Conectar Shopify"}
               </Button>
             </div>
           </form>
