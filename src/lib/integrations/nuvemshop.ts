@@ -11,142 +11,104 @@ export async function syncNuvemshopOrders(organizationId: string) {
     return { error: "Nuvemshop not connected" };
   }
 
-  // Reset stuck SYNCING before starting
-  await prisma.integration.update({
-    where: { id: integration.id },
-    data: { syncStatus: "SYNCING", errorMessage: null },
-  });
-
-  const syncLog = await prisma.syncLog.create({
-    data: { organizationId, platform: "NUVEMSHOP", status: "SYNCING" },
-  });
-
   try {
     const accessToken = decrypt(integration.accessToken);
     const storeId = integration.externalStoreId || "";
 
-    // Incremental sync: if we have a lastSyncAt, only fetch orders since then.
-    // First sync: fetch only 1 page of 200 (most recent orders) to stay within timeout.
+    // Incremental sync: only fetch new orders since last sync
     const hasLastSync = !!integration.lastSyncAt;
     let sinceParam = "";
-
     if (hasLastSync) {
-      // Subtract 1 hour buffer to catch late-arriving orders
       const since = new Date(integration.lastSyncAt!.getTime() - 60 * 60 * 1000);
       sinceParam = `&created_at_min=${since.toISOString()}`;
     }
 
-    // Fetch orders — limit pages to avoid timeout
-    // First sync: 1 page (200 orders). Subsequent: up to 3 pages (600 new orders).
-    const maxPages = hasLastSync ? 3 : 1;
-    let allOrders: Record<string, unknown>[] = [];
-    let page = 1;
-    let hasMore = true;
+    // Fetch ONLY 50 orders per call to fit within Vercel Hobby 10s timeout
+    const url = `https://api.nuvemshop.com.br/v1/${storeId}/orders?per_page=50&page=1${sinceParam}`;
+    const response = await fetch(url, {
+      headers: {
+        Authentication: `bearer ${accessToken}`,
+        "User-Agent": "CDR Group Hub (cdrgroup.com)",
+        "Content-Type": "application/json",
+      },
+    });
 
-    while (hasMore && page <= maxPages) {
-      const url = `https://api.nuvemshop.com.br/v1/${storeId}/orders?per_page=200&page=${page}${sinceParam}`;
-      const response = await fetch(url, {
-        headers: {
-          Authentication: `bearer ${accessToken}`,
-          "User-Agent": "CDR Group Hub (cdrgroup.com)",
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Nuvemshop API error: ${response.status}`);
-      }
-
-      const orders = await response.json();
-      if (!Array.isArray(orders) || orders.length === 0) {
-        hasMore = false;
-        break;
-      }
-
-      allOrders = allOrders.concat(orders);
-      hasMore = orders.length === 200;
-      page++;
+    if (!response.ok) {
+      throw new Error(`Nuvemshop API error: ${response.status}`);
     }
 
-    // Batch upsert in a single transaction (fast: one DB round-trip per chunk)
-    const CHUNK_SIZE = 50;
-    let synced = 0;
+    const orders = await response.json();
+    if (!Array.isArray(orders) || orders.length === 0) {
+      // No orders but API works — mark success
+      await prisma.integration.update({
+        where: { id: integration.id },
+        data: { syncStatus: "SUCCESS", lastSyncAt: new Date(), errorMessage: null },
+      });
+      return { success: true, synced: 0 };
+    }
 
-    for (let i = 0; i < allOrders.length; i += CHUNK_SIZE) {
-      const chunk = allOrders.slice(i, i + CHUNK_SIZE);
+    // Build all upsert operations and run in ONE single transaction
+    const operations = orders.map((order: Record<string, unknown>) => {
+      const customer = order.customer as Record<string, unknown> | null;
+      const products = order.products as Array<Record<string, unknown>> | undefined;
+      const lineItems = (products || []).map((p) => ({
+        product_id: String(p.product_id ?? ""),
+        variant_id: String(p.variant_id ?? ""),
+        name: String(p.name ?? ""),
+        quantity: Number(p.quantity ?? 0),
+        price: String(p.price ?? "0"),
+        sku: String(p.sku ?? ""),
+      }));
 
-      const operations = chunk.map((order) => {
-        const raw = order as Record<string, unknown>;
-        const customer = raw.customer as Record<string, unknown> | null;
-        const products = raw.products as Array<Record<string, unknown>> | undefined;
-        const lineItems = (products || []).map((p) => ({
-          product_id: String(p.product_id ?? ""),
-          variant_id: String(p.variant_id ?? ""),
-          name: String(p.name ?? ""),
-          quantity: Number(p.quantity ?? 0),
-          price: String(p.price ?? "0"),
-          sku: String(p.sku ?? ""),
-        }));
-
-        return prisma.order.upsert({
-          where: {
-            organizationId_platform_externalOrderId: {
-              organizationId,
-              platform: "NUVEMSHOP",
-              externalOrderId: String(raw.id),
-            },
-          },
-          create: {
+      return prisma.order.upsert({
+        where: {
+          organizationId_platform_externalOrderId: {
             organizationId,
             platform: "NUVEMSHOP",
-            externalOrderId: String(raw.id),
-            status: mapNuvemshopStatus(String(raw.payment_status || "")),
-            customerName: customer?.name as string || null,
-            customerEmail: customer?.email as string || null,
-            totalAmount: parseFloat(String(raw.total || "0")),
-            currency: (raw.currency as string) || "BRL",
-            itemCount: products?.length || 0,
-            orderDate: parseOrderDate(String(raw.created_at)),
-            rawData: { ...raw, line_items: lineItems },
+            externalOrderId: String(order.id),
           },
-          update: {
-            status: mapNuvemshopStatus(String(raw.payment_status || "")),
-            totalAmount: parseFloat(String(raw.total || "0")),
-            customerName: customer?.name as string || null,
-            customerEmail: customer?.email as string || null,
-            itemCount: products?.length || 0,
-            orderDate: parseOrderDate(String(raw.created_at)),
-            rawData: { ...raw, line_items: lineItems },
-          },
-        });
+        },
+        create: {
+          organizationId,
+          platform: "NUVEMSHOP",
+          externalOrderId: String(order.id),
+          status: mapNuvemshopStatus(String(order.payment_status || "")),
+          customerName: customer?.name as string || null,
+          customerEmail: customer?.email as string || null,
+          totalAmount: parseFloat(String(order.total || "0")),
+          currency: (order.currency as string) || "BRL",
+          itemCount: products?.length || 0,
+          orderDate: parseOrderDate(String(order.created_at)),
+          rawData: { ...order, line_items: lineItems },
+        },
+        update: {
+          status: mapNuvemshopStatus(String(order.payment_status || "")),
+          totalAmount: parseFloat(String(order.total || "0")),
+          customerName: customer?.name as string || null,
+          customerEmail: customer?.email as string || null,
+          itemCount: products?.length || 0,
+          orderDate: parseOrderDate(String(order.created_at)),
+          rawData: { ...order, line_items: lineItems },
+        },
       });
+    });
 
-      await prisma.$transaction(operations);
-      synced += chunk.length;
-    }
+    // Single transaction: 1 API call to fetch + 1 DB transaction to write
+    await prisma.$transaction(operations);
 
+    // Mark success + update lastSyncAt
     await prisma.integration.update({
       where: { id: integration.id },
-      data: { syncStatus: "SUCCESS", lastSyncAt: new Date() },
+      data: { syncStatus: "SUCCESS", lastSyncAt: new Date(), errorMessage: null },
     });
 
-    await prisma.syncLog.update({
-      where: { id: syncLog.id },
-      data: { status: "SUCCESS", recordsSynced: synced, completedAt: new Date() },
-    });
-
-    return { success: true, synced };
+    return { success: true, synced: orders.length };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : "Unknown error";
 
     await prisma.integration.update({
       where: { id: integration.id },
       data: { syncStatus: "FAILED", errorMessage: errorMsg },
-    }).catch(() => {});
-
-    await prisma.syncLog.update({
-      where: { id: syncLog.id },
-      data: { status: "FAILED", errorMessage: errorMsg, completedAt: new Date() },
     }).catch(() => {});
 
     return { error: errorMsg };

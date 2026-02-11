@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { syncNuvemshopOrders, syncNuvemshopFunnel } from "@/lib/integrations/nuvemshop";
+import { syncNuvemshopOrders } from "@/lib/integrations/nuvemshop";
 
 export const maxDuration = 60;
 
@@ -22,23 +22,12 @@ export async function POST() {
     const orgId = membership.organizationId;
 
     try {
-        // Run orders sync FIRST (priority) — sequential to avoid doubling time
+        // Orders-only sync — must complete within Vercel 10s timeout
         const ordersResult = await syncNuvemshopOrders(orgId);
-
-        // Only run funnel if orders succeeded (and we have time left)
-        let funnelResult: unknown = { skipped: true };
-        if ("success" in ordersResult && ordersResult.success) {
-            try {
-                funnelResult = await syncNuvemshopFunnel(orgId);
-            } catch {
-                funnelResult = { error: "funnel sync failed" };
-            }
-        }
 
         return NextResponse.json({
             success: !("error" in ordersResult && ordersResult.error),
             orders: ordersResult,
-            funnel: funnelResult,
         });
     } catch (error: unknown) {
         return NextResponse.json({
