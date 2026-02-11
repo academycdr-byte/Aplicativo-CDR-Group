@@ -24,22 +24,26 @@ export async function syncNuvemshopOrders(organizationId: string) {
     const accessToken = decrypt(integration.accessToken);
     const storeId = integration.externalStoreId || "";
 
-    // Fetch all orders with pagination
+    // Only sync orders from last 90 days to avoid Vercel timeout
+    const sinceDate = new Date();
+    sinceDate.setDate(sinceDate.getDate() - 90);
+    const sinceISO = sinceDate.toISOString();
+
+    // Fetch orders with pagination (newest first, last 90 days)
     let allOrders: Record<string, unknown>[] = [];
     let page = 1;
     let hasMore = true;
+    const MAX_PAGES = 10; // Safety: max 2000 orders per sync
 
-    while (hasMore) {
-      const response = await fetch(
-        `https://api.nuvemshop.com.br/v1/${storeId}/orders?per_page=200&page=${page}`,
-        {
-          headers: {
-            Authentication: `bearer ${accessToken}`,
-            "User-Agent": "CDR Group Hub (cdrgroup.com)",
-            "Content-Type": "application/json",
-          },
-        }
-      );
+    while (hasMore && page <= MAX_PAGES) {
+      const url = `https://api.nuvemshop.com.br/v1/${storeId}/orders?per_page=200&page=${page}&created_at_min=${sinceISO}`;
+      const response = await fetch(url, {
+        headers: {
+          Authentication: `bearer ${accessToken}`,
+          "User-Agent": "CDR Group Hub (cdrgroup.com)",
+          "Content-Type": "application/json",
+        },
+      });
 
       if (!response.ok) {
         throw new Error(`Nuvemshop API error: ${response.status}`);
@@ -56,53 +60,61 @@ export async function syncNuvemshopOrders(organizationId: string) {
       page++;
     }
 
+    // Batch upsert in chunks of 25 using transactions
+    const CHUNK_SIZE = 25;
     let synced = 0;
 
-    for (const order of allOrders) {
-      const raw = order as Record<string, unknown>;
-      const customer = raw.customer as Record<string, unknown> | null;
-      const products = raw.products as Array<Record<string, unknown>> | undefined;
-      const lineItems = (products || []).map((p) => ({
-        product_id: String(p.product_id ?? ""),
-        variant_id: String(p.variant_id ?? ""),
-        name: String(p.name ?? ""),
-        quantity: Number(p.quantity ?? 0),
-        price: String(p.price ?? "0"),
-        sku: String(p.sku ?? ""),
-      }));
+    for (let i = 0; i < allOrders.length; i += CHUNK_SIZE) {
+      const chunk = allOrders.slice(i, i + CHUNK_SIZE);
 
-      await prisma.order.upsert({
-        where: {
-          organizationId_platform_externalOrderId: {
+      const operations = chunk.map((order) => {
+        const raw = order as Record<string, unknown>;
+        const customer = raw.customer as Record<string, unknown> | null;
+        const products = raw.products as Array<Record<string, unknown>> | undefined;
+        const lineItems = (products || []).map((p) => ({
+          product_id: String(p.product_id ?? ""),
+          variant_id: String(p.variant_id ?? ""),
+          name: String(p.name ?? ""),
+          quantity: Number(p.quantity ?? 0),
+          price: String(p.price ?? "0"),
+          sku: String(p.sku ?? ""),
+        }));
+
+        return prisma.order.upsert({
+          where: {
+            organizationId_platform_externalOrderId: {
+              organizationId,
+              platform: "NUVEMSHOP",
+              externalOrderId: String(raw.id),
+            },
+          },
+          create: {
             organizationId,
             platform: "NUVEMSHOP",
             externalOrderId: String(raw.id),
+            status: mapNuvemshopStatus(String(raw.payment_status || "")),
+            customerName: customer?.name as string || null,
+            customerEmail: customer?.email as string || null,
+            totalAmount: parseFloat(String(raw.total || "0")),
+            currency: (raw.currency as string) || "BRL",
+            itemCount: products?.length || 0,
+            orderDate: parseOrderDate(String(raw.created_at)),
+            rawData: { ...raw, line_items: lineItems },
           },
-        },
-        create: {
-          organizationId,
-          platform: "NUVEMSHOP",
-          externalOrderId: String(raw.id),
-          status: mapNuvemshopStatus(String(raw.payment_status || "")),
-          customerName: customer?.name as string || null,
-          customerEmail: customer?.email as string || null,
-          totalAmount: parseFloat(String(raw.total || "0")),
-          currency: (raw.currency as string) || "BRL",
-          itemCount: products?.length || 0,
-          orderDate: parseOrderDate(String(raw.created_at)),
-          rawData: { ...raw, line_items: lineItems },
-        },
-        update: {
-          status: mapNuvemshopStatus(String(raw.payment_status || "")),
-          totalAmount: parseFloat(String(raw.total || "0")),
-          customerName: customer?.name as string || null,
-          customerEmail: customer?.email as string || null,
-          itemCount: products?.length || 0,
-          orderDate: parseOrderDate(String(raw.created_at)),
-          rawData: { ...raw, line_items: lineItems },
-        },
+          update: {
+            status: mapNuvemshopStatus(String(raw.payment_status || "")),
+            totalAmount: parseFloat(String(raw.total || "0")),
+            customerName: customer?.name as string || null,
+            customerEmail: customer?.email as string || null,
+            itemCount: products?.length || 0,
+            orderDate: parseOrderDate(String(raw.created_at)),
+            rawData: { ...raw, line_items: lineItems },
+          },
+        });
       });
-      synced++;
+
+      await prisma.$transaction(operations);
+      synced += chunk.length;
     }
 
     await prisma.integration.update({

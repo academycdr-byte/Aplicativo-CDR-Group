@@ -2,10 +2,13 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { decrypt } from "@/lib/encryption";
-import { syncNuvemshopOrders, syncNuvemshopFunnel } from "@/lib/integrations/nuvemshop";
 
 export const maxDuration = 60;
 
+/**
+ * Lightweight diagnostic — read-only, no sync, no DB writes.
+ * Shows: integration status, API order count + details, DB state.
+ */
 export async function GET() {
     const session = await auth();
     if (!session?.user?.id) {
@@ -21,152 +24,113 @@ export async function GET() {
     }
 
     const orgId = membership.organizationId;
-    const steps: Record<string, unknown> = {};
 
-    // STEP 1: Integration record
+    // 1. Integration record
     const integration = await prisma.integration.findUnique({
         where: { organizationId_platform: { organizationId: orgId, platform: "NUVEMSHOP" } },
     });
 
-    steps.integration = integration
-        ? {
-            id: integration.id,
-            status: integration.status,
-            syncStatus: integration.syncStatus,
-            lastSyncAt: integration.lastSyncAt,
-            errorMessage: integration.errorMessage,
-            externalStoreId: integration.externalStoreId,
-            hasAccessToken: !!integration.accessToken,
-        }
-        : "NOT FOUND";
-
     if (!integration || !integration.accessToken) {
-        return NextResponse.json({ steps, error: "No integration or token" });
+        return NextResponse.json({
+            error: "No integration",
+            integration: integration ? {
+                status: integration.status,
+                syncStatus: integration.syncStatus,
+                hasToken: !!integration.accessToken,
+            } : null,
+        });
     }
 
-    // STEP 2: Decrypt token
     let accessToken: string;
     try {
         accessToken = decrypt(integration.accessToken);
-        steps.tokenDecrypt = "OK";
     } catch (err) {
-        steps.tokenDecrypt = `FAILED: ${err instanceof Error ? err.message : "unknown"}`;
-        return NextResponse.json({ steps });
+        return NextResponse.json({
+            error: "Token decrypt failed",
+            detail: err instanceof Error ? err.message : "unknown",
+        });
     }
 
     const storeId = integration.externalStoreId || "";
 
-    // STEP 3: Fetch ALL orders from Nuvemshop API (same as sync)
-    let allApiOrders: Record<string, unknown>[] = [];
-    let page = 1;
-    let hasMore = true;
+    // 2. Fetch first page of orders from API (per_page=50, enough to diagnose)
+    let apiOrders: Record<string, unknown>[] = [];
     let apiError: string | null = null;
+    let apiTotalHint: string | null = null;
 
-    while (hasMore) {
-        try {
-            const url = `https://api.nuvemshop.com.br/v1/${storeId}/orders?per_page=200&page=${page}`;
-            const res = await fetch(url, {
+    try {
+        const res = await fetch(
+            `https://api.nuvemshop.com.br/v1/${storeId}/orders?per_page=50&page=1`,
+            {
                 headers: {
                     Authentication: `bearer ${accessToken}`,
                     "User-Agent": "CDR Group Hub (cdrgroup.com)",
                     "Content-Type": "application/json",
                 },
-            });
-
-            if (!res.ok) {
-                const body = await res.text();
-                apiError = `HTTP ${res.status}: ${body}`;
-                break;
             }
+        );
 
-            const orders = await res.json();
-            if (!Array.isArray(orders) || orders.length === 0) {
-                hasMore = false;
-                break;
-            }
-
-            allApiOrders = allApiOrders.concat(orders);
-            hasMore = orders.length === 200;
-            page++;
-        } catch (err) {
-            apiError = err instanceof Error ? err.message : "unknown";
-            break;
+        if (!res.ok) {
+            apiError = `HTTP ${res.status}: ${await res.text()}`;
+        } else {
+            apiOrders = await res.json();
+            if (!Array.isArray(apiOrders)) apiOrders = [];
+            apiTotalHint = apiOrders.length === 50 ? "50+ (more pages exist)" : `${apiOrders.length} total`;
         }
-    }
-
-    steps.apiResult = {
-        totalFromApi: allApiOrders.length,
-        pagesRead: page,
-        error: apiError,
-        orders: allApiOrders.map((o) => ({
-            id: o.id,
-            number: o.number,
-            status: o.status,
-            payment_status: o.payment_status,
-            shipping_status: o.shipping_status,
-            total: o.total,
-            currency: o.currency,
-            created_at: o.created_at,
-            customer: (o.customer as Record<string, unknown>)?.name || null,
-            productsCount: Array.isArray(o.products) ? (o.products as unknown[]).length : 0,
-        })),
-    };
-
-    // STEP 4: Run the FULL sync
-    let syncResult: unknown;
-    let funnelResult: unknown;
-    try {
-        const [ordersRes, funnelRes] = await Promise.allSettled([
-            syncNuvemshopOrders(orgId),
-            syncNuvemshopFunnel(orgId),
-        ]);
-        syncResult = ordersRes.status === "fulfilled" ? ordersRes.value : { error: String(ordersRes.reason) };
-        funnelResult = funnelRes.status === "fulfilled" ? funnelRes.value : { error: String(funnelRes.reason) };
     } catch (err) {
-        syncResult = { error: err instanceof Error ? err.message : "unknown" };
-        funnelResult = { error: "skipped" };
+        apiError = err instanceof Error ? err.message : "unknown";
     }
 
-    steps.syncResult = syncResult;
-    steps.funnelResult = funnelResult;
-
-    // STEP 5: DB state after sync
-    const [orderCount, orderSample, syncLogs] = await Promise.all([
+    // 3. DB state (read-only)
+    const [dbOrderCount, dbOrders, lastSyncLog] = await Promise.all([
         prisma.order.count({ where: { organizationId: orgId, platform: "NUVEMSHOP" } }),
         prisma.order.findMany({
             where: { organizationId: orgId, platform: "NUVEMSHOP" },
-            select: {
-                externalOrderId: true,
-                status: true,
-                totalAmount: true,
-                customerName: true,
-                orderDate: true,
-                itemCount: true,
-            },
+            select: { externalOrderId: true, status: true, totalAmount: true, orderDate: true, itemCount: true },
             orderBy: { orderDate: "desc" },
             take: 20,
         }),
-        prisma.syncLog.findMany({
+        prisma.syncLog.findFirst({
             where: { organizationId: orgId, platform: "NUVEMSHOP" },
             orderBy: { startedAt: "desc" },
-            take: 5,
         }),
     ]);
 
-    steps.dbAfterSync = {
-        totalOrders: orderCount,
-        orders: orderSample.map((o) => ({
-            ...o,
-            totalAmount: Number(o.totalAmount),
-        })),
-        recentSyncLogs: syncLogs.map((l) => ({
-            status: l.status,
-            recordsSynced: l.recordsSynced,
-            errorMessage: l.errorMessage,
-            startedAt: l.startedAt,
-            completedAt: l.completedAt,
-        })),
-    };
-
-    return NextResponse.json(steps);
+    return NextResponse.json({
+        integration: {
+            storeId,
+            status: integration.status,
+            syncStatus: integration.syncStatus,
+            lastSyncAt: integration.lastSyncAt,
+            errorMessage: integration.errorMessage,
+        },
+        api: {
+            totalHint: apiTotalHint,
+            error: apiError,
+            orders: apiOrders.map((o) => ({
+                id: o.id,
+                number: o.number,
+                status: o.status,
+                payment_status: o.payment_status,
+                total: o.total,
+                created_at: o.created_at,
+                customer: (o.customer as Record<string, unknown>)?.name || null,
+                productsCount: Array.isArray(o.products) ? (o.products as unknown[]).length : 0,
+            })),
+        },
+        db: {
+            totalOrders: dbOrderCount,
+            orders: dbOrders.map((o) => ({
+                ...o,
+                totalAmount: Number(o.totalAmount),
+            })),
+            lastSync: lastSyncLog ? {
+                status: lastSyncLog.status,
+                recordsSynced: lastSyncLog.recordsSynced,
+                errorMessage: lastSyncLog.errorMessage,
+                startedAt: lastSyncLog.startedAt,
+                completedAt: lastSyncLog.completedAt,
+            } : null,
+        },
+    });
 }
