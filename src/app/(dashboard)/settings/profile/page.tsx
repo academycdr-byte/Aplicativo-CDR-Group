@@ -10,9 +10,11 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { Camera, Trash2, Loader2 } from "lucide-react";
 import { getProfile, updateProfile, changePassword } from "@/actions/auth";
+import { useAvatar } from "@/contexts/avatar-context";
 
 export default function ProfilePage() {
-  const { data: session, update: updateSession } = useSession();
+  const { data: session } = useSession();
+  const { setAvatarUrl } = useAvatar();
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -61,7 +63,7 @@ export default function ProfilePage() {
       }
 
       setImage(data.image);
-      await updateSession({ image: data.image });
+      setAvatarUrl(data.image);
       toast.success("Foto de perfil atualizada!");
     } catch {
       toast.error("Erro ao enviar foto");
@@ -80,7 +82,7 @@ export default function ProfilePage() {
       }
 
       setImage(null);
-      await updateSession({ image: null });
+      setAvatarUrl(null);
       toast.success("Foto removida!");
     } catch {
       toast.error("Erro ao remover foto");

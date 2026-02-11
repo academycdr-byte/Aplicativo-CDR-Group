@@ -14,9 +14,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async jwt({ token, user, trigger, session }) {
       if (user) {
         token.sub = user.id;
-        token.image = user.image || null;
 
-        // Load user's first organization and role
+        // Load user's first organization
         const membership = await prisma.membership.findFirst({
           where: { userId: user.id },
           include: { organization: true },
@@ -25,7 +24,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         if (membership) {
           token.organizationId = membership.organizationId;
-          token.role = membership.role;
+          // If logged in as CLIENT, force CLIENT role regardless of DB role
+          const loginType = (user as Record<string, unknown>).loginType as string;
+          if (loginType === "CLIENT") {
+            token.role = "CLIENT";
+          } else {
+            token.role = membership.role;
+          }
         }
       }
 
@@ -36,9 +41,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
         if (session.role) {
           token.role = session.role;
-        }
-        if (session.image !== undefined) {
-          token.image = session.image;
         }
       }
 
@@ -54,7 +56,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (token.role) {
         session.user.role = token.role as string;
       }
-      session.user.image = (token.image as string) || null;
       return session;
     },
   },
@@ -64,6 +65,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Senha", type: "password" },
+        loginType: { label: "Login Type", type: "text" },
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
@@ -92,6 +94,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name: user.name,
           email: user.email,
           image: user.image,
+          loginType: credentials.loginType && credentials.loginType !== "" ? (credentials.loginType as string) : "CLIENT",
         };
       },
     }),

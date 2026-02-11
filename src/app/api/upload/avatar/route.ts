@@ -5,6 +5,20 @@ import { prisma } from "@/lib/prisma";
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_SIZE = 2 * 1024 * 1024; // 2MB
 
+export async function GET() {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { image: true },
+  });
+
+  return NextResponse.json({ image: user?.image || null });
+}
+
 export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {

@@ -16,12 +16,13 @@ import {
 import { ThemeToggle } from "@/components/theme-toggle";
 import { MobileSidebar } from "@/components/layout/mobile-sidebar";
 import { Input } from "@/components/ui/input";
+import { useAvatar } from "@/contexts/avatar-context";
 
 export function Header() {
   const { data: session } = useSession();
+  const { avatarUrl } = useAvatar();
 
   const userName = session?.user?.name || "Usuário";
-  const userImage = session?.user?.image;
   const userInitial = userName.charAt(0).toUpperCase();
 
   return (
@@ -53,7 +54,7 @@ export function Header() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-9 w-9 rounded-full focus-visible:ring-offset-0">
               <Avatar className="h-9 w-9 border border-border/50">
-                <AvatarImage src={userImage || ""} />
+                <AvatarImage src={avatarUrl || ""} />
                 <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
                   {userInitial}
                 </AvatarFallback>
