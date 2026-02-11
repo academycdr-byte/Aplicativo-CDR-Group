@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { encrypt } from "@/lib/encryption";
-import { exchangeNuvemshopToken, syncNuvemshopOrders, syncNuvemshopFunnel } from "@/lib/integrations/nuvemshop";
+import { exchangeNuvemshopToken } from "@/lib/integrations/nuvemshop";
 import { auth } from "@/auth";
 import { checkRateLimit } from "@/lib/rate-limit";
 
@@ -61,13 +61,9 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Trigger initial sync in the background (don't wait for it)
-    syncNuvemshopOrders(organizationId).catch((err) => {
-      console.error("[Nuvemshop OAuth] Initial order sync failed:", err);
-    });
-    syncNuvemshopFunnel(organizationId).catch((err) => {
-      console.error("[Nuvemshop OAuth] Initial funnel sync failed:", err);
-    });
+    // Sync is triggered by the frontend via POST /api/sync/nuvemshop
+    // after redirect. Fire-and-forget here gets killed by Vercel
+    // once the redirect response is sent.
 
     return NextResponse.redirect(
       new URL("/integrations?success=nuvemshop", request.url)

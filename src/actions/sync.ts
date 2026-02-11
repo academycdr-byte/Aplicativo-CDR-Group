@@ -49,6 +49,7 @@ export async function syncPlatform(platform: string) {
 }
 
 const STALE_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
+const STUCK_SYNCING_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
 
 export async function smartSync(): Promise<{ triggered: boolean }> {
   const ctx = await getSessionWithOrg();
@@ -56,13 +57,30 @@ export async function smartSync(): Promise<{ triggered: boolean }> {
 
   const integrations = await prisma.integration.findMany({
     where: { organizationId: ctx.organization.id, status: "CONNECTED" },
-    select: { lastSyncAt: true, syncStatus: true },
+    select: { id: true, lastSyncAt: true, syncStatus: true, updatedAt: true },
   });
 
   if (integrations.length === 0) return { triggered: false };
-  if (integrations.some((i) => i.syncStatus === "SYNCING")) return { triggered: false };
 
+  // Recover from stuck SYNCING status (e.g. killed by Vercel timeout)
   const now = Date.now();
+  const stuckSyncing = integrations.filter(
+    (i) => i.syncStatus === "SYNCING" && now - i.updatedAt.getTime() > STUCK_SYNCING_THRESHOLD_MS
+  );
+
+  if (stuckSyncing.length > 0) {
+    await prisma.integration.updateMany({
+      where: { id: { in: stuckSyncing.map((i) => i.id) } },
+      data: { syncStatus: "FAILED", errorMessage: "Sync timed out (recovered by smartSync)" },
+    });
+  }
+
+  // Re-check after recovery: if still actively syncing, skip
+  const activelySyncing = integrations.some(
+    (i) => i.syncStatus === "SYNCING" && now - i.updatedAt.getTime() <= STUCK_SYNCING_THRESHOLD_MS
+  );
+  if (activelySyncing) return { triggered: false };
+
   const hasStale = integrations.some(
     (i) => !i.lastSyncAt || now - i.lastSyncAt.getTime() > STALE_THRESHOLD_MS
   );
