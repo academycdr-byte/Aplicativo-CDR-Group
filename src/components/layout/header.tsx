@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { User, LogOut, Bell, Search } from "lucide-react";
-import { useSession } from "next-auth/react";
-import { logoutUser } from "@/actions/auth";
+import { useSession, signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -81,7 +80,7 @@ export function Header() {
             <DropdownMenuSeparator className="bg-border/50" />
             <DropdownMenuItem
               className="text-destructive focus:text-destructive focus:bg-destructive/10 rounded-lg cursor-pointer"
-              onClick={() => logoutUser()}
+              onClick={() => signOut({ callbackUrl: "/login" })}
             >
               <LogOut className="w-4 h-4 mr-2" />
               Sair
