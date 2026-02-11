@@ -5,6 +5,8 @@ import { exchangeNuvemshopToken, syncNuvemshopOrders, syncNuvemshopFunnel } from
 import { auth } from "@/auth";
 import { checkRateLimit } from "@/lib/rate-limit";
 
+export const maxDuration = 60;
+
 export async function GET(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {

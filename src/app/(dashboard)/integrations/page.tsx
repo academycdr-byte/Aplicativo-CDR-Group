@@ -197,14 +197,19 @@ function IntegrationsContent() {
       toast.error(`Erro ao conectar Google Analytics${detail ? `: ${detail}` : ""}`, { duration: 10000 });
     } else if (success === "nuvemshop") {
       toast.success("Nuvemshop conectada com sucesso! Sincronizando pedidos...");
-      syncPlatform("NUVEMSHOP").then((result) => {
-        if ("error" in result && result.error) {
-          toast.error(`Erro ao sincronizar Nuvemshop: ${result.error}`);
-        } else {
-          toast.success("Pedidos da Nuvemshop sincronizados!");
-          loadIntegrations();
-        }
-      });
+      fetch("/api/sync/nuvemshop", { method: "POST" })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success) {
+            toast.success("Pedidos da Nuvemshop sincronizados!");
+            loadIntegrations();
+          } else {
+            toast.error(`Erro ao sincronizar Nuvemshop: ${data.error || "Erro desconhecido"}`);
+          }
+        })
+        .catch(() => {
+          toast.error("Erro ao sincronizar Nuvemshop");
+        });
     } else if (error === "nuvemshop_oauth_failed") {
       toast.error(`Erro ao conectar Nuvemshop${detail ? `: ${detail}` : ""}`, { duration: 10000 });
     } else if (error === "missing_params") {
@@ -317,6 +322,25 @@ function IntegrationsContent() {
 
   async function handleSync(platform: Platform) {
     setSyncing(platform);
+
+    // Use dedicated API route for Nuvemshop (needs longer timeout)
+    if (platform === "NUVEMSHOP") {
+      try {
+        const res = await fetch("/api/sync/nuvemshop", { method: "POST" });
+        const data = await res.json();
+        if (data.success) {
+          toast.success("Sincronizacao concluida!");
+          loadIntegrations();
+        } else {
+          toast.error(`Erro ao sincronizar: ${data.error || "Erro desconhecido"}`);
+        }
+      } catch {
+        toast.error("Erro ao sincronizar Nuvemshop");
+      }
+      setSyncing(null);
+      return;
+    }
+
     const result = await syncPlatform(platform);
     if ("error" in result && result.error) {
       toast.error(`Erro ao sincronizar: ${result.error}`);

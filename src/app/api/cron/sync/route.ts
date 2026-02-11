@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { syncAllPlatforms } from "@/lib/integrations/sync";
 
+export const maxDuration = 60;
+
 export async function GET(request: NextRequest) {
   // CRON_SECRET is required in production
   const cronSecret = process.env.CRON_SECRET;
