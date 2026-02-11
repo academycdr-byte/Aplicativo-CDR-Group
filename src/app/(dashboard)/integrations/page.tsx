@@ -195,6 +195,18 @@ function IntegrationsContent() {
       });
     } else if (error === "google_analytics_oauth_failed") {
       toast.error(`Erro ao conectar Google Analytics${detail ? `: ${detail}` : ""}`, { duration: 10000 });
+    } else if (success === "nuvemshop") {
+      toast.success("Nuvemshop conectada com sucesso! Sincronizando pedidos...");
+      syncPlatform("NUVEMSHOP").then((result) => {
+        if ("error" in result && result.error) {
+          toast.error(`Erro ao sincronizar Nuvemshop: ${result.error}`);
+        } else {
+          toast.success("Pedidos da Nuvemshop sincronizados!");
+          loadIntegrations();
+        }
+      });
+    } else if (error === "nuvemshop_oauth_failed") {
+      toast.error(`Erro ao conectar Nuvemshop${detail ? `: ${detail}` : ""}`, { duration: 10000 });
     } else if (error === "missing_params") {
       toast.error("Erro no fluxo OAuth: parametros ausentes");
     } else if (error === "missing_shop") {
