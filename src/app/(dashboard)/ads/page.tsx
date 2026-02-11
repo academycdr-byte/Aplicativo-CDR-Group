@@ -522,8 +522,8 @@ export default function AdsPage() {
 
       {loading ? (
         <div className="space-y-6">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-4">
+            {[1, 2, 3, 4, 5, 6, 7].map((i) => (
               <Card key={i} className="h-28">
                 <CardContent className="pt-5">
                   <div className="animate-pulse space-y-3">
@@ -541,8 +541,9 @@ export default function AdsPage() {
       ) : (
       <>
       {/* KPI Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-4">
         <KPICard title="Investimento" value={t.spend} prevValue={p.spend} icon={DollarSign} prefix="R$" variant="destructive" />
+        <KPICard title="Valor Convertido" value={t.revenue} prevValue={p.revenue} icon={DollarSign} prefix="R$" variant="success" />
         <KPICard title="Cliques" value={t.clicks} prevValue={p.clicks} icon={MousePointer} variant="amber" />
         <KPICard title="Conversões" value={t.conversions} prevValue={p.conversions} icon={TrendingUp} variant="success" />
         <KPICard title="ROAS" value={roas.toFixed(2)} prevValue={prevRoas} icon={BarChart2} suffix="x" variant="default" />
