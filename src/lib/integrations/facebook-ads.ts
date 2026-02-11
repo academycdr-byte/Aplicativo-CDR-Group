@@ -224,9 +224,10 @@ async function saveInsightsToDB(
 
         return prisma.adMetric.upsert({
           where: {
-            organizationId_platform_campaignId_adId_date: {
+            organizationId_platform_accountId_campaignId_adId_date: {
               organizationId,
               platform: "FACEBOOK_ADS",
+              accountId: accountId || "unknown",
               campaignId: insight.campaign_id || "unknown",
               adId: insight.ad_id || "unknown",
               date: new Date(insight.date_start),
@@ -243,7 +244,7 @@ async function saveInsightsToDB(
             adName: insight.ad_name,
             thumbnailUrl: thumbnails[insight.ad_id] || null,
             videoUrl: videoUrls[insight.ad_id] || null,
-            accountId: accountId || null,
+            accountId: accountId || "unknown",
             date: new Date(insight.date_start),
             impressions: parseInt(insight.impressions || "0"),
             reach: parseInt(insight.reach || "0"),
@@ -262,7 +263,7 @@ async function saveInsightsToDB(
             adName: insight.ad_name,
             thumbnailUrl: thumbnails[insight.ad_id] || null,
             videoUrl: videoUrls[insight.ad_id] || null,
-            accountId: accountId || null,
+            accountId: accountId || "unknown",
             impressions: parseInt(insight.impressions || "0"),
             reach: parseInt(insight.reach || "0"),
             clicks: parseInt(insight.clicks || "0"),
