@@ -18,8 +18,12 @@ export const getSessionWithOrg = cache(async () => {
   const session = await getSession();
   if (!session) return null;
 
+  const orgId = session.user.organizationId;
   const membership = await prisma.membership.findFirst({
-    where: { userId: session.user.id },
+    where: {
+      userId: session.user.id,
+      ...(orgId ? { organizationId: orgId } : {}),
+    },
     include: { organization: true },
     orderBy: { createdAt: "asc" },
   });

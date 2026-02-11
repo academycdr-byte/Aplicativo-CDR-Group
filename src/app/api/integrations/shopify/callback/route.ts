@@ -58,15 +58,22 @@ export async function GET(request: NextRequest) {
     // Trocar code por access token usando form-urlencoded
     const tokenData = await exchangeShopifyCode(shop, code);
 
-    // Buscar membership do usuario para obter organizationId
+    // Use active organization from JWT session
+    const organizationId = session.user.organizationId;
+    if (!organizationId) {
+      return NextResponse.redirect(
+        new URL("/integrations?error=shopify_oauth_failed&detail=Organizacao+nao+encontrada", request.url)
+      );
+    }
+
+    // Verify user has membership in this org
     const membership = await prisma.membership.findFirst({
-      where: { userId: session.user.id },
-      orderBy: { createdAt: "asc" },
+      where: { userId: session.user.id, organizationId },
     });
 
     if (!membership) {
       return NextResponse.redirect(
-        new URL("/integrations?error=shopify_oauth_failed&detail=Organizacao+nao+encontrada", request.url)
+        new URL("/integrations?error=shopify_oauth_failed&detail=Sem+acesso+a+organizacao", request.url)
       );
     }
 
@@ -74,12 +81,12 @@ export async function GET(request: NextRequest) {
     await prisma.integration.upsert({
       where: {
         organizationId_platform: {
-          organizationId: membership.organizationId,
+          organizationId,
           platform: "SHOPIFY",
         },
       },
       create: {
-        organizationId: membership.organizationId,
+        organizationId,
         platform: "SHOPIFY",
         status: "CONNECTED",
         accessToken: encrypt(tokenData.access_token),
@@ -95,7 +102,7 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    console.log("[Shopify OAuth] Integration saved for shop:", shop);
+    console.log("[Shopify OAuth] Integration saved for shop:", shop, "org:", organizationId);
 
     // Register webhooks in the background (don't wait for it)
     registerShopifyWebhooks(shop, tokenData.access_token).catch((err) => {
@@ -103,7 +110,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Trigger initial sync in the background (don't wait for it)
-    syncShopifyOrders(membership.organizationId).catch((err) => {
+    syncShopifyOrders(organizationId).catch((err) => {
       console.error("[Shopify OAuth] Initial sync failed:", err);
     });
 

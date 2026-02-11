@@ -10,19 +10,22 @@ export async function GET() {
     return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
   }
 
+  const organizationId = session.user.organizationId;
+  if (!organizationId) {
+    return NextResponse.json({ error: "Organizacao nao encontrada" }, { status: 403 });
+  }
+
   const membership = await prisma.membership.findFirst({
-    where: { userId: session.user.id },
-    orderBy: { createdAt: "asc" },
+    where: { userId: session.user.id, organizationId },
   });
 
-  if (!membership || membership.role !== "ADMIN") {
+  if (!membership || (membership.role !== "ADMIN" && membership.role !== "OWNER")) {
     return NextResponse.json({ error: "Acesso restrito a admins" }, { status: 403 });
   }
 
-  const integration = await prisma.integration.findFirst({
+  const integration = await prisma.integration.findUnique({
     where: {
-      organization: { memberships: { some: { userId: session.user.id } } },
-      platform: "SHOPIFY",
+      organizationId_platform: { organizationId, platform: "SHOPIFY" },
     },
   });
 
