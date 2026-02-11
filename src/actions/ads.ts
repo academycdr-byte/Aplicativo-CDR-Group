@@ -281,8 +281,100 @@ export async function getCreativePerformance(params?: FilterParams) {
     .sort((a, b) => b.spend - a.spend);
 }
 
+export async function getAdSetPerformance(params?: FilterParams) {
+  const ctx = await getSessionWithOrg();
+  if (!ctx) return [];
+
+  const days = params?.days || 30;
+  const dateFilter = buildDateFilter(getDateRange(days, params?.from, params?.to));
+  const where = buildWhereClause(ctx.organization.id, dateFilter, params);
+
+  where.adSetId = { not: null };
+
+  const metrics = await prisma.adMetric.findMany({
+    where,
+    select: {
+      adSetId: true, adSetName: true, adId: true,
+      campaignName: true, platform: true,
+      impressions: true, reach: true, clicks: true,
+      spend: true, conversions: true, revenue: true,
+      addToCart: true, initiateCheckout: true,
+    },
+    orderBy: { date: "desc" },
+  });
+
+  const byAdSet: Record<string, {
+    adSetId: string;
+    adSetName: string | null;
+    campaignName: string | null;
+    platform: string;
+    impressions: number;
+    reach: number;
+    clicks: number;
+    spend: number;
+    conversions: number;
+    revenue: number;
+    addToCart: number;
+    initiateCheckout: number;
+    adIds: Set<string>;
+  }> = {};
+
+  for (const m of metrics) {
+    const key = m.adSetId || "unknown";
+    if (!byAdSet[key]) {
+      byAdSet[key] = {
+        adSetId: key,
+        adSetName: m.adSetName,
+        campaignName: m.campaignName,
+        platform: m.platform,
+        impressions: 0,
+        reach: 0,
+        clicks: 0,
+        spend: 0,
+        conversions: 0,
+        revenue: 0,
+        addToCart: 0,
+        initiateCheckout: 0,
+        adIds: new Set(),
+      };
+    }
+    byAdSet[key].impressions += m.impressions;
+    byAdSet[key].reach += m.reach;
+    byAdSet[key].clicks += m.clicks;
+    byAdSet[key].spend += Number(m.spend);
+    byAdSet[key].conversions += m.conversions;
+    byAdSet[key].revenue += Number(m.revenue);
+    byAdSet[key].addToCart += m.addToCart;
+    byAdSet[key].initiateCheckout += m.initiateCheckout;
+    if (m.adId) byAdSet[key].adIds.add(m.adId);
+  }
+
+  return Object.values(byAdSet)
+    .map((s) => ({
+      adSetId: s.adSetId,
+      adSetName: s.adSetName,
+      campaignName: s.campaignName,
+      platform: s.platform,
+      impressions: s.impressions,
+      reach: s.reach,
+      clicks: s.clicks,
+      spend: s.spend,
+      conversions: s.conversions,
+      revenue: s.revenue,
+      addToCart: s.addToCart,
+      initiateCheckout: s.initiateCheckout,
+      adCount: s.adIds.size,
+      ctr: s.impressions > 0 ? (s.clicks / s.impressions) * 100 : 0,
+      roas: s.spend > 0 ? s.revenue / s.spend : 0,
+      cpa: s.conversions > 0 ? s.spend / s.conversions : 0,
+      cpc: s.clicks > 0 ? s.spend / s.clicks : 0,
+      cpm: s.impressions > 0 ? (s.spend / s.impressions) * 1000 : 0,
+    }))
+    .sort((a, b) => b.spend - a.spend);
+}
+
 /**
- * Consolidated ads page data loader (1 HTTP round-trip instead of 3).
+ * Consolidated ads page data loader (1 HTTP round-trip instead of 4).
  */
 export async function loadAllAdsData(
   params: FilterParams & { days: number; from?: string; to?: string },
@@ -297,12 +389,14 @@ export async function loadAllAdsData(
     getAdMetrics(params),
     getAdMetricsByDay(days, from, to, searchQuery, excludedTerms, params.platform),
     getCreativePerformance(params),
+    getAdSetPerformance(params),
   ]);
 
   return {
     metrics: results[0].status === "fulfilled" ? results[0].value : { metrics: [], totals: null, previousTotals: null },
     dailyData: results[1].status === "fulfilled" ? results[1].value : [],
     creatives: results[2].status === "fulfilled" ? results[2].value : [],
+    adSets: results[3].status === "fulfilled" ? results[3].value : [],
     failedCount: results.filter((r) => r.status === "rejected").length,
   };
 }

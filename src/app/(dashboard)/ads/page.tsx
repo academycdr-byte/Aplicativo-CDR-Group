@@ -43,7 +43,8 @@ import {
   ShoppingCart,
   CreditCard,
   BarChart2,
-  ListFilter
+  ListFilter,
+  Users
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -126,6 +127,27 @@ type AdMetric = {
   initiateCheckout: number;
 };
 
+type AdSet = {
+  adSetId: string;
+  adSetName: string | null;
+  campaignName: string | null;
+  platform: string;
+  impressions: number;
+  reach: number;
+  clicks: number;
+  spend: number;
+  conversions: number;
+  revenue: number;
+  addToCart: number;
+  initiateCheckout: number;
+  ctr: number;
+  roas: number;
+  cpa: number;
+  cpc: number;
+  cpm: number;
+  adCount: number;
+};
+
 const platformLabels: Record<string, string> = {
   FACEBOOK_ADS: "Facebook Ads",
   GOOGLE_ADS: "Google Ads",
@@ -168,6 +190,7 @@ export default function AdsPage() {
   const [metrics, setMetrics] = useState<AdMetric[]>([]);
   const [dayData, setDayData] = useState<DayMetric[]>([]);
   const [creatives, setCreatives] = useState<Creative[]>([]);
+  const [adSets, setAdSets] = useState<AdSet[]>([]);
 
   // Filters
   const [platformFilter, setPlatformFilter] = useState("all");
@@ -179,8 +202,10 @@ export default function AdsPage() {
   // Pagination State
   const [metricsPage, setMetricsPage] = useState(1);
   const [creativesPage, setCreativesPage] = useState(1);
+  const [adSetsPage, setAdSetsPage] = useState(1);
   const metricsPerPage = 20;
   const creativesPerPage = 12;
+  const adSetsPerPage = 15;
 
   // Chart State
   const [chartMetric, setChartMetric] = useState<"spend_revenue" | "roas" | "cpa" | "ctr">("spend_revenue");
@@ -194,6 +219,8 @@ export default function AdsPage() {
   const [metricsSortDir, setMetricsSortDir] = useState<SortDir>("desc");
   const [creativesSortKey, setCreativesSortKey] = useState<string>("spend");
   const [creativesSortDir, setCreativesSortDir] = useState<SortDir>("desc");
+  const [adSetsSortKey, setAdSetsSortKey] = useState<string>("spend");
+  const [adSetsSortDir, setAdSetsSortDir] = useState<SortDir>("desc");
 
   // Video Modal
   const [selectedCreative, setSelectedCreative] = useState<Creative | null>(null);
@@ -230,6 +257,7 @@ export default function AdsPage() {
       setMetrics(data.metrics.metrics);
       setDayData(data.dailyData);
       setCreatives(data.creatives);
+      setAdSets(data.adSets);
     } catch (error) {
       console.error("Failed to load ads data", error);
     } finally {
@@ -237,6 +265,7 @@ export default function AdsPage() {
     }
     setMetricsPage(1);
     setCreativesPage(1);
+    setAdSetsPage(1);
   }, [period, platformFilter, accountFilter, searchQuery, excludedTerms]);
 
   useEffect(() => {
@@ -347,6 +376,15 @@ export default function AdsPage() {
       return creativesSortDir === "desc" ? bVal - aVal : aVal - bVal;
     });
   }, [creatives, creativesSortKey, creativesSortDir, uniqueCreatives]);
+
+  // AdSets Sorting
+  const sortedAdSets = useMemo(() => {
+    return [...adSets].sort((a, b) => {
+      const aVal = Number((a as unknown as Record<string, unknown>)[adSetsSortKey]) || 0;
+      const bVal = Number((b as unknown as Record<string, unknown>)[adSetsSortKey]) || 0;
+      return adSetsSortDir === "desc" ? bVal - aVal : aVal - bVal;
+    });
+  }, [adSets, adSetsSortKey, adSetsSortDir]);
 
   // Top Performers Logic
   const topCreatives = useMemo(() => {
@@ -772,6 +810,82 @@ export default function AdsPage() {
           </div>
         )}
       </div>
+
+      {/* AdSet Performance Section */}
+      {sortedAdSets.length > 0 && (
+      <Card className="border border-border shadow-none rounded-lg">
+        <CardHeader className="flex flex-row items-center justify-between border-b border-border/50 px-5 py-4">
+          <div className="flex items-center gap-2">
+            <Users className="w-4 h-4 text-muted-foreground" />
+            <CardTitle className="text-base font-semibold">Performance por Públicos</CardTitle>
+            <span className="text-sm text-muted-foreground">({sortedAdSets.length})</span>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0 overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent border-b border-border/50">
+                <TableHead className="w-[280px]">Público</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-center">Anúncios</TableHead>
+                <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("spend", adSetsSortKey, adSetsSortDir, setAdSetsSortKey, setAdSetsSortDir)}>Gasto <ArrowUpDown className="inline w-3 h-3 ml-1" /></TableHead>
+                <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("clicks", adSetsSortKey, adSetsSortDir, setAdSetsSortKey, setAdSetsSortDir)}>Cliques</TableHead>
+                <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("ctr", adSetsSortKey, adSetsSortDir, setAdSetsSortKey, setAdSetsSortDir)}>CTR</TableHead>
+                <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("conversions", adSetsSortKey, adSetsSortDir, setAdSetsSortKey, setAdSetsSortDir)}>Conv.</TableHead>
+                <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("cpa", adSetsSortKey, adSetsSortDir, setAdSetsSortKey, setAdSetsSortDir)}>CPA</TableHead>
+                <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("roas", adSetsSortKey, adSetsSortDir, setAdSetsSortKey, setAdSetsSortDir)}>ROAS <ArrowUpDown className="inline w-3 h-3 ml-1" /></TableHead>
+                <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("revenue", adSetsSortKey, adSetsSortDir, setAdSetsSortKey, setAdSetsSortDir)}>Receita</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sortedAdSets
+                .slice((adSetsPage - 1) * adSetsPerPage, adSetsPage * adSetsPerPage)
+                .map((s) => (
+                  <TableRow key={s.adSetId} className={`hover:bg-muted/30 border-b border-border/50 ${s.roas >= 3 ? "bg-emerald-500/5 hover:bg-emerald-500/10" : ""}`}>
+                    <TableCell>
+                      <div className="min-w-0 max-w-[260px]">
+                        <p className="text-sm font-medium truncate" title={s.adSetName || ""}>{s.adSetName || "Sem Nome"}</p>
+                        <p className="text-xs text-muted-foreground truncate">{s.campaignName}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={s.roas >= 3 ? "default" : s.roas >= 1 ? "secondary" : "destructive"} className="text-[10px]">
+                        {s.roas >= 3 ? "Validado" : s.roas >= 1 ? "Testando" : "Negativo"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant="outline" className="text-[10px]">{s.adCount}</Badge>
+                    </TableCell>
+                    <TableCell className="text-right">{fmt(s.spend)}</TableCell>
+                    <TableCell className="text-right">{fmtNum(s.clicks)}</TableCell>
+                    <TableCell className="text-right">{s.ctr.toFixed(2)}%</TableCell>
+                    <TableCell className="text-right">{fmtNum(s.conversions)}</TableCell>
+                    <TableCell className="text-right">{s.cpa > 0 ? fmt(s.cpa) : "-"}</TableCell>
+                    <TableCell className="text-right font-medium text-foreground">
+                      <span className={s.roas >= 3 ? "text-emerald-500" : s.roas >= 1 ? "text-amber-500" : "text-red-500"}>
+                        {s.roas > 0 ? s.roas.toFixed(2) + "x" : "-"}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right">{fmt(s.revenue)}</TableCell>
+                  </TableRow>
+                ))}
+            </TableBody>
+          </Table>
+
+          {sortedAdSets.length > adSetsPerPage && (
+            <div className="flex items-center justify-between px-4 py-4 border-t border-border/50">
+              <p className="text-xs text-muted-foreground">
+                Página {adSetsPage} de {Math.ceil(sortedAdSets.length / adSetsPerPage)}
+              </p>
+              <div className="flex gap-2">
+                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setAdSetsPage(p => Math.max(1, p - 1))} disabled={adSetsPage === 1}><ChevronLeft className="w-4 h-4" /></Button>
+                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setAdSetsPage(p => Math.min(Math.ceil(sortedAdSets.length / adSetsPerPage), p + 1))} disabled={adSetsPage >= Math.ceil(sortedAdSets.length / adSetsPerPage)}><ChevronRight className="w-4 h-4" /></Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+      )}
 
       {/* Top Performers Section */}
       <Card className="border border-border shadow-none rounded-lg">
