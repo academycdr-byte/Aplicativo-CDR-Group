@@ -33,11 +33,11 @@ export async function POST(request: NextRequest) {
         const result = await syncNuvemshopOrders(orgId, {
             startPage: body.startPage,
             syncLogId: body.syncLogId,
-            timeBudgetMs: 50000, // 50s budget within 60s maxDuration
+            timeBudgetMs: 45000, // 45s budget — safe margin within 60s Vercel limit
         });
 
         return NextResponse.json({
-            success: !result.error,
+            success: result.success,
             orders: { synced: result.synced, error: result.error },
             hasMore: result.hasMore,
             nextPage: result.nextPage,

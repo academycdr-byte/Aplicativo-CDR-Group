@@ -25,7 +25,6 @@ import {
 import {
   ResponsiveContainer,
   ComposedChart,
-  Bar,
   Line,
   XAxis,
   YAxis,
@@ -92,12 +91,12 @@ type RecentOrder = {
 };
 
 const metricToggles = [
-  { key: "faturamento", label: "Faturamento", color: "var(--chart-1)", type: "bar" },
-  { key: "investimento", label: "Investimento", color: "var(--chart-5)", type: "bar" },
-  { key: "compras", label: "Compras", color: "var(--chart-2)", type: "bar" },
-  { key: "ticketMedio", label: "Ticket", color: "var(--chart-3)", type: "line" },
-  { key: "cpa", label: "CPA", color: "var(--chart-4)", type: "line" },
-  { key: "roas", label: "ROAS", color: "var(--chart-1)", type: "line" },
+  { key: "faturamento", label: "Faturamento", color: "#10b981", type: "area" },
+  { key: "investimento", label: "Investimento", color: "#f43f5e", type: "area" },
+  { key: "compras", label: "Compras", color: "#8b5cf6", type: "line" },
+  { key: "ticketMedio", label: "Ticket", color: "#f59e0b", type: "line" },
+  { key: "cpa", label: "CPA", color: "#06b6d4", type: "line" },
+  { key: "roas", label: "ROAS", color: "#3b82f6", type: "line" },
 ] as const;
 
 export default function DashboardPage() {
@@ -258,11 +257,15 @@ export default function DashboardPage() {
                   className={cn(
                     "flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] uppercase tracking-wide font-semibold border transition-all duration-200",
                     activeMetrics.has(m.key)
-                      ? "bg-primary/10 text-primary border-primary/20 hover:bg-primary/20"
+                      ? "border-white/10 text-foreground"
                       : "bg-transparent text-muted-foreground border-transparent hover:bg-secondary"
                   )}
+                  style={activeMetrics.has(m.key) ? { backgroundColor: `${m.color}15` } : undefined}
                 >
-                  <div className={cn("w-1.5 h-1.5 rounded-full", activeMetrics.has(m.key) ? "bg-primary" : "bg-muted-foreground/30")} />
+                  <div
+                    className="w-2 h-2 rounded-full transition-all duration-200"
+                    style={{ backgroundColor: activeMetrics.has(m.key) ? m.color : "var(--muted-foreground)", opacity: activeMetrics.has(m.key) ? 1 : 0.3 }}
+                  />
                   {m.label}
                 </button>
               ))}
@@ -271,21 +274,25 @@ export default function DashboardPage() {
 
           <CardContent className="px-1 sm:px-6 pb-4 sm:pb-6">
             {metricsData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={280} className="sm:!h-[340px]">
-                <ComposedChart data={metricsData} margin={{ top: 10, right: 5, left: -25, bottom: 0 }}>
+              <ResponsiveContainer width="100%" height={280} className="sm:!h-[360px]">
+                <ComposedChart data={metricsData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
                   <defs>
-                    <linearGradient id="gradientPrimary" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.2} />
-                      <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
+                    <linearGradient id="gradFaturamento" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#10b981" stopOpacity={0.25} />
+                      <stop offset="100%" stopColor="#10b981" stopOpacity={0.02} />
+                    </linearGradient>
+                    <linearGradient id="gradInvestimento" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#f43f5e" stopOpacity={0.15} />
+                      <stop offset="100%" stopColor="#f43f5e" stopOpacity={0.02} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} opacity={0.3} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} opacity={0.15} />
                   <XAxis
                     dataKey="date"
-                    tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                    tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
                     tickLine={false}
                     axisLine={false}
-                    tickMargin={8}
+                    tickMargin={10}
                     interval="preserveStartEnd"
                     tickFormatter={(v) => {
                       const d = new Date(v + "T00:00:00");
@@ -298,7 +305,7 @@ export default function DashboardPage() {
                     tickLine={false}
                     axisLine={false}
                     tickFormatter={(v) => fmtShort(v)}
-                    width={40}
+                    width={45}
                   />
                   <YAxis
                     yAxisId="right"
@@ -306,51 +313,115 @@ export default function DashboardPage() {
                     tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
                     tickLine={false}
                     axisLine={false}
-                    width={25}
+                    width={30}
                   />
                   <Tooltip
-                    cursor={{ stroke: "var(--primary)", strokeWidth: 1, strokeDasharray: "4 4", opacity: 0.5 }}
+                    cursor={{ stroke: "var(--muted-foreground)", strokeWidth: 1, strokeDasharray: "4 4", opacity: 0.3 }}
                     content={({ active, payload, label }) => {
                       if (!active || !payload?.length) return null;
                       const d = new Date(label + "T00:00:00");
                       return (
-                        <div className="bg-card/95 backdrop-blur-xl border border-border/50 rounded-xl shadow-floating p-3 sm:p-4 min-w-[180px] sm:min-w-[200px]">
-                          <p className="font-semibold text-xs sm:text-sm mb-2 sm:mb-3 text-foreground">{d.toLocaleDateString("pt-BR", { weekday: 'short', day: 'numeric', month: 'short' })}</p>
-                          <div className="space-y-1.5 sm:space-y-2">
-                            {payload.map((p) => (
-                              <div key={p.dataKey} className="flex items-center justify-between gap-4 sm:gap-6 text-xs sm:text-sm">
-                                <span className="text-muted-foreground capitalize flex items-center gap-1.5">
-                                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: p.color }} />
-                                  {metricToggles.find((m) => m.key === p.dataKey)?.label}
-                                </span>
-                                <span className="font-semibold tabular-nums text-foreground">
-                                  {p.dataKey === "roas" ? `${Number(p.value).toFixed(2)}x`
-                                    : p.dataKey === "compras" ? fmtNum(Number(p.value))
-                                      : fmt(Number(p.value))}
-                                </span>
-                              </div>
-                            ))}
+                        <div className="bg-card/95 backdrop-blur-xl border border-border/50 rounded-xl shadow-2xl p-3.5 sm:p-4 min-w-[200px] sm:min-w-[220px]">
+                          <p className="font-semibold text-xs sm:text-sm mb-3 text-foreground border-b border-border/30 pb-2">
+                            {d.toLocaleDateString("pt-BR", { weekday: 'short', day: 'numeric', month: 'short' })}
+                          </p>
+                          <div className="space-y-2">
+                            {payload.map((p) => {
+                              const toggle = metricToggles.find((m) => m.key === p.dataKey);
+                              return (
+                                <div key={p.dataKey} className="flex items-center justify-between gap-4 sm:gap-6 text-xs sm:text-sm">
+                                  <span className="text-muted-foreground flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: toggle?.color }} />
+                                    {toggle?.label}
+                                  </span>
+                                  <span className="font-semibold tabular-nums text-foreground">
+                                    {p.dataKey === "roas" ? `${Number(p.value).toFixed(2)}x`
+                                      : p.dataKey === "compras" ? fmtNum(Number(p.value))
+                                        : fmt(Number(p.value))}
+                                  </span>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       );
                     }}
                   />
+                  {/* Faturamento — primary area with gradient */}
                   {activeMetrics.has("faturamento") && (
                     <Area
                       yAxisId="left"
                       type="monotone"
                       dataKey="faturamento"
-                      stroke="var(--chart-1)"
-                      fill="url(#gradientPrimary)"
-                      strokeWidth={2}
+                      stroke="#10b981"
+                      fill="url(#gradFaturamento)"
+                      strokeWidth={2.5}
+                      dot={false}
+                      activeDot={{ r: 4, fill: "#10b981", stroke: "#fff", strokeWidth: 2 }}
                     />
                   )}
-                  {activeMetrics.has("investimento") && <Bar yAxisId="left" dataKey="investimento" fill="var(--destructive)" radius={[4, 4, 0, 0]} barSize={20} fillOpacity={0.8} />}
-                  {activeMetrics.has("compras") && <Bar yAxisId="left" dataKey="compras" fill="var(--chart-2)" radius={[4, 4, 0, 0]} barSize={20} fillOpacity={0.8} />}
-
-                  {activeMetrics.has("ticketMedio") && <Line yAxisId="right" type="monotone" dataKey="ticketMedio" stroke="var(--chart-3)" strokeWidth={2} dot={false} />}
-                  {activeMetrics.has("cpa") && <Line yAxisId="right" type="monotone" dataKey="cpa" stroke="var(--chart-4)" strokeWidth={2} dot={false} />}
-                  {activeMetrics.has("roas") && <Line yAxisId="right" type="monotone" dataKey="roas" stroke="var(--primary)" strokeWidth={2} dot={false} />}
+                  {/* Investimento — subtle area (no more bars!) */}
+                  {activeMetrics.has("investimento") && (
+                    <Area
+                      yAxisId="left"
+                      type="monotone"
+                      dataKey="investimento"
+                      stroke="#f43f5e"
+                      fill="url(#gradInvestimento)"
+                      strokeWidth={2}
+                      strokeDasharray="6 3"
+                      dot={false}
+                      activeDot={{ r: 4, fill: "#f43f5e", stroke: "#fff", strokeWidth: 2 }}
+                    />
+                  )}
+                  {/* Compras — clean line with dots */}
+                  {activeMetrics.has("compras") && (
+                    <Line
+                      yAxisId="left"
+                      type="monotone"
+                      dataKey="compras"
+                      stroke="#8b5cf6"
+                      strokeWidth={2}
+                      dot={{ r: 3, fill: "#8b5cf6", stroke: "#1a1a2e", strokeWidth: 2 }}
+                      activeDot={{ r: 5, fill: "#8b5cf6", stroke: "#fff", strokeWidth: 2 }}
+                    />
+                  )}
+                  {/* Ticket Médio */}
+                  {activeMetrics.has("ticketMedio") && (
+                    <Line
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey="ticketMedio"
+                      stroke="#f59e0b"
+                      strokeWidth={2}
+                      dot={false}
+                      activeDot={{ r: 4, fill: "#f59e0b", stroke: "#fff", strokeWidth: 2 }}
+                    />
+                  )}
+                  {/* CPA */}
+                  {activeMetrics.has("cpa") && (
+                    <Line
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey="cpa"
+                      stroke="#06b6d4"
+                      strokeWidth={2}
+                      dot={false}
+                      activeDot={{ r: 4, fill: "#06b6d4", stroke: "#fff", strokeWidth: 2 }}
+                    />
+                  )}
+                  {/* ROAS */}
+                  {activeMetrics.has("roas") && (
+                    <Line
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey="roas"
+                      stroke="#3b82f6"
+                      strokeWidth={2}
+                      dot={false}
+                      activeDot={{ r: 4, fill: "#3b82f6", stroke: "#fff", strokeWidth: 2 }}
+                    />
+                  )}
                 </ComposedChart>
               </ResponsiveContainer>
             ) : (

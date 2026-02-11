@@ -284,9 +284,11 @@ function IntegrationsContent() {
     let syncLogId: string | undefined;
     let totalSynced = 0;
     let iteration = 0;
+    let consecutiveErrors = 0;
     const MAX_ITERATIONS = 50;
+    const MAX_CONSECUTIVE_ERRORS = 3;
 
-    while (hasMore && iteration < MAX_ITERATIONS) {
+    while (hasMore && iteration < MAX_ITERATIONS && consecutiveErrors < MAX_CONSECUTIVE_ERRORS) {
       iteration++;
       try {
         const res = await fetch("/api/sync/nuvemshop", {
@@ -297,13 +299,41 @@ function IntegrationsContent() {
             ...(syncLogId ? { syncLogId } : {}),
           }),
         });
+
+        // Handle non-JSON responses (Vercel 504 timeout, 502, etc.)
+        if (!res.ok) {
+          consecutiveErrors++;
+          if (consecutiveErrors < MAX_CONSECUTIVE_ERRORS) {
+            toast.info(`Tentativa ${consecutiveErrors}/${MAX_CONSECUTIVE_ERRORS}... reconectando`);
+            await new Promise((r) => setTimeout(r, 2000));
+            continue;
+          }
+          toast.error(`Servidor retornou erro ${res.status}. Tente novamente em instantes.`);
+          break;
+        }
+
         const data = await res.json();
 
         if (!data.success) {
+          // If some orders were synced before error, it's a partial success — retry
+          const partialSynced = data.orders?.synced || 0;
+          totalSynced += partialSynced;
+
+          if (data.hasMore && partialSynced > 0) {
+            consecutiveErrors++;
+            nextPage = data.nextPage;
+            syncLogId = data.syncLogId;
+            toast.info(`${totalSynced} pedidos importados, retomando...`);
+            await new Promise((r) => setTimeout(r, 1000));
+            continue;
+          }
+
           toast.error(`Erro ao sincronizar: ${data.error || data.orders?.error || "Erro desconhecido"}`);
-          return totalSynced;
+          break;
         }
 
+        // Success — reset error counter
+        consecutiveErrors = 0;
         totalSynced += data.orders?.synced || 0;
         hasMore = data.hasMore === true;
         nextPage = data.nextPage;
@@ -313,15 +343,21 @@ function IntegrationsContent() {
           toast.info(`Sincronizando... ${totalSynced} pedidos importados, continuando...`);
         }
       } catch {
-        toast.error("Erro ao sincronizar Nuvemshop");
-        return totalSynced;
+        consecutiveErrors++;
+        if (consecutiveErrors < MAX_CONSECUTIVE_ERRORS) {
+          toast.info(`Reconectando... tentativa ${consecutiveErrors}/${MAX_CONSECUTIVE_ERRORS}`);
+          await new Promise((r) => setTimeout(r, 2000));
+          continue;
+        }
+        toast.error("Erro de conexão ao sincronizar. Tente novamente.");
+        break;
       }
     }
 
     if (totalSynced > 0) {
-      toast.success(`Sincronizacao concluida! ${totalSynced} pedidos sincronizados.`);
-    } else {
-      toast.success("Sincronizacao concluida! Nenhum pedido novo.");
+      toast.success(`Sincronização concluída! ${totalSynced} pedidos sincronizados.`);
+    } else if (consecutiveErrors === 0) {
+      toast.success("Sincronização concluída! Nenhum pedido novo.");
     }
     loadIntegrations();
     return totalSynced;
