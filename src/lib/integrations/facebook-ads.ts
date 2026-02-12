@@ -212,10 +212,10 @@ async function saveInsightsToDB(
         const findActionValue = (types: string[]) =>
           actionValues.find((a: { action_type: string }) => types.includes(a.action_type));
 
-        const purchases = findAction(["purchase", "offsite_conversion.fb_pixel_purchase"]);
-        const purchaseValue = findActionValue(["purchase", "offsite_conversion.fb_pixel_purchase"]);
-        const addToCartAction = findAction(["add_to_cart", "offsite_conversion.fb_pixel_add_to_cart"]);
-        const initiateCheckoutAction = findAction(["initiate_checkout", "offsite_conversion.fb_pixel_initiate_checkout"]);
+        const purchases = findAction(["purchase", "offsite_conversion.fb_pixel_purchase", "omni_purchase"]);
+        const purchaseValue = findActionValue(["purchase", "offsite_conversion.fb_pixel_purchase", "omni_purchase"]);
+        const addToCartAction = findAction(["add_to_cart", "offsite_conversion.fb_pixel_add_to_cart", "omni_add_to_cart"]);
+        const initiateCheckoutAction = findAction(["initiate_checkout", "offsite_conversion.fb_pixel_initiate_checkout", "omni_initiate_checkout"]);
 
         const conversions = parseInt(purchases?.value || "0");
         const revenue = parseFloat(purchaseValue?.value || "0");
@@ -471,9 +471,9 @@ export async function syncFacebookAdsMetrics(
       const freshnessPromises = accountIds.map(async (accountId) => {
         if (!hasTimeLeft()) return;
         try {
-          // Fetch last 2 days (Yesterday + Today)
+          // Fetch Today only for max speed (Yesterday is handled in Phase 1)
           await fetchAndSavePageByPage(
-            buildUrl(accountId, daysAgo(1), daysAgo(0)),
+            buildUrl(accountId, daysAgo(0), daysAgo(0)),
             accountId,
           );
         } catch (err) {
