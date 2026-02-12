@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { encrypt, decrypt } from "@/lib/encryption";
-import { toBrasiliaDateStr } from "@/lib/date-utils";
+import { toBrasiliaDateStr, toBrasiliaStartOfDay } from "@/lib/date-utils";
 
 const FB_GRAPH_VERSION = "v21.0";
 const FB_REDIRECT_URI = "https://aplicativo-cdr-group.vercel.app/api/integrations/facebook/callback";
@@ -230,7 +230,7 @@ async function saveInsightsToDB(
               accountId: accountId || "unknown",
               campaignId: insight.campaign_id || "unknown",
               adId: insight.ad_id || "unknown",
-              date: new Date(insight.date_start),
+              date: toBrasiliaStartOfDay(insight.date_start),
             },
           },
           create: {
@@ -245,7 +245,10 @@ async function saveInsightsToDB(
             thumbnailUrl: thumbnails[insight.ad_id] || null,
             videoUrl: videoUrls[insight.ad_id] || null,
             accountId: accountId || "unknown",
-            date: new Date(insight.date_start),
+            // IMPORTANTE: Converter para Inicio do Dia em Brasilia (03:00 UTC)
+            // Se usar new Date(date_start), fica 00:00 UTC, que eh "Ontem" as 21:00 no Brasil
+            // O dashboard busca gte: 03:00 UTC (Inicio do dia BR), entao 00:00 UTC ficaria de fora
+            date: toBrasiliaStartOfDay(insight.date_start),
             impressions: parseInt(insight.impressions || "0"),
             reach: parseInt(insight.reach || "0"),
             clicks: parseInt(insight.clicks || "0"),

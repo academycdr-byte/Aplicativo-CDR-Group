@@ -157,6 +157,19 @@ export default function DashboardPage() {
     setLoading(false);
   }, [period]);
 
+  // Auto-sync when "Today" is selected to ensure real-time data
+  useEffect(() => {
+    if (period.type === "preset" && period.days === 0) {
+      console.log("Selecionado Hoje - Iniciando Sincronizacao em Segundo Plano...");
+      // Trigger sync without blocking UI
+      syncAll().then((res) => {
+        if (res?.started) {
+          toast.success("Atualizando dados em tempo real...");
+        }
+      });
+    }
+  }, [period]);
+
   useEffect(() => {
     loadData();
   }, [loadData]);
