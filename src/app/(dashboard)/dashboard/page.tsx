@@ -161,14 +161,18 @@ export default function DashboardPage() {
   useEffect(() => {
     if (period.type === "preset" && period.days === 0) {
       console.log("Selecionado Hoje - Iniciando Sincronizacao em Segundo Plano...");
+      toast.info("Verificando dados recentes...");
+
       // Trigger sync without blocking UI
       syncAll().then((res) => {
-        if (res?.started) {
-          toast.success("Atualizando dados em tempo real...");
+        if (!res?.error) {
+          toast.success("Dados atualizados!");
+          // Reload dashboard data to reflect the new sync
+          loadData();
         }
       });
     }
-  }, [period]);
+  }, [period, loadData]);
 
   useEffect(() => {
     loadData();
