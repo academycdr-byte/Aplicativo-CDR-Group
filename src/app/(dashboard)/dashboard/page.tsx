@@ -602,7 +602,7 @@ function KPICard({ label, value, change, icon: Icon, trend, action }: {
       <div className="absolute right-0 top-0 p-3 opacity-5 group-hover:opacity-10 transition-opacity">
         <Icon className="w-12 h-12 sm:w-16 sm:h-16" />
       </div>
-      <CardContent className="p-4 sm:p-6">
+      <CardContent className="p-4 sm:p-6 relative z-10">
         <div className="flex items-start justify-between mb-3 sm:mb-4">
           <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
             <Icon className="w-5 h-5" />
