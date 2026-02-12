@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { encrypt, decrypt } from "@/lib/encryption";
-import { exchangeShopifyCode, validateShopifyHmac, syncShopifyOrders, registerShopifyWebhooks } from "@/lib/integrations/shopify";
+import { exchangeShopifyCode, validateShopifyHmac, registerShopifyWebhooks } from "@/lib/integrations/shopify";
 import { cookies } from "next/headers";
 
 export const maxDuration = 60;
@@ -127,10 +127,8 @@ export async function GET(request: NextRequest) {
       console.error("[Shopify OAuth] Webhook registration failed:", err);
     });
 
-    // Trigger initial sync in the background (don't wait for it)
-    syncShopifyOrders(organizationId).catch((err) => {
-      console.error("[Shopify OAuth] Initial sync failed:", err);
-    });
+    // Initial sync is handled by the frontend continuation loop (syncShopifyWithContinuation)
+    // triggered when the redirect reaches /integrations?success=shopify
 
     return NextResponse.redirect(new URL("/integrations?success=shopify", request.url));
   } catch (error) {

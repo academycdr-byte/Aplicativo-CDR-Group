@@ -135,15 +135,7 @@ function IntegrationsContent() {
 
     if (success === "shopify") {
       toast.success("Shopify conectada com sucesso! Sincronizando pedidos...");
-      // Auto-trigger sync after successful connection
-      syncPlatform("SHOPIFY").then((result) => {
-        if ("error" in result && result.error) {
-          toast.error(`Erro ao sincronizar Shopify: ${result.error}`);
-        } else {
-          toast.success("Pedidos da Shopify sincronizados!");
-          loadIntegrations();
-        }
-      });
+      syncShopifyWithContinuation();
     } else if (error === "shopify_oauth_failed") {
       toast.error(`Erro ao conectar Shopify${detail ? `: ${detail}` : ""}`, { duration: 10000 });
     } else if (error === "shopify_config_error") {
@@ -365,11 +357,101 @@ function IntegrationsContent() {
     return totalSynced;
   }
 
+  async function syncShopifyWithContinuation() {
+    let hasMore = true;
+    let nextUrl: string | undefined;
+    let syncLogId: string | undefined;
+    let totalSynced = 0;
+    let iteration = 0;
+    let consecutiveErrors = 0;
+    const MAX_ITERATIONS = 50;
+    const MAX_CONSECUTIVE_ERRORS = 3;
+
+    while (hasMore && iteration < MAX_ITERATIONS && consecutiveErrors < MAX_CONSECUTIVE_ERRORS) {
+      iteration++;
+      try {
+        const isFirstCall = iteration === 1 && !nextUrl && !syncLogId;
+        const res = await fetch("/api/sync/shopify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...(nextUrl ? { nextUrl } : {}),
+            ...(syncLogId ? { syncLogId } : {}),
+            ...(isFirstCall ? { forceFullSync: true } : {}),
+          }),
+        });
+
+        if (!res.ok) {
+          consecutiveErrors++;
+          if (consecutiveErrors < MAX_CONSECUTIVE_ERRORS) {
+            toast.info(`Tentativa ${consecutiveErrors}/${MAX_CONSECUTIVE_ERRORS}... reconectando`);
+            await new Promise((r) => setTimeout(r, 2000));
+            continue;
+          }
+          toast.error(`Servidor retornou erro ${res.status}. Tente novamente em instantes.`);
+          break;
+        }
+
+        const data = await res.json();
+
+        if (!data.success) {
+          const partialSynced = data.orders?.synced || 0;
+          totalSynced += partialSynced;
+
+          if (data.hasMore && partialSynced > 0) {
+            consecutiveErrors++;
+            nextUrl = data.nextUrl;
+            syncLogId = data.syncLogId;
+            toast.info(`${totalSynced} pedidos importados, retomando...`);
+            await new Promise((r) => setTimeout(r, 1000));
+            continue;
+          }
+
+          toast.error(`Erro ao sincronizar: ${data.error || data.orders?.error || "Erro desconhecido"}`);
+          break;
+        }
+
+        consecutiveErrors = 0;
+        totalSynced += data.orders?.synced || 0;
+        hasMore = data.hasMore === true;
+        nextUrl = data.nextUrl;
+        syncLogId = data.syncLogId;
+
+        if (hasMore) {
+          toast.info(`Sincronizando... ${totalSynced} pedidos importados, continuando...`);
+        }
+      } catch {
+        consecutiveErrors++;
+        if (consecutiveErrors < MAX_CONSECUTIVE_ERRORS) {
+          toast.info(`Reconectando... tentativa ${consecutiveErrors}/${MAX_CONSECUTIVE_ERRORS}`);
+          await new Promise((r) => setTimeout(r, 2000));
+          continue;
+        }
+        toast.error("Erro de conexão ao sincronizar. Tente novamente.");
+        break;
+      }
+    }
+
+    if (totalSynced > 0) {
+      toast.success(`Sincronização concluída! ${totalSynced} pedidos sincronizados.`);
+    } else if (consecutiveErrors === 0) {
+      toast.success("Sincronização concluída! Nenhum pedido novo.");
+    }
+    loadIntegrations();
+    return totalSynced;
+  }
+
   async function handleSync(platform: Platform) {
     setSyncing(platform);
 
     if (platform === "NUVEMSHOP") {
       await syncNuvemshopWithContinuation();
+      setSyncing(null);
+      return;
+    }
+
+    if (platform === "SHOPIFY") {
+      await syncShopifyWithContinuation();
       setSyncing(null);
       return;
     }

@@ -296,96 +296,277 @@ export async function fetchShopifyOrders(integrationId: string) {
   return allOrders;
 }
 
-export async function syncShopifyOrders(organizationId: string) {
+// --- Shopify Sync with time budget, cursor, and parallel upserts ---
+
+interface ShopifySyncOptions {
+  nextUrl?: string;
+  syncLogId?: string;
+  timeBudgetMs?: number;
+}
+
+interface ShopifySyncResult {
+  success?: boolean;
+  error?: string;
+  synced: number;
+  hasMore: boolean;
+  nextUrl?: string;
+  syncLogId?: string;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function buildShopifyOrderUpsertArgs(organizationId: string, order: any) {
+  const customer = order.customer;
+  const customerName = customer
+    ? `${customer.first_name || ""} ${customer.last_name || ""}`.trim() || null
+    : null;
+  return {
+    where: {
+      organizationId_platform_externalOrderId: {
+        organizationId,
+        platform: "SHOPIFY" as const,
+        externalOrderId: String(order.id),
+      },
+    },
+    create: {
+      organizationId,
+      platform: "SHOPIFY" as const,
+      externalOrderId: String(order.id),
+      status: mapShopifyStatus(order.financial_status),
+      customerName,
+      customerEmail: customer?.email || null,
+      totalAmount: parseFloat(order.current_total_price || order.total_price || "0"),
+      currency: order.currency || "BRL",
+      itemCount: order.line_items?.length || 0,
+      orderDate: parseShopifyLocalDate(order.created_at),
+      rawData: order,
+    },
+    update: {
+      status: mapShopifyStatus(order.financial_status),
+      totalAmount: parseFloat(order.current_total_price || order.total_price || "0"),
+      customerName,
+      customerEmail: customer?.email || null,
+      itemCount: order.line_items?.length || 0,
+      orderDate: parseShopifyLocalDate(order.created_at),
+      rawData: order,
+    },
+  };
+}
+
+async function upsertShopifyOrdersParallel(
+  organizationId: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  orders: any[],
+  concurrency = 5
+): Promise<number> {
+  let saved = 0;
+  for (let i = 0; i < orders.length; i += concurrency) {
+    const batch = orders.slice(i, i + concurrency);
+    const results = await Promise.allSettled(
+      batch.map((order) =>
+        prisma.order.upsert(buildShopifyOrderUpsertArgs(organizationId, order))
+      )
+    );
+    saved += results.filter((r) => r.status === "fulfilled").length;
+  }
+  return saved;
+}
+
+export async function syncShopifyOrders(
+  organizationId: string,
+  options: ShopifySyncOptions = {}
+): Promise<ShopifySyncResult> {
+  const { timeBudgetMs = 50000 } = options;
+  const startTime = Date.now();
+
   const integration = await prisma.integration.findUnique({
     where: { organizationId_platform: { organizationId, platform: "SHOPIFY" } },
   });
 
   if (!integration || integration.status !== "CONNECTED") {
-    return { error: "Shopify not connected" };
+    return { error: "Shopify not connected", synced: 0, hasMore: false };
   }
 
-  await prisma.integration.update({
-    where: { id: integration.id },
-    data: { syncStatus: "SYNCING" },
-  });
+  if (!integration.accessToken) {
+    return { error: "Access token not found", synced: 0, hasMore: false };
+  }
 
-  const syncLog = await prisma.syncLog.create({
-    data: {
-      organizationId,
-      platform: "SHOPIFY",
-      status: "SYNCING",
-    },
-  });
+  const accessToken = decrypt(integration.accessToken);
+  const shop = integration.externalStoreId || "";
 
-  try {
-    const orders = await fetchShopifyOrders(integration.id);
-    let synced = 0;
+  // Determine starting URL: explicit option > saved cursor > fresh start
+  let currentUrl: string | null = options.nextUrl || null;
+  const meta = (integration.metadata as Record<string, unknown>) || {};
 
-    for (const order of orders) {
-      await prisma.order.upsert({
-        where: {
-          organizationId_platform_externalOrderId: {
-            organizationId,
-            platform: "SHOPIFY",
-            externalOrderId: String(order.id),
-          },
-        },
-        create: {
-          organizationId,
-          platform: "SHOPIFY",
-          externalOrderId: String(order.id),
-          status: mapShopifyStatus(order.financial_status),
-          customerName: order.customer
-            ? `${order.customer.first_name || ""} ${order.customer.last_name || ""}`.trim()
-            : null,
-          customerEmail: order.customer?.email || null,
-          totalAmount: parseFloat(order.current_total_price || order.total_price || "0"),
-          currency: order.currency || "BRL",
-          itemCount: order.line_items?.length || 0,
-          orderDate: parseShopifyLocalDate(order.created_at),
-          rawData: order,
-        },
-        update: {
-          status: mapShopifyStatus(order.financial_status),
-          totalAmount: parseFloat(order.current_total_price || order.total_price || "0"),
-          customerName: order.customer
-            ? `${order.customer.first_name || ""} ${order.customer.last_name || ""}`.trim()
-            : null,
-          customerEmail: order.customer?.email || null,
-          itemCount: order.line_items?.length || 0,
-          orderDate: parseShopifyLocalDate(order.created_at),
-          rawData: order,
-        },
-      });
-      synced++;
+  if (!currentUrl && !options.syncLogId) {
+    const cursor = meta.syncCursor as { nextUrl?: string; syncLogId?: string } | undefined;
+    if (cursor?.nextUrl) {
+      currentUrl = cursor.nextUrl;
+      options.syncLogId = cursor.syncLogId;
+      console.log("[Shopify Sync] Resuming from saved cursor");
     }
+  }
 
+  if (!currentUrl) {
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+    currentUrl = `https://${shop}/admin/api/${SHOPIFY_API_VERSION}/orders.json?status=any&limit=250&created_at_min=${ninetyDaysAgo.toISOString()}`;
+  }
+
+  // First call: set SYNCING + create SyncLog
+  const isFirstCall = !options.syncLogId;
+  let logId = options.syncLogId || "";
+
+  if (isFirstCall) {
     await prisma.integration.update({
       where: { id: integration.id },
-      data: { syncStatus: "SUCCESS", lastSyncAt: new Date() },
+      data: { syncStatus: "SYNCING", errorMessage: null },
+    });
+    const syncLog = await prisma.syncLog.create({
+      data: { organizationId, platform: "SHOPIFY", status: "SYNCING" },
+    });
+    logId = syncLog.id;
+  }
+
+  let totalSyncedThisCall = 0;
+
+  try {
+    while (currentUrl) {
+      // Check time budget BEFORE fetching next page
+      if (Date.now() - startTime > timeBudgetMs) {
+        console.log(`[Shopify Sync] Time budget reached (${timeBudgetMs}ms), saving cursor`);
+        await prisma.integration.update({
+          where: { id: integration.id },
+          data: {
+            metadata: { ...meta, syncCursor: { nextUrl: currentUrl, syncLogId: logId } } as unknown as Record<string, string | number | boolean | null>,
+          },
+        });
+        if (logId) {
+          await prisma.syncLog.update({
+            where: { id: logId },
+            data: { recordsSynced: totalSyncedThisCall },
+          }).catch(() => {});
+        }
+        return {
+          success: true,
+          synced: totalSyncedThisCall,
+          hasMore: true,
+          nextUrl: currentUrl,
+          syncLogId: logId,
+        };
+      }
+
+      // Fetch one page from Shopify API
+      const response: Response = await fetch(currentUrl, {
+        headers: {
+          "X-Shopify-Access-Token": accessToken,
+          "Content-Type": "application/json",
+        },
+        signal: AbortSignal.timeout(15000),
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        console.error("[Shopify API] Orders fetch failed:", response.status, errorBody);
+
+        if (response.status === 401) {
+          await prisma.integration.update({
+            where: { id: integration.id },
+            data: { status: "DISCONNECTED", errorMessage: "Token expirado ou invalido. Reconecte a Shopify." },
+          });
+          throw new Error("Token Shopify expirado. Reconecte a integracao.");
+        }
+
+        if (response.status === 429) {
+          // Rate limited — save cursor and return for retry
+          console.warn("[Shopify Sync] Rate limited (429), saving cursor for retry");
+          await prisma.integration.update({
+            where: { id: integration.id },
+            data: {
+              metadata: { ...meta, syncCursor: { nextUrl: currentUrl, syncLogId: logId } } as unknown as Record<string, string | number | boolean | null>,
+            },
+          });
+          return {
+            success: true,
+            synced: totalSyncedThisCall,
+            hasMore: true,
+            nextUrl: currentUrl,
+            syncLogId: logId,
+          };
+        }
+
+        throw new Error(`Shopify API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const orders = data.orders || [];
+
+      // Parallel upserts (5 concurrent)
+      if (orders.length > 0) {
+        const saved = await upsertShopifyOrdersParallel(organizationId, orders);
+        totalSyncedThisCall += saved;
+      }
+
+      console.log(`[Shopify Sync] Page done: ${orders.length} fetched, ${totalSyncedThisCall} total saved`);
+
+      // Follow Link header for next page
+      const linkHeader: string | null = response.headers.get("Link");
+      currentUrl = null;
+      if (linkHeader) {
+        const nextMatch: RegExpMatchArray | null = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
+        if (nextMatch) {
+          currentUrl = nextMatch[1];
+        }
+      }
+    }
+
+    // All pages done — clear cursor, mark SUCCESS
+    const { syncCursor: _, ...restMeta } = meta;
+    await prisma.integration.update({
+      where: { id: integration.id },
+      data: {
+        syncStatus: "SUCCESS",
+        lastSyncAt: new Date(),
+        metadata: restMeta as Record<string, string | number | boolean | null>,
+        errorMessage: null,
+      },
     });
 
-    await prisma.syncLog.update({
-      where: { id: syncLog.id },
-      data: { status: "SUCCESS", recordsSynced: synced, completedAt: new Date() },
-    });
+    if (logId) {
+      await prisma.syncLog.update({
+        where: { id: logId },
+        data: { status: "SUCCESS", recordsSynced: totalSyncedThisCall, completedAt: new Date() },
+      }).catch(() => {});
+    }
 
-    return { success: true, synced };
+    return { success: true, synced: totalSyncedThisCall, hasMore: false, syncLogId: logId };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : "Unknown error";
 
-    await prisma.integration.update({
-      where: { id: integration.id },
-      data: { syncStatus: "FAILED", errorMessage: errorMsg },
-    });
+    // Save cursor on error if partial progress was made
+    if (totalSyncedThisCall > 0 && currentUrl) {
+      await prisma.integration.update({
+        where: { id: integration.id },
+        data: {
+          syncStatus: "FAILED",
+          errorMessage: errorMsg,
+          metadata: { ...meta, syncCursor: { nextUrl: currentUrl, syncLogId: logId } } as unknown as Record<string, string | number | boolean | null>,
+        },
+      }).catch(() => {});
+    } else {
+      await prisma.integration.update({
+        where: { id: integration.id },
+        data: { syncStatus: "FAILED", errorMessage: errorMsg },
+      }).catch(() => {});
+    }
 
-    await prisma.syncLog.update({
-      where: { id: syncLog.id },
-      data: { status: "FAILED", errorMessage: errorMsg, completedAt: new Date() },
-    });
+    if (logId) {
+      await prisma.syncLog.update({
+        where: { id: logId },
+        data: { status: "FAILED", errorMessage: errorMsg, completedAt: new Date() },
+      }).catch(() => {});
+    }
 
-    return { error: errorMsg };
+    return { error: errorMsg, synced: totalSyncedThisCall, hasMore: false };
   }
 }
 
