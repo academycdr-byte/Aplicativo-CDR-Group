@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     const orgId = membership.organizationId;
 
     try {
-        let body: { startPhase?: number; syncLogId?: string; forceFullSync?: boolean } = {};
+        let body: { startPhase?: number; accountIndex?: number; syncLogId?: string; forceFullSync?: boolean } = {};
         try {
             body = await request.json();
         } catch {
@@ -47,6 +47,7 @@ export async function POST(request: NextRequest) {
 
         const result = await syncFacebookAdsMetrics(orgId, {
             startPhase: body.startPhase,
+            accountIndex: body.accountIndex,
             syncLogId: body.syncLogId,
             timeBudgetMs: 45000,
         });
@@ -57,6 +58,7 @@ export async function POST(request: NextRequest) {
             error: result.error,
             hasMore: result.hasMore,
             nextPhase: result.nextPhase,
+            accountIndex: result.accountIndex,
             syncLogId: result.syncLogId,
         });
     } catch (error: unknown) {

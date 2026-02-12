@@ -57,16 +57,22 @@ export async function smartSync(): Promise<{ triggered: boolean }> {
 
   const integrations = await prisma.integration.findMany({
     where: { organizationId: ctx.organization.id, status: "CONNECTED" },
-    select: { id: true, lastSyncAt: true, syncStatus: true, updatedAt: true },
+    select: { id: true, lastSyncAt: true, syncStatus: true, updatedAt: true, metadata: true },
   });
 
   if (integrations.length === 0) return { triggered: false };
 
   // Recover from stuck SYNCING status (e.g. killed by Vercel timeout)
+  // BUT: don't mark as failed if there's an active sync cursor (multi-call continuation in progress)
   const now = Date.now();
-  const stuckSyncing = integrations.filter(
-    (i) => i.syncStatus === "SYNCING" && now - i.updatedAt.getTime() > STUCK_SYNCING_THRESHOLD_MS
-  );
+  const stuckSyncing = integrations.filter((i) => {
+    if (i.syncStatus !== "SYNCING") return false;
+    if (now - i.updatedAt.getTime() <= STUCK_SYNCING_THRESHOLD_MS) return false;
+    // Respect active cursors - these are legitimate multi-call syncs
+    const meta = i.metadata as Record<string, unknown> | null;
+    if (meta?.fbSyncCursor || meta?.syncCursor) return false;
+    return true;
+  });
 
   if (stuckSyncing.length > 0) {
     await prisma.integration.updateMany({

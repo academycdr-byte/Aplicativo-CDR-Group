@@ -198,8 +198,8 @@ async function saveInsightsToDB(
 
   let synced = 0;
 
-  // Batch upserts using Promise.all in groups of 20 for speed
-  const batchSize = 20;
+  // Batch upserts using Promise.all in groups of 50 for speed
+  const batchSize = 50;
   for (let i = 0; i < insights.length; i += batchSize) {
     const batch = insights.slice(i, i + batchSize);
     await Promise.all(
@@ -285,6 +285,7 @@ async function saveInsightsToDB(
 
 interface FbSyncOptions {
   startPhase?: number;
+  accountIndex?: number;
   syncLogId?: string;
   timeBudgetMs?: number;
 }
@@ -295,6 +296,7 @@ interface FbSyncResult {
   synced: number;
   hasMore: boolean;
   nextPhase?: number;
+  accountIndex?: number;
   syncLogId?: string;
 }
 
@@ -314,12 +316,14 @@ export async function syncFacebookAdsMetrics(
 
   // Determine starting phase: explicit option > saved cursor > phase 1
   let currentPhase = options.startPhase || 1;
+  let startAccountIndex = options.accountIndex;
   const meta = (integration.metadata as Record<string, unknown>) || {};
 
   if (!options.startPhase && !options.syncLogId) {
-    const cursor = meta.fbSyncCursor as { nextPhase?: number; syncLogId?: string } | undefined;
+    const cursor = meta.fbSyncCursor as { nextPhase?: number; accountIndex?: number; syncLogId?: string } | undefined;
     if (cursor?.nextPhase) {
       currentPhase = cursor.nextPhase;
+      startAccountIndex = cursor.accountIndex;
       options.syncLogId = cursor.syncLogId;
     }
   }
@@ -392,11 +396,11 @@ export async function syncFacebookAdsMetrics(
       `https://graph.facebook.com/${FB_GRAPH_VERSION}/act_${adAccountId}/insights?fields=${fields}&level=ad&time_range=${encodeURIComponent(JSON.stringify({ since, until }))}&time_increment=1&limit=500&access_token=${accessToken}`;
 
     // Helper: save phase cursor and return hasMore
-    const saveCursorAndReturn = async (nextPhase: number): Promise<FbSyncResult> => {
+    const saveCursorAndReturn = async (nextPhase: number, accountIdx?: number): Promise<FbSyncResult> => {
       await prisma.integration.update({
         where: { id: integration.id },
         data: {
-          metadata: { ...latestMeta, fbSyncCursor: { nextPhase, syncLogId: logId } } as unknown as Record<string, string | number | boolean | null>,
+          metadata: { ...latestMeta, fbSyncCursor: { nextPhase, accountIndex: accountIdx, syncLogId: logId } } as unknown as Record<string, string | number | boolean | null>,
         },
       });
       if (logId) {
@@ -410,61 +414,119 @@ export async function syncFacebookAdsMetrics(
         synced: totalSynced,
         hasMore: true,
         nextPhase,
+        accountIndex: accountIdx,
         syncLogId: logId,
       };
     };
 
-    // ===== PHASE-BASED SYNC WITH CONTINUATION =====
+    // ===== PHASE-BASED SYNC WITH PAGE-BY-PAGE PROCESSING =====
+
+    // Helper: fetch insights page by page, saving each page immediately
+    // Returns number of records synced. Checks time budget between pages.
+    const fetchAndSavePageByPage = async (
+      url: string,
+      adAccountId: string,
+    ): Promise<{ synced: number; timedOut: boolean }> => {
+      let synced = 0;
+      let pageUrl: string | null = url;
+
+      while (pageUrl) {
+        const response: Response = await fetch(pageUrl);
+        if (!response.ok) {
+          const errorBody = await response.text();
+          console.error("[Facebook Ads] Insights fetch failed:", response.status, errorBody);
+          break;
+        }
+
+        const data: { data?: Record<string, unknown>[]; error?: unknown; paging?: { next?: string } } = await response.json();
+        if (data.error) {
+          console.error("[Facebook Ads] API error:", JSON.stringify(data.error));
+          break;
+        }
+
+        if (data.data && data.data.length > 0) {
+          synced += await saveInsightsToDB(data.data as any[], organizationId, noMedia, noMedia, adAccountId);
+        }
+
+        pageUrl = data.paging?.next || null;
+
+        // Check time budget between pages (most critical check)
+        if (pageUrl && !hasTimeLeft()) {
+          return { synced, timedOut: true };
+        }
+      }
+
+      return { synced, timedOut: false };
+    };
 
     // PHASE 1: Last 7 days for ALL accounts (highest priority)
     if (currentPhase <= 1) {
-      for (const adAccountId of accountIds) {
-        if (!hasTimeLeft()) return saveCursorAndReturn(1);
+      const startIdx = (currentPhase === 1 && startAccountIndex !== undefined) ? startAccountIndex : 0;
+      for (let ai = startIdx; ai < accountIds.length; ai++) {
+        if (!hasTimeLeft()) return saveCursorAndReturn(1, ai);
         try {
-          const insights = await fetchAllInsights(buildUrl(adAccountId, daysAgo(7), daysAgo(0)));
-          totalSynced += await saveInsightsToDB(insights, organizationId, noMedia, noMedia, adAccountId);
+          const result = await fetchAndSavePageByPage(
+            buildUrl(accountIds[ai], daysAgo(7), daysAgo(0)),
+            accountIds[ai],
+          );
+          totalSynced += result.synced;
+          if (result.timedOut) return saveCursorAndReturn(1, ai);
         } catch (err) {
-          accountErrors.push(`Phase1 act_${adAccountId}: ${err instanceof Error ? err.message : "Unknown"}`);
+          accountErrors.push(`Phase1 act_${accountIds[ai]}: ${err instanceof Error ? err.message : "Unknown"}`);
         }
       }
+      startAccountIndex = undefined; // Reset for next phase
       if (!hasTimeLeft()) return saveCursorAndReturn(2);
     }
 
     // PHASE 2: Days 8-30 for ALL accounts
     if (currentPhase <= 2) {
-      for (const adAccountId of accountIds) {
-        if (!hasTimeLeft()) return saveCursorAndReturn(2);
+      const startIdx = (currentPhase === 2 && startAccountIndex !== undefined) ? startAccountIndex : 0;
+      for (let ai = startIdx; ai < accountIds.length; ai++) {
+        if (!hasTimeLeft()) return saveCursorAndReturn(2, ai);
         try {
-          const insights = await fetchAllInsights(buildUrl(adAccountId, daysAgo(30), daysAgo(7)));
-          totalSynced += await saveInsightsToDB(insights, organizationId, noMedia, noMedia, adAccountId);
+          const result = await fetchAndSavePageByPage(
+            buildUrl(accountIds[ai], daysAgo(30), daysAgo(7)),
+            accountIds[ai],
+          );
+          totalSynced += result.synced;
+          if (result.timedOut) return saveCursorAndReturn(2, ai);
         } catch (err) {
-          accountErrors.push(`Phase2 act_${adAccountId}: ${err instanceof Error ? err.message : "Unknown"}`);
+          accountErrors.push(`Phase2 act_${accountIds[ai]}: ${err instanceof Error ? err.message : "Unknown"}`);
         }
       }
+      startAccountIndex = undefined;
       if (!hasTimeLeft()) return saveCursorAndReturn(3);
     }
 
     // PHASE 3: Days 31-90 for ALL accounts
     if (currentPhase <= 3) {
-      for (const adAccountId of accountIds) {
-        if (!hasTimeLeft()) return saveCursorAndReturn(3);
+      const startIdx = (currentPhase === 3 && startAccountIndex !== undefined) ? startAccountIndex : 0;
+      for (let ai = startIdx; ai < accountIds.length; ai++) {
+        if (!hasTimeLeft()) return saveCursorAndReturn(3, ai);
         try {
-          const insights = await fetchAllInsights(buildUrl(adAccountId, daysAgo(90), daysAgo(30)));
-          totalSynced += await saveInsightsToDB(insights, organizationId, noMedia, noMedia, adAccountId);
+          const result = await fetchAndSavePageByPage(
+            buildUrl(accountIds[ai], daysAgo(90), daysAgo(30)),
+            accountIds[ai],
+          );
+          totalSynced += result.synced;
+          if (result.timedOut) return saveCursorAndReturn(3, ai);
         } catch (err) {
-          accountErrors.push(`Phase3 act_${adAccountId}: ${err instanceof Error ? err.message : "Unknown"}`);
+          accountErrors.push(`Phase3 act_${accountIds[ai]}: ${err instanceof Error ? err.message : "Unknown"}`);
         }
       }
+      startAccountIndex = undefined;
       if (!hasTimeLeft()) return saveCursorAndReturn(4);
     }
 
     // PHASE 4: Fetch thumbnails/videos for ALL accounts
     if (currentPhase <= 4) {
-      for (const adAccountId of accountIds) {
-        if (!hasTimeLeft()) return saveCursorAndReturn(4);
+      const startIdx = (currentPhase === 4 && startAccountIndex !== undefined) ? startAccountIndex : 0;
+      for (let ai = startIdx; ai < accountIds.length; ai++) {
+        if (!hasTimeLeft()) return saveCursorAndReturn(4, ai);
         try {
           const recentMetrics = await prisma.adMetric.findMany({
-            where: { organizationId, platform: "FACEBOOK_ADS", accountId: adAccountId, thumbnailUrl: null, adId: { not: null } },
+            where: { organizationId, platform: "FACEBOOK_ADS", accountId: accountIds[ai], thumbnailUrl: null, adId: { not: null } },
             select: { adId: true },
             distinct: ["adId"],
             take: 100,
@@ -496,13 +558,15 @@ export async function syncFacebookAdsMetrics(
           // Non-fatal: thumbnails can be fetched on next sync
         }
       }
+      startAccountIndex = undefined;
       if (!hasTimeLeft()) return saveCursorAndReturn(5);
     }
 
     // PHASE 5: Older data 91-365 days for ALL accounts
     if (currentPhase <= 5) {
-      for (const adAccountId of accountIds) {
-        if (!hasTimeLeft()) return saveCursorAndReturn(5);
+      const startIdx = (currentPhase === 5 && startAccountIndex !== undefined) ? startAccountIndex : 0;
+      for (let ai = startIdx; ai < accountIds.length; ai++) {
+        if (!hasTimeLeft()) return saveCursorAndReturn(5, ai);
         const olderChunks: { since: string; until: string }[] = [];
         for (let offset = 90; offset < 365; offset += 90) {
           olderChunks.push({
@@ -512,10 +576,14 @@ export async function syncFacebookAdsMetrics(
         }
 
         for (const chunk of olderChunks) {
-          if (!hasTimeLeft()) return saveCursorAndReturn(5);
+          if (!hasTimeLeft()) return saveCursorAndReturn(5, ai);
           try {
-            const insights = await fetchAllInsights(buildUrl(adAccountId, chunk.since, chunk.until));
-            totalSynced += await saveInsightsToDB(insights, organizationId, noMedia, noMedia, adAccountId);
+            const result = await fetchAndSavePageByPage(
+              buildUrl(accountIds[ai], chunk.since, chunk.until),
+              accountIds[ai],
+            );
+            totalSynced += result.synced;
+            if (result.timedOut) return saveCursorAndReturn(5, ai);
           } catch {
             // Non-fatal for older data
           }

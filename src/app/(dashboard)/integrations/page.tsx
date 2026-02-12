@@ -437,11 +437,12 @@ function IntegrationsContent() {
   async function syncFacebookWithContinuation() {
     let hasMore = true;
     let nextPhase: number | undefined;
+    let accountIndex: number | undefined;
     let syncLogId: string | undefined;
     let totalSynced = 0;
     let iteration = 0;
     let consecutiveErrors = 0;
-    const MAX_ITERATIONS = 10;
+    const MAX_ITERATIONS = 20;
     const MAX_CONSECUTIVE_ERRORS = 3;
 
     while (hasMore && iteration < MAX_ITERATIONS && consecutiveErrors < MAX_CONSECUTIVE_ERRORS) {
@@ -453,6 +454,7 @@ function IntegrationsContent() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             ...(nextPhase ? { startPhase: nextPhase } : {}),
+            ...(accountIndex !== undefined ? { accountIndex } : {}),
             ...(syncLogId ? { syncLogId } : {}),
             ...(isFirstCall ? { forceFullSync: true } : {}),
           }),
@@ -480,10 +482,13 @@ function IntegrationsContent() {
         totalSynced += data.synced || 0;
         hasMore = data.hasMore === true;
         nextPhase = data.nextPhase;
+        accountIndex = data.accountIndex;
         syncLogId = data.syncLogId;
 
         if (hasMore) {
-          toast.info(`Sincronizando métricas... fase ${(nextPhase || 1) - 1} concluída, continuando...`);
+          const phaseNames: Record<number, string> = { 1: "7 dias", 2: "30 dias", 3: "90 dias", 4: "thumbnails", 5: "365 dias" };
+          const phaseName = phaseNames[nextPhase || 1] || `fase ${nextPhase}`;
+          toast.info(`Sincronizando métricas... ${totalSynced} importadas, próximo: ${phaseName}`);
         }
       } catch {
         consecutiveErrors++;
@@ -587,14 +592,7 @@ function IntegrationsContent() {
         setFbAccountDialog(false);
         toast.success(`${result.count} conta(s) conectada(s)! Sincronizando metricas...`);
         loadIntegrations();
-        syncPlatform("FACEBOOK_ADS").then((syncResult) => {
-          if ("error" in syncResult && syncResult.error) {
-            toast.error(`Erro ao sincronizar Facebook Ads: ${syncResult.error}`);
-          } else {
-            toast.success("Metricas do Facebook Ads sincronizadas!");
-            loadIntegrations();
-          }
-        });
+        syncFacebookWithContinuation();
       }
     } else if (selectedFbAccount) {
       const result = await selectFacebookAdAccount(selectedFbAccount);
@@ -604,14 +602,7 @@ function IntegrationsContent() {
         setFbAccountDialog(false);
         toast.success(`Conta "${result.accountName}" conectada! Sincronizando metricas...`);
         loadIntegrations();
-        syncPlatform("FACEBOOK_ADS").then((syncResult) => {
-          if ("error" in syncResult && syncResult.error) {
-            toast.error(`Erro ao sincronizar Facebook Ads: ${syncResult.error}`);
-          } else {
-            toast.success("Metricas do Facebook Ads sincronizadas!");
-            loadIntegrations();
-          }
-        });
+        syncFacebookWithContinuation();
       }
     }
     setLoading(false);
