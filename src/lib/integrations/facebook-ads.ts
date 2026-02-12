@@ -467,8 +467,9 @@ export async function syncFacebookAdsMetrics(
     // Do not save cursor for this phase, as it must run on every sync start
     if (currentPhase <= 1) { // Implicitly includes "start of sync"
       console.log(`[Facebook Ads] Phase 0: Fetching recent data (Yesterday + Today) for freshness`);
-      for (const accountId of accountIds) {
-        if (!hasTimeLeft()) break; // If budget exhausted just by Phase 0, we'll resume Phase 1 next time
+
+      const freshnessPromises = accountIds.map(async (accountId) => {
+        if (!hasTimeLeft()) return;
         try {
           // Fetch last 2 days (Yesterday + Today)
           await fetchAndSavePageByPage(
@@ -476,10 +477,12 @@ export async function syncFacebookAdsMetrics(
             accountId,
           );
         } catch (err) {
-          // Non-fatal, just log and continue to main phases
+          // Non-fatal, just log
           console.warn(`[Facebook Ads] Phase 0 freshness fetch failed for ${accountId}:`, err);
         }
-      }
+      });
+
+      await Promise.all(freshnessPromises);
     }
 
     // PHASE 1: Last 7 days for ALL accounts (highest priority history)
