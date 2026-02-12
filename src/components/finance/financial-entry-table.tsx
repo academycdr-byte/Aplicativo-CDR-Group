@@ -298,15 +298,64 @@ export function FinancialEntryTable({
                 </Button>
             </div>
 
-            {/* Table */}
-            <div className="border rounded-md overflow-x-auto">
-                <Table className="min-w-[540px]">
+            {/* Mobile Cards */}
+            <div className="space-y-2 sm:hidden">
+                {filteredEntries.length === 0 ? (
+                    <div className="text-center py-8 text-sm text-muted-foreground border border-dashed rounded-lg">
+                        Nenhum lancamento registrado no periodo.
+                    </div>
+                ) : (
+                    filteredEntries.map((entry) => (
+                        <div key={entry.id} className="flex items-center gap-3 p-3 rounded-lg border border-border/50 bg-card/30">
+                            <div className="flex-1 min-w-0 space-y-1">
+                                <div className="flex items-center gap-2">
+                                    {entry.type === "income" ? (
+                                        <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px] shrink-0">
+                                            Receita
+                                        </Badge>
+                                    ) : (
+                                        <Badge className="bg-red-500/10 text-red-600 border-red-500/20 text-[10px] shrink-0">
+                                            Custo
+                                        </Badge>
+                                    )}
+                                    <span className="text-[11px] text-muted-foreground">{formatDate(entry.entryDate)}</span>
+                                </div>
+                                <div className="flex items-baseline justify-between gap-2">
+                                    <p className="text-xs text-muted-foreground truncate">
+                                        {getCategoryLabel(entry.category)}
+                                        {entry.description ? ` · ${entry.description}` : ""}
+                                    </p>
+                                    <span className={cn(
+                                        "text-sm font-bold shrink-0",
+                                        entry.type === "income" ? "text-emerald-600" : "text-red-600"
+                                    )}>
+                                        {entry.type === "income" ? "+" : "-"}{fmt(Number(entry.amount))}
+                                    </span>
+                                </div>
+                            </div>
+                            <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-8 w-8 shrink-0"
+                                disabled={deletingId === entry.id}
+                                onClick={() => handleDelete(entry.id)}
+                            >
+                                <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                            </Button>
+                        </div>
+                    ))
+                )}
+            </div>
+
+            {/* Desktop Table */}
+            <div className="border rounded-md overflow-x-auto hidden sm:block">
+                <Table>
                     <TableHeader>
                         <TableRow>
                             <TableHead>Data</TableHead>
                             <TableHead>Tipo</TableHead>
-                            <TableHead className="hidden sm:table-cell">Categoria</TableHead>
-                            <TableHead className="hidden sm:table-cell">Descricao</TableHead>
+                            <TableHead>Categoria</TableHead>
+                            <TableHead>Descricao</TableHead>
                             <TableHead className="text-right">Valor</TableHead>
                             <TableHead className="w-[60px]"></TableHead>
                         </TableRow>
@@ -317,17 +366,17 @@ export function FinancialEntryTable({
                                 <TableCell className="font-medium">{formatDate(entry.entryDate)}</TableCell>
                                 <TableCell>
                                     {entry.type === "income" ? (
-                                        <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px] sm:text-xs">
+                                        <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-xs">
                                             Receita
                                         </Badge>
                                     ) : (
-                                        <Badge className="bg-red-500/10 text-red-600 border-red-500/20 text-[10px] sm:text-xs">
+                                        <Badge className="bg-red-500/10 text-red-600 border-red-500/20 text-xs">
                                             Custo
                                         </Badge>
                                     )}
                                 </TableCell>
-                                <TableCell className="hidden sm:table-cell">{getCategoryLabel(entry.category)}</TableCell>
-                                <TableCell className="hidden sm:table-cell">{entry.description || "-"}</TableCell>
+                                <TableCell>{getCategoryLabel(entry.category)}</TableCell>
+                                <TableCell>{entry.description || "-"}</TableCell>
                                 <TableCell className={cn(
                                     "text-right font-medium",
                                     entry.type === "income" ? "text-emerald-600" : "text-red-600"
