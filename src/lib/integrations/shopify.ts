@@ -241,7 +241,9 @@ export async function fetchShopifyOrders(integrationId: string) {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let allOrders: any[] = [];
-  let url: string | null = `https://${shop}/admin/api/${SHOPIFY_API_VERSION}/orders.json?status=any&limit=250`;
+  const ninetyDaysAgo = new Date();
+  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+  let url: string | null = `https://${shop}/admin/api/${SHOPIFY_API_VERSION}/orders.json?status=any&limit=250&created_at_min=${ninetyDaysAgo.toISOString()}`;
   const MAX_ORDERS = 10000;
 
   while (url && allOrders.length < MAX_ORDERS) {
@@ -439,14 +441,14 @@ export async function syncShopifyFunnel(organizationId: string) {
     const shop = integration.externalStoreId || "";
 
     // Get orders by date from our database (with customer emails for repurchase rate)
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
     const [orders, allHistoricalOrders] = await Promise.all([
       prisma.order.findMany({
         where: {
           organizationId,
           platform: "SHOPIFY",
-          orderDate: { gte: thirtyDaysAgo },
+          orderDate: { gte: ninetyDaysAgo },
         },
         select: { orderDate: true, customerEmail: true },
       }),
@@ -571,7 +573,7 @@ export async function syncShopifyFunnel(organizationId: string) {
     console.warn("[Shopify Funnel] Strategy 1 failed, using Strategy 2 (sales + abandoned checkouts)");
 
     const salesSessions = await fetchSalesSessionData(shop, accessToken);
-    const abandonedByDate = await fetchAbandonedCheckoutsByDate(shop, accessToken, thirtyDaysAgo);
+    const abandonedByDate = await fetchAbandonedCheckoutsByDate(shop, accessToken, ninetyDaysAgo);
     const hasSalesSessionData = Object.keys(salesSessions).length > 0;
 
     // Merge all dates
@@ -709,11 +711,11 @@ async function fetchShopifySessionsFunnel(
 ): Promise<Record<string, DailyFunnelMetrics> | null> {
   const queries = [
     // Full funnel data (matches Shopify Analytics exactly)
-    `FROM sessions SHOW sessions, sessions_with_cart_additions, sessions_that_reached_checkout, sessions_that_completed_checkout, conversion_rate WHERE human_or_bot_session IN ('human', 'bot') TIMESERIES day SINCE -30d UNTIL today ORDER BY day ASC LIMIT 1000`,
+    `FROM sessions SHOW sessions, sessions_with_cart_additions, sessions_that_reached_checkout, sessions_that_completed_checkout, conversion_rate WHERE human_or_bot_session IN ('human', 'bot') TIMESERIES day SINCE -90d UNTIL today ORDER BY day ASC LIMIT 1000`,
     // Without WHERE filter as fallback
-    `FROM sessions SHOW sessions, sessions_with_cart_additions, sessions_that_reached_checkout, sessions_that_completed_checkout TIMESERIES day SINCE -30d UNTIL today ORDER BY day ASC`,
+    `FROM sessions SHOW sessions, sessions_with_cart_additions, sessions_that_reached_checkout, sessions_that_completed_checkout TIMESERIES day SINCE -90d UNTIL today ORDER BY day ASC`,
     // Sessions only fallback
-    `FROM sessions SHOW sessions TIMESERIES day SINCE -30d UNTIL today ORDER BY day ASC`,
+    `FROM sessions SHOW sessions TIMESERIES day SINCE -90d UNTIL today ORDER BY day ASC`,
   ];
 
   const versions = [SHOPIFY_GRAPHQL_VERSION, SHOPIFY_API_VERSION];
@@ -788,8 +790,8 @@ async function fetchSalesSessionData(
   const result: Record<string, number> = {};
 
   const queries = [
-    `FROM sales SHOW sessions GROUP BY day SINCE -30d UNTIL today ORDER BY day ASC`,
-    `FROM sales SHOW sessions GROUP BY day SINCE -30d`,
+    `FROM sales SHOW sessions GROUP BY day SINCE -90d UNTIL today ORDER BY day ASC`,
+    `FROM sales SHOW sessions GROUP BY day SINCE -90d`,
   ];
 
   for (const query of queries) {
@@ -836,8 +838,8 @@ async function fetchShopifyCustomerMetrics(
   const result: Record<string, { total: number; returning: number }> = {};
 
   const queries = [
-    `FROM sales SHOW returning_customers, customers TIMESERIES day SINCE -30d UNTIL today ORDER BY day ASC LIMIT 1000`,
-    `FROM sales SHOW returning_customers, customers GROUP BY day SINCE -30d UNTIL today ORDER BY day ASC`,
+    `FROM sales SHOW returning_customers, customers TIMESERIES day SINCE -90d UNTIL today ORDER BY day ASC LIMIT 1000`,
+    `FROM sales SHOW returning_customers, customers GROUP BY day SINCE -90d UNTIL today ORDER BY day ASC`,
   ];
 
   const versions = [SHOPIFY_GRAPHQL_VERSION, SHOPIFY_API_VERSION];
