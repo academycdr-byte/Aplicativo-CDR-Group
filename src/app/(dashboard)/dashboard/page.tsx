@@ -183,36 +183,34 @@ export default function DashboardPage() {
     });
   }
 
-  function fmt(amount: number) {
-    // If we have rates and currency is not BRL, convert
-    let value = amount;
-    let code: Currency = "BRL";
+  function fmtStandard(amount: number) {
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    }).format(amount);
+  }
 
-    if (currency !== "BRL" && exchangeRates) {
-      value = amount * (exchangeRates[currency] || 1);
-      code = currency;
+  function fmtRevenue(amount: number) {
+    let value = amount;
+
+    // Convert Source Currency -> BRL
+    // Example: 1000 GBP (source) / 0.14 (rate BRL->GBP) = 7142 BRL
+    if (currency !== "BRL" && exchangeRates && exchangeRates[currency]) {
+      value = amount / exchangeRates[currency];
     }
 
-    return new Intl.NumberFormat(CURRENCIES[code].locale, {
-      style: "currency",
-      currency: code,
-    }).format(value);
+    return fmtStandard(value);
   }
 
   function fmtShort(v: number) {
-    let value = v;
-    let code: Currency = "BRL";
+    const symbol = "R$";
 
-    if (currency !== "BRL" && exchangeRates) {
-      value = v * (exchangeRates[currency] || 1);
-      code = currency;
-    }
+    // No conversion for charts/short format as per request ("only revenue card")
+    // If user wants charts converted later, we can add logic here.
 
-    const symbol = CURRENCIES[code].symbol;
-
-    if (value >= 1000000) return `${symbol} ${(value / 1000000).toFixed(1)}M`;
-    if (value >= 1000) return `${symbol} ${(value / 1000).toFixed(1)}k`;
-    return `${symbol} ${value.toFixed(0)}`;
+    if (v >= 1000000) return `${symbol} ${(v / 1000000).toFixed(1)}M`;
+    if (v >= 1000) return `${symbol} ${(v / 1000).toFixed(1)}k`;
+    return `${symbol} ${v.toFixed(0)}`;
   }
 
   function fmtNum(v: number) {
@@ -250,7 +248,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard
           label="FATURAMENTO"
-          value={fmt(stats?.revenue || 0)}
+          value={fmtRevenue(stats?.revenue || 0)}
           change={stats?.revenueChange || "0%"}
           icon={TrendingUp}
           trend="up"
@@ -274,7 +272,7 @@ export default function DashboardPage() {
         />
         <KPICard
           label="INVESTIMENTO"
-          value={fmt(stats?.adSpend || 0)}
+          value={fmtStandard(stats?.adSpend || 0)}
           change={stats?.adSpendChange || "0%"}
           icon={DollarSign}
           trend="down"
@@ -394,7 +392,7 @@ export default function DashboardPage() {
                                   <span className="font-semibold tabular-nums text-foreground">
                                     {p.dataKey === "roas" ? `${Number(p.value).toFixed(2)}x`
                                       : p.dataKey === "compras" ? fmtNum(Number(p.value))
-                                        : fmt(Number(p.value))}
+                                        : fmtStandard(Number(p.value))}
                                   </span>
                                 </div>
                               );
@@ -502,7 +500,7 @@ export default function DashboardPage() {
                 data={profitData.dailyProfits}
                 totalProfit={profitData.totalProfit}
                 currentMonthLabel={getMonthLabel()}
-                formatter={fmt}
+                formatter={fmtStandard}
               />
             </div>
           </CardContent>
