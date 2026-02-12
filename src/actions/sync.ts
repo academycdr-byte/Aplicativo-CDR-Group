@@ -107,3 +107,25 @@ export async function smartSync(): Promise<{ triggered: boolean }> {
 
   return { triggered: true };
 }
+
+export async function syncRecent() {
+  const ctx = await getSessionWithOrg();
+  if (!ctx) return { error: "Not authenticated" };
+
+  // Only sync primary platforms for freshness: Facebook Ads & Shopify
+  // Facebook Ads supports "freshnessOnly" to skip history
+  // Shopify already does a fast freshness check at start
+
+  const orgId = ctx.organization.id;
+
+  // Parallelize for max speed
+  const results = await Promise.allSettled([
+    syncFacebookAdsMetrics(orgId, { freshnessOnly: true, timeBudgetMs: 20000 }),
+    syncShopifyOrders(orgId, { timeBudgetMs: 20000 })
+  ]);
+
+  return {
+    success: true,
+    results: results.map(r => r.status === "fulfilled" ? r.value : { error: r.reason })
+  };
+}

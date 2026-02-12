@@ -30,7 +30,7 @@ import {
 import { toast } from "sonner";
 import { loadAllDashboardData } from "@/actions/dashboard";
 import { getExchangeRates } from "@/actions/currency";
-import { syncAll } from "@/actions/sync";
+import { syncAll, syncRecent } from "@/actions/sync";
 import { PeriodSelector, periodToParams, type PeriodValue } from "@/components/period-selector";
 import { EstimatedProfitCalendar } from "@/components/estimated-profit-calendar";
 import { FunnelVisual, type FunnelStep, type FunnelRate } from "@/components/funnel-visual";
@@ -176,6 +176,15 @@ export default function DashboardPage() {
 
   useEffect(() => {
     loadData();
+
+    // Speculative sync on mount to ensure "Today" data is fresh 
+    // without user needing to click "Today" or "Sync"
+    console.log("Dashboard mounted: triggering background freshness check...");
+    syncRecent().then(() => {
+      console.log("Background freshness check completed.");
+      // Optional: reload data silently if we want to confirm freshness
+      // loadData(); 
+    });
   }, [loadData]);
 
   async function handleSync() {
