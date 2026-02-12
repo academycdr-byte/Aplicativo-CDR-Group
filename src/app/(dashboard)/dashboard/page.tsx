@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -190,16 +190,15 @@ export default function DashboardPage() {
     }).format(amount);
   }
 
-  function fmtRevenue(amount: number) {
-    let value = amount;
-
-    // Convert Source Currency -> BRL
-    // Example: 1000 GBP (source) / 0.14 (rate BRL->GBP) = 7142 BRL
+  function getConvertedValue(amount: number) {
     if (currency !== "BRL" && exchangeRates && exchangeRates[currency]) {
-      value = amount / exchangeRates[currency];
+      return amount / exchangeRates[currency];
     }
+    return amount;
+  }
 
-    return fmtStandard(value);
+  function fmtRevenue(amount: number) {
+    return fmtStandard(getConvertedValue(amount));
   }
 
   function fmtShort(v: number) {
@@ -216,6 +215,15 @@ export default function DashboardPage() {
   function fmtNum(v: number) {
     return new Intl.NumberFormat("pt-BR").format(v);
   }
+
+  const convertedMetrics = useMemo(() => {
+    return metricsData.map((m) => ({
+      ...m,
+      faturamento: getConvertedValue(m.faturamento),
+      ticketMedio: getConvertedValue(m.ticketMedio),
+      roas: getConvertedValue(m.roas),
+    }));
+  }, [metricsData, currency, exchangeRates]);
 
   const getMonthLabel = () => {
     const date = new Date();
@@ -286,7 +294,7 @@ export default function DashboardPage() {
         />
         <KPICard
           label="ROAS"
-          value={`${(stats?.roas || 0).toFixed(2)}x`}
+          value={`${getConvertedValue(stats?.roas || 0).toFixed(2)}x`}
           change="0%" // TODO: Add real daily change if available
           icon={Target}
           trend="neutral"
@@ -330,7 +338,7 @@ export default function DashboardPage() {
           <CardContent className="px-1 sm:px-6 pb-4 sm:pb-6">
             {metricsData.length > 0 ? (
               <ResponsiveContainer width="100%" height={280} className="sm:!h-[360px]">
-                <ComposedChart data={metricsData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+                <ComposedChart data={convertedMetrics} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
                   <defs>
                     <linearGradient id="gradFaturamento" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#10b981" stopOpacity={0.25} />
