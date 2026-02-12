@@ -442,7 +442,6 @@ export async function saveFinancialEntry(input: FinancialEntryInput) {
         },
     });
 
-    revalidatePath("/financeiro");
     return { success: true };
 }
 
@@ -473,6 +472,5 @@ export async function deleteFinancialEntry(id: string) {
         where: { id },
     });
 
-    revalidatePath("/financeiro");
     return { success: true };
 }
