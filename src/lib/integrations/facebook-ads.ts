@@ -283,23 +283,60 @@ async function saveInsightsToDB(
   return synced;
 }
 
-export async function syncFacebookAdsMetrics(organizationId: string) {
+interface FbSyncOptions {
+  startPhase?: number;
+  syncLogId?: string;
+  timeBudgetMs?: number;
+}
+
+interface FbSyncResult {
+  success?: boolean;
+  error?: string;
+  synced: number;
+  hasMore: boolean;
+  nextPhase?: number;
+  syncLogId?: string;
+}
+
+export async function syncFacebookAdsMetrics(
+  organizationId: string,
+  options: FbSyncOptions = {}
+): Promise<FbSyncResult> {
+  const { timeBudgetMs = 50_000 } = options;
+
   const integration = await prisma.integration.findUnique({
     where: { organizationId_platform: { organizationId, platform: "FACEBOOK_ADS" } },
   });
 
   if (!integration || integration.status !== "CONNECTED" || !integration.accessToken) {
-    return { error: "Facebook Ads not connected" };
+    return { error: "Facebook Ads not connected", synced: 0, hasMore: false };
   }
 
-  await prisma.integration.update({
-    where: { id: integration.id },
-    data: { syncStatus: "SYNCING" },
-  });
+  // Determine starting phase: explicit option > saved cursor > phase 1
+  let currentPhase = options.startPhase || 1;
+  const meta = (integration.metadata as Record<string, unknown>) || {};
 
-  const syncLog = await prisma.syncLog.create({
-    data: { organizationId, platform: "FACEBOOK_ADS", status: "SYNCING" },
-  });
+  if (!options.startPhase && !options.syncLogId) {
+    const cursor = meta.fbSyncCursor as { nextPhase?: number; syncLogId?: string } | undefined;
+    if (cursor?.nextPhase) {
+      currentPhase = cursor.nextPhase;
+      options.syncLogId = cursor.syncLogId;
+    }
+  }
+
+  const isFirstCall = !options.syncLogId;
+  let logId = options.syncLogId || "";
+
+  if (isFirstCall) {
+    await prisma.integration.update({
+      where: { id: integration.id },
+      data: { syncStatus: "SYNCING", errorMessage: null },
+    });
+    const syncLog = await prisma.syncLog.create({
+      data: { organizationId, platform: "FACEBOOK_ADS", status: "SYNCING" },
+    });
+    logId = syncLog.id;
+  }
 
   try {
     let accessToken = decrypt(integration.accessToken);
@@ -317,10 +354,10 @@ export async function syncFacebookAdsMetrics(organizationId: string) {
     }
 
     // Support multiple accounts from metadata
-    const metadata = integration.metadata as { selectedAccounts?: { id: string; name: string }[] } | null;
-    const selectedAccounts = metadata?.selectedAccounts || [];
-    const accountIds: string[] = selectedAccounts.length > 0
-      ? selectedAccounts.map((a) => a.id.replace("act_", ""))
+    const latestMeta = (integration.metadata as Record<string, unknown>) || {};
+    const selAccounts = (latestMeta as { selectedAccounts?: { id: string; name: string }[] }).selectedAccounts || [];
+    const accountIds: string[] = selAccounts.length > 0
+      ? selAccounts.map((a) => a.id.replace("act_", ""))
       : integration.externalAccountId ? [integration.externalAccountId] : [];
 
     if (accountIds.length === 0) {
@@ -339,7 +376,6 @@ export async function syncFacebookAdsMetrics(organizationId: string) {
 
     const today = new Date();
     const startTime = Date.now();
-    const TIME_BUDGET_MS = 50_000; // 50s safe margin within 60s Vercel limit
     let totalSynced = 0;
     const noMedia: Record<string, string> = {};
     const accountErrors: string[] = [];
@@ -350,50 +386,82 @@ export async function syncFacebookAdsMetrics(organizationId: string) {
       return toBrasiliaDateStr(d);
     };
 
-    const hasTimeLeft = () => Date.now() - startTime < TIME_BUDGET_MS;
+    const hasTimeLeft = () => Date.now() - startTime < timeBudgetMs;
 
     const buildUrl = (adAccountId: string, since: string, until: string) =>
       `https://graph.facebook.com/${FB_GRAPH_VERSION}/act_${adAccountId}/insights?fields=${fields}&level=ad&time_range=${encodeURIComponent(JSON.stringify({ since, until }))}&time_increment=1&limit=500&access_token=${accessToken}`;
 
-    // ===== BREADTH-FIRST SYNC: Recent data for ALL accounts first =====
+    // Helper: save phase cursor and return hasMore
+    const saveCursorAndReturn = async (nextPhase: number): Promise<FbSyncResult> => {
+      await prisma.integration.update({
+        where: { id: integration.id },
+        data: {
+          metadata: { ...latestMeta, fbSyncCursor: { nextPhase, syncLogId: logId } } as unknown as Record<string, string | number | boolean | null>,
+        },
+      });
+      if (logId) {
+        await prisma.syncLog.update({
+          where: { id: logId },
+          data: { recordsSynced: totalSynced },
+        }).catch(() => {});
+      }
+      return {
+        success: true,
+        synced: totalSynced,
+        hasMore: true,
+        nextPhase,
+        syncLogId: logId,
+      };
+    };
+
+    // ===== PHASE-BASED SYNC WITH CONTINUATION =====
 
     // PHASE 1: Last 7 days for ALL accounts (highest priority)
-    for (const adAccountId of accountIds) {
-      if (!hasTimeLeft()) break;
-      try {
-        const insights = await fetchAllInsights(buildUrl(adAccountId, daysAgo(7), daysAgo(0)));
-        totalSynced += await saveInsightsToDB(insights, organizationId, noMedia, noMedia, adAccountId);
-      } catch (err) {
-        accountErrors.push(`Phase1 act_${adAccountId}: ${err instanceof Error ? err.message : "Unknown"}`);
+    if (currentPhase <= 1) {
+      for (const adAccountId of accountIds) {
+        if (!hasTimeLeft()) return saveCursorAndReturn(1);
+        try {
+          const insights = await fetchAllInsights(buildUrl(adAccountId, daysAgo(7), daysAgo(0)));
+          totalSynced += await saveInsightsToDB(insights, organizationId, noMedia, noMedia, adAccountId);
+        } catch (err) {
+          accountErrors.push(`Phase1 act_${adAccountId}: ${err instanceof Error ? err.message : "Unknown"}`);
+        }
       }
+      if (!hasTimeLeft()) return saveCursorAndReturn(2);
     }
 
     // PHASE 2: Days 8-30 for ALL accounts
-    for (const adAccountId of accountIds) {
-      if (!hasTimeLeft()) break;
-      try {
-        const insights = await fetchAllInsights(buildUrl(adAccountId, daysAgo(30), daysAgo(7)));
-        totalSynced += await saveInsightsToDB(insights, organizationId, noMedia, noMedia, adAccountId);
-      } catch (err) {
-        accountErrors.push(`Phase2 act_${adAccountId}: ${err instanceof Error ? err.message : "Unknown"}`);
+    if (currentPhase <= 2) {
+      for (const adAccountId of accountIds) {
+        if (!hasTimeLeft()) return saveCursorAndReturn(2);
+        try {
+          const insights = await fetchAllInsights(buildUrl(adAccountId, daysAgo(30), daysAgo(7)));
+          totalSynced += await saveInsightsToDB(insights, organizationId, noMedia, noMedia, adAccountId);
+        } catch (err) {
+          accountErrors.push(`Phase2 act_${adAccountId}: ${err instanceof Error ? err.message : "Unknown"}`);
+        }
       }
+      if (!hasTimeLeft()) return saveCursorAndReturn(3);
     }
 
     // PHASE 3: Days 31-90 for ALL accounts
-    for (const adAccountId of accountIds) {
-      if (!hasTimeLeft()) break;
-      try {
-        const insights = await fetchAllInsights(buildUrl(adAccountId, daysAgo(90), daysAgo(30)));
-        totalSynced += await saveInsightsToDB(insights, organizationId, noMedia, noMedia, adAccountId);
-      } catch (err) {
-        accountErrors.push(`Phase3 act_${adAccountId}: ${err instanceof Error ? err.message : "Unknown"}`);
+    if (currentPhase <= 3) {
+      for (const adAccountId of accountIds) {
+        if (!hasTimeLeft()) return saveCursorAndReturn(3);
+        try {
+          const insights = await fetchAllInsights(buildUrl(adAccountId, daysAgo(90), daysAgo(30)));
+          totalSynced += await saveInsightsToDB(insights, organizationId, noMedia, noMedia, adAccountId);
+        } catch (err) {
+          accountErrors.push(`Phase3 act_${adAccountId}: ${err instanceof Error ? err.message : "Unknown"}`);
+        }
       }
+      if (!hasTimeLeft()) return saveCursorAndReturn(4);
     }
 
-    // PHASE 3.5: Fetch thumbnails/videos for ALL accounts (if time allows)
-    if (hasTimeLeft()) {
+    // PHASE 4: Fetch thumbnails/videos for ALL accounts
+    if (currentPhase <= 4) {
       for (const adAccountId of accountIds) {
-        if (!hasTimeLeft()) break;
+        if (!hasTimeLeft()) return saveCursorAndReturn(4);
         try {
           const recentMetrics = await prisma.adMetric.findMany({
             where: { organizationId, platform: "FACEBOOK_ADS", accountId: adAccountId, thumbnailUrl: null, adId: { not: null } },
@@ -409,7 +477,7 @@ export async function syncFacebookAdsMetrics(organizationId: string) {
             ]);
             const updateIds = adIdsToFetch.filter((id) => thumbnails[id] || videoUrls[id]);
             for (let i = 0; i < updateIds.length; i += 30) {
-              if (!hasTimeLeft()) break;
+              if (!hasTimeLeft()) return saveCursorAndReturn(5);
               const batch = updateIds.slice(i, i + 30);
               await Promise.all(
                 batch.map((adId) =>
@@ -428,12 +496,13 @@ export async function syncFacebookAdsMetrics(organizationId: string) {
           // Non-fatal: thumbnails can be fetched on next sync
         }
       }
+      if (!hasTimeLeft()) return saveCursorAndReturn(5);
     }
 
-    // PHASE 4: Older data 91-365 days for ALL accounts (if time allows)
-    if (hasTimeLeft()) {
+    // PHASE 5: Older data 91-365 days for ALL accounts
+    if (currentPhase <= 5) {
       for (const adAccountId of accountIds) {
-        if (!hasTimeLeft()) break;
+        if (!hasTimeLeft()) return saveCursorAndReturn(5);
         const olderChunks: { since: string; until: string }[] = [];
         for (let offset = 90; offset < 365; offset += 90) {
           olderChunks.push({
@@ -443,7 +512,7 @@ export async function syncFacebookAdsMetrics(organizationId: string) {
         }
 
         for (const chunk of olderChunks) {
-          if (!hasTimeLeft()) break;
+          if (!hasTimeLeft()) return saveCursorAndReturn(5);
           try {
             const insights = await fetchAllInsights(buildUrl(adAccountId, chunk.since, chunk.until));
             totalSynced += await saveInsightsToDB(insights, organizationId, noMedia, noMedia, adAccountId);
@@ -454,35 +523,42 @@ export async function syncFacebookAdsMetrics(organizationId: string) {
       }
     }
 
+    // ALL PHASES DONE — clear cursor, mark SUCCESS
+    const { fbSyncCursor: _, ...restMeta } = latestMeta;
     await prisma.integration.update({
       where: { id: integration.id },
       data: {
         syncStatus: "SUCCESS",
         lastSyncAt: new Date(),
+        metadata: restMeta as Record<string, string | number | boolean | null>,
         errorMessage: accountErrors.length > 0 ? `Partial errors: ${accountErrors.join("; ")}` : null,
       },
     });
 
-    await prisma.syncLog.update({
-      where: { id: syncLog.id },
-      data: { status: "SUCCESS", recordsSynced: totalSynced, completedAt: new Date() },
-    });
+    if (logId) {
+      await prisma.syncLog.update({
+        where: { id: logId },
+        data: { status: "SUCCESS", recordsSynced: totalSynced, completedAt: new Date() },
+      }).catch(() => {});
+    }
 
-    return { success: true, synced: totalSynced };
+    return { success: true, synced: totalSynced, hasMore: false, syncLogId: logId };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : "Unknown error";
 
     await prisma.integration.update({
       where: { id: integration.id },
       data: { syncStatus: "FAILED", errorMessage: errorMsg },
-    });
+    }).catch(() => {});
 
-    await prisma.syncLog.update({
-      where: { id: syncLog.id },
-      data: { status: "FAILED", errorMessage: errorMsg, completedAt: new Date() },
-    });
+    if (logId) {
+      await prisma.syncLog.update({
+        where: { id: logId },
+        data: { status: "FAILED", errorMessage: errorMsg, completedAt: new Date() },
+      }).catch(() => {});
+    }
 
-    return { error: errorMsg };
+    return { error: errorMsg, synced: 0, hasMore: false };
   }
 }
 

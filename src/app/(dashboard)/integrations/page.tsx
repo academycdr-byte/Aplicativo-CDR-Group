@@ -142,14 +142,7 @@ function IntegrationsContent() {
       toast.error(`Configuracao Shopify incorreta${detail ? `: ${detail}` : ""}`, { duration: 10000 });
     } else if (success === "facebook") {
       toast.success("Facebook Ads conectado com sucesso! Sincronizando metricas...");
-      syncPlatform("FACEBOOK_ADS").then((result) => {
-        if ("error" in result && result.error) {
-          toast.error(`Erro ao sincronizar Facebook Ads: ${result.error}`);
-        } else {
-          toast.success("Metricas do Facebook Ads sincronizadas!");
-          loadIntegrations();
-        }
-      });
+      syncFacebookWithContinuation();
     } else if (error === "facebook_oauth_failed") {
       toast.error(`Erro ao conectar Facebook Ads${detail ? `: ${detail}` : ""}`, { duration: 10000 });
     } else if (success === "google_analytics") {
@@ -441,6 +434,78 @@ function IntegrationsContent() {
     return totalSynced;
   }
 
+  async function syncFacebookWithContinuation() {
+    let hasMore = true;
+    let nextPhase: number | undefined;
+    let syncLogId: string | undefined;
+    let totalSynced = 0;
+    let iteration = 0;
+    let consecutiveErrors = 0;
+    const MAX_ITERATIONS = 10;
+    const MAX_CONSECUTIVE_ERRORS = 3;
+
+    while (hasMore && iteration < MAX_ITERATIONS && consecutiveErrors < MAX_CONSECUTIVE_ERRORS) {
+      iteration++;
+      try {
+        const isFirstCall = iteration === 1 && !nextPhase && !syncLogId;
+        const res = await fetch("/api/sync/facebook", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...(nextPhase ? { startPhase: nextPhase } : {}),
+            ...(syncLogId ? { syncLogId } : {}),
+            ...(isFirstCall ? { forceFullSync: true } : {}),
+          }),
+        });
+
+        if (!res.ok) {
+          consecutiveErrors++;
+          if (consecutiveErrors < MAX_CONSECUTIVE_ERRORS) {
+            toast.info(`Tentativa ${consecutiveErrors}/${MAX_CONSECUTIVE_ERRORS}... reconectando`);
+            await new Promise((r) => setTimeout(r, 2000));
+            continue;
+          }
+          toast.error(`Servidor retornou erro ${res.status}. Tente novamente em instantes.`);
+          break;
+        }
+
+        const data = await res.json();
+
+        if (!data.success) {
+          toast.error(`Erro ao sincronizar: ${data.error || "Erro desconhecido"}`);
+          break;
+        }
+
+        consecutiveErrors = 0;
+        totalSynced += data.synced || 0;
+        hasMore = data.hasMore === true;
+        nextPhase = data.nextPhase;
+        syncLogId = data.syncLogId;
+
+        if (hasMore) {
+          toast.info(`Sincronizando métricas... fase ${(nextPhase || 1) - 1} concluída, continuando...`);
+        }
+      } catch {
+        consecutiveErrors++;
+        if (consecutiveErrors < MAX_CONSECUTIVE_ERRORS) {
+          toast.info(`Reconectando... tentativa ${consecutiveErrors}/${MAX_CONSECUTIVE_ERRORS}`);
+          await new Promise((r) => setTimeout(r, 2000));
+          continue;
+        }
+        toast.error("Erro de conexão ao sincronizar. Tente novamente.");
+        break;
+      }
+    }
+
+    if (totalSynced > 0) {
+      toast.success(`Sincronização concluída! ${totalSynced} métricas sincronizadas.`);
+    } else if (consecutiveErrors === 0) {
+      toast.success("Sincronização concluída! Nenhuma métrica nova.");
+    }
+    loadIntegrations();
+    return totalSynced;
+  }
+
   async function handleSync(platform: Platform) {
     setSyncing(platform);
 
@@ -452,6 +517,12 @@ function IntegrationsContent() {
 
     if (platform === "SHOPIFY") {
       await syncShopifyWithContinuation();
+      setSyncing(null);
+      return;
+    }
+
+    if (platform === "FACEBOOK_ADS") {
+      await syncFacebookWithContinuation();
       setSyncing(null);
       return;
     }
