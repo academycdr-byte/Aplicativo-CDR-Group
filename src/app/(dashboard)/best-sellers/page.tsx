@@ -1,14 +1,14 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { type Product, type Collection } from "@/lib/ecommerce-service";
-import { getBestSellersAction, getCollectionsAction, getOrdersRevenueTotalAction } from "@/actions/ecommerce";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { type Product } from "@/lib/ecommerce-service";
+import { getBestSellersAction, getOrdersRevenueTotalAction } from "@/actions/ecommerce";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ShoppingBag, TrendingUp, Filter, AlertCircle, Package, LayoutGrid, List, ArrowUpDown, ArrowUp, ArrowDown, Boxes } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ShoppingBag, TrendingUp, Search, AlertCircle, Package, LayoutGrid, List, ArrowUpDown, ArrowUp, ArrowDown, Boxes, X } from "lucide-react";
 import Image from "next/image";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { PeriodSelector, periodToParams, type PeriodValue } from "@/components/period-selector";
@@ -19,8 +19,6 @@ type SortDir = "desc" | "asc";
 
 export default function BestSellersPage() {
     const [products, setProducts] = useState<Product[]>([]);
-    const [collections, setCollections] = useState<Collection[]>([]);
-    const [selectedCollection, setSelectedCollection] = useState<string>("all");
     const [period, setPeriod] = useState<PeriodValue>({ type: "preset", days: 30 });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -28,6 +26,7 @@ export default function BestSellersPage() {
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
     const [sortField, setSortField] = useState<SortField>("totalSold");
     const [sortDir, setSortDir] = useState<SortDir>("desc");
+    const [search, setSearch] = useState("");
 
     useEffect(() => {
         const fetchData = async () => {
@@ -51,16 +50,12 @@ export default function BestSellersPage() {
                 }
 
                 const results = await Promise.allSettled([
-                    getBestSellersAction(selectedCollection === "all" ? undefined : selectedCollection, fromDate, toDate),
-                    getCollectionsAction(),
+                    getBestSellersAction(undefined, fromDate, toDate),
                     getOrdersRevenueTotalAction(fromDate, toDate)
                 ]);
 
                 if (results[0].status === "fulfilled") setProducts(results[0].value);
-                if (results[1].status === "fulfilled" && collections.length === 0 && results[1].value.length > 0) {
-                    setCollections(results[1].value);
-                }
-                if (results[2].status === "fulfilled") setRevenueTotal(results[2].value);
+                if (results[1].status === "fulfilled") setRevenueTotal(results[1].value);
             } catch (err) {
                 console.error("Failed to fetch data:", err);
                 setError("Não foi possível carregar os produtos. Verifique sua conexão com a loja ou tente novamente mais tarde.");
@@ -70,7 +65,7 @@ export default function BestSellersPage() {
         };
 
         fetchData();
-    }, [selectedCollection, period]);
+    }, [period]);
 
     const formatCurrency = (value: number, currency: string) => {
         return new Intl.NumberFormat('pt-BR', {
@@ -94,7 +89,13 @@ export default function BestSellersPage() {
         return sold > 0 ? getProductRevenue(p) / sold : 0;
     };
 
-    const sortedProducts = [...products].sort((a, b) => {
+    const searchTerm = search.trim().toLowerCase();
+    const filteredProducts = useMemo(() => {
+        if (!searchTerm) return products;
+        return products.filter(p => p.title.toLowerCase().includes(searchTerm));
+    }, [products, searchTerm]);
+
+    const sortedProducts = [...filteredProducts].sort((a, b) => {
         const getVal = (p: Product) => {
             if (sortField === "totalSold") return p.totalSold || 0;
             if (sortField === "revenue") return getProductRevenue(p);
@@ -160,20 +161,21 @@ export default function BestSellersPage() {
                     />
 
                     <div className="relative">
-                        <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground z-10" />
-                        <Select value={selectedCollection} onValueChange={setSelectedCollection}>
-                            <SelectTrigger className="w-[180px] sm:w-[220px] pl-9 bg-background/50 backdrop-blur-sm border-border/50 hover:bg-accent/50 transition-colors">
-                                <SelectValue placeholder="Filtrar por Coleção" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">Todas as Coleções</SelectItem>
-                                {collections.map((col) => (
-                                    <SelectItem key={col.id} value={col.id}>
-                                        {col.title}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                        <Input
+                            placeholder="Buscar produto..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="w-[180px] sm:w-[220px] pl-9 pr-8 bg-background/50 backdrop-blur-sm border-border/50 hover:bg-accent/50 transition-colors"
+                        />
+                        {search && (
+                            <button
+                                onClick={() => setSearch("")}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                                <X className="w-3.5 h-3.5" />
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -196,7 +198,7 @@ export default function BestSellersPage() {
                             </div>
                             <div>
                                 <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-semibold">Produtos Diferentes</p>
-                                <p className="text-2xl font-bold tracking-tight text-foreground">{products.length}</p>
+                                <p className="text-2xl font-bold tracking-tight text-foreground">{filteredProducts.length}</p>
                             </div>
                         </CardContent>
                     </Card>
@@ -208,7 +210,7 @@ export default function BestSellersPage() {
                             <div>
                                 <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-semibold">Total Unidades Vendidas</p>
                                 <p className="text-2xl font-bold tracking-tight text-foreground">
-                                    {products.reduce((sum, p) => sum + (p.totalSold || 0), 0).toLocaleString("pt-BR")}
+                                    {filteredProducts.reduce((sum, p) => sum + (p.totalSold || 0), 0).toLocaleString("pt-BR")}
                                 </p>
                             </div>
                         </CardContent>
@@ -221,7 +223,12 @@ export default function BestSellersPage() {
                             <div>
                                 <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-semibold">Receita Total</p>
                                 <p className="text-2xl font-bold tracking-tight text-foreground">
-                                    {formatCurrency(revenueTotal, "BRL")}
+                                    {formatCurrency(
+                                        searchTerm
+                                            ? filteredProducts.reduce((sum, p) => sum + getProductRevenue(p), 0)
+                                            : revenueTotal,
+                                        "BRL"
+                                    )}
                                 </p>
                             </div>
                         </CardContent>
@@ -245,7 +252,7 @@ export default function BestSellersPage() {
                 )
             ) : (
                 <>
-                    {products.length > 0 ? (
+                    {filteredProducts.length > 0 ? (
                         viewMode === "grid" ? (
                             /* Grid View */
                             <motion.div
@@ -401,11 +408,15 @@ export default function BestSellersPage() {
                             </div>
                             <h3 className="text-lg font-semibold mb-2">Nenhum produto encontrado</h3>
                             <p className="text-muted-foreground max-w-sm mx-auto mb-6">
-                                Não encontramos produtos na sua loja correspondentes aos filtros selecionados.
+                                {searchTerm
+                                    ? `Nenhum produto encontrado para "${search.trim()}".`
+                                    : "Não encontramos produtos vendidos no período selecionado."}
                             </p>
-                            <Button variant="outline" onClick={() => setSelectedCollection("all")}>
-                                Limpar Filtros
-                            </Button>
+                            {searchTerm && (
+                                <Button variant="outline" onClick={() => setSearch("")}>
+                                    Limpar Busca
+                                </Button>
+                            )}
                         </div>
                     )}
                 </>
