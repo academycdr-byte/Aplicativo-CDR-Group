@@ -76,6 +76,7 @@ export function FinancialEntryTable({
     onUpdate?: () => void;
 }) {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [saving, setSaving] = useState(false);
     const [newEntry, setNewEntry] = useState({
         type: "cost" as "cost" | "income",
         amount: 0,
@@ -107,40 +108,45 @@ export function FinancialEntryTable({
             return;
         }
 
-        try {
-            await saveFinancialEntry({
-                type: newEntry.type,
-                amount: Number(newEntry.amount),
-                description: newEntry.description || undefined,
-                category: newEntry.category,
-                entryDate: new Date(newEntry.entryDate + "T12:00:00"),
-            });
-            toast.success("Lancamento registrado com sucesso!");
-            setIsDialogOpen(false);
-            setNewEntry({
-                type: "cost",
-                amount: 0,
-                description: "",
-                category: "",
-                entryDate: new Date().toISOString().split("T")[0],
-            });
-            onUpdate?.();
-        } catch {
-            toast.error("Erro ao registrar lancamento");
+        setSaving(true);
+        const result = await saveFinancialEntry({
+            type: newEntry.type,
+            amount: Number(newEntry.amount),
+            description: newEntry.description || undefined,
+            category: newEntry.category,
+            entryDate: new Date(newEntry.entryDate + "T12:00:00"),
+        });
+        setSaving(false);
+
+        if (result && "error" in result && result.error) {
+            toast.error(result.error);
+            return;
         }
+
+        toast.success("Lancamento registrado com sucesso!");
+        setIsDialogOpen(false);
+        setNewEntry({
+            type: "cost",
+            amount: 0,
+            description: "",
+            category: "",
+            entryDate: new Date().toISOString().split("T")[0],
+        });
+        onUpdate?.();
     };
 
     const handleDelete = async (id: string) => {
         setDeletingId(id);
-        try {
-            await deleteFinancialEntry(id);
-            toast.success("Lancamento removido");
-            onUpdate?.();
-        } catch {
-            toast.error("Erro ao remover lancamento");
-        } finally {
-            setDeletingId(null);
+        const result = await deleteFinancialEntry(id);
+        setDeletingId(null);
+
+        if (result && "error" in result && result.error) {
+            toast.error(result.error);
+            return;
         }
+
+        toast.success("Lancamento removido");
+        onUpdate?.();
     };
 
     return (
@@ -264,7 +270,9 @@ export function FinancialEntryTable({
                             </div>
                         </div>
                         <DialogFooter>
-                            <Button onClick={handleCreate}>Registrar</Button>
+                            <Button type="button" onClick={handleCreate} disabled={saving}>
+                                {saving ? "Salvando..." : "Registrar"}
+                            </Button>
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
