@@ -479,6 +479,24 @@ export async function getDailyProfit(days: number = 30, from?: string, to?: stri
     }
   }
 
+  // Fetch manual financial entries in period
+  const financialEntries = await prisma.financialEntry.findMany({
+    where: { organizationId: orgId, entryDate: dateFilter },
+    select: { entryDate: true, type: true, amount: true },
+  });
+
+  // Group manual entries by day
+  const manualCostsByDay = new Map<string, number>();
+  const manualIncomeByDay = new Map<string, number>();
+  for (const entry of financialEntries) {
+    const key = toDateKeyBrasilia(entry.entryDate);
+    if (entry.type === "cost") {
+      manualCostsByDay.set(key, (manualCostsByDay.get(key) || 0) + Number(entry.amount));
+    } else {
+      manualIncomeByDay.set(key, (manualIncomeByDay.get(key) || 0) + Number(entry.amount));
+    }
+  }
+
   // Group orders by day
   const dailyData: Record<string, { revenue: number; orderCount: number; cogs: number; adSpend: number }> = {};
 
@@ -514,6 +532,11 @@ export async function getDailyProfit(days: number = 30, from?: string, to?: stri
     dailyData[key].adSpend += Number(m.spend);
   }
 
+  // Ensure days with only manual entries also appear in dailyData
+  for (const key of [...manualCostsByDay.keys(), ...manualIncomeByDay.keys()]) {
+    if (!dailyData[key]) dailyData[key] = { revenue: 0, orderCount: 0, cogs: 0, adSpend: 0 };
+  }
+
   // Calculate number of days in period for daily fixed cost proration
   const fromDate = range.since;
   const toDate = range.until;
@@ -533,21 +556,25 @@ export async function getDailyProfit(days: number = 30, from?: string, to?: stri
       cogs = supplierPaymentsByDay.get(date) || 0;
     }
 
+    // Manual financial entries for this day
+    const dayManualCosts = manualCostsByDay.get(date) || 0;
+    const dayManualIncome = manualIncomeByDay.get(date) || 0;
+
     const ticketMedio = d.orderCount > 0 ? d.revenue / d.orderCount : 0;
     const gatewayFee = d.revenue * gwRate;
     const checkoutFee = d.revenue * ckRate;
     const transactionFees = fixedFeePerTx * d.orderCount;
     const chargebackCost = ticketMedio * cbRate * d.orderCount;
 
-    const grossProfit = d.revenue - cogs - d.adSpend - gatewayFee - checkoutFee - transactionFees - dailyFixedCost - chargebackCost;
+    const grossProfit = d.revenue + dayManualIncome - cogs - d.adSpend - gatewayFee - checkoutFee - transactionFees - dailyFixedCost - chargebackCost - dayManualCosts;
     const taxFee = taxBase === "profit"
       ? Math.max(0, grossProfit) * taxRate
       : d.revenue * taxRate;
 
-    const totalCosts = cogs + d.adSpend + gatewayFee + checkoutFee + taxFee + transactionFees + dailyFixedCost + chargebackCost;
-    const profit = d.revenue - totalCosts;
+    const totalCosts = cogs + d.adSpend + gatewayFee + checkoutFee + taxFee + transactionFees + dailyFixedCost + chargebackCost + dayManualCosts;
+    const profit = d.revenue + dayManualIncome - totalCosts;
 
-    dailyProfits.push({ date, profit, revenue: d.revenue, costs: totalCosts });
+    dailyProfits.push({ date, profit, revenue: d.revenue + dayManualIncome, costs: totalCosts });
     totalProfit += profit;
   }
 
