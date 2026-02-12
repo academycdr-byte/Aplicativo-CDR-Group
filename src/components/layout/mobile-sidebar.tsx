@@ -12,11 +12,13 @@ import {
   Megaphone,
   BarChart3,
   Settings,
-  Shield,
   FileText,
   Wallet,
-  type LucideIcon,
+  ChevronRight,
+  type LucideIcon
 } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useAvatar } from "@/contexts/avatar-context";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -39,7 +41,10 @@ export function MobileSidebar() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const { data: session } = useSession();
+  const { avatarUrl } = useAvatar();
 
+  const userName = session?.user?.name || "Usuário";
+  const userInitial = userName.charAt(0).toUpperCase();
   const userRole = session?.user?.role;
   const isInternal = userRole === "OWNER" || userRole === "ADMIN" || userRole === "MEMBER";
 
@@ -101,7 +106,7 @@ export function MobileSidebar() {
           <Menu className="w-5 h-5" />
         </Button>
       </SheetTrigger>
-      <SheetContent side="left" className="w-[85vw] max-w-64 p-0 bg-sidebar-bg text-sidebar-text overflow-y-auto">
+      <SheetContent side="left" className="w-[85vw] max-w-64 p-0 bg-sidebar-bg text-sidebar-text flex flex-col">
         <SheetHeader className="px-5 py-5 border-b border-white/5">
           <SheetTitle className="flex items-center gap-3 text-sidebar-text">
             <Image
@@ -117,7 +122,7 @@ export function MobileSidebar() {
             </div>
           </SheetTitle>
         </SheetHeader>
-        <nav className="px-3 pt-4 pb-4 space-y-4 sm:space-y-6">
+        <nav className="flex-1 overflow-y-auto px-3 pt-4 pb-4 space-y-4 sm:space-y-6">
           <div className="space-y-1">
             <p className="px-3 mb-3 text-[11px] font-semibold uppercase tracking-widest text-sidebar-text/40">
               CDR AI
@@ -145,6 +150,31 @@ export function MobileSidebar() {
             ))}
           </div>
         </nav>
+
+        {/* User Profile */}
+        <div className="px-3 py-3 border-t border-white/5">
+          <Link
+            href="/settings"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-white/5 transition-colors"
+          >
+            <Avatar className="h-9 w-9 border border-white/10 shadow-sm">
+              <AvatarImage src={avatarUrl || ""} />
+              <AvatarFallback className="bg-primary/20 text-primary text-xs font-bold">
+                {userInitial}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1 overflow-hidden">
+              <p className="text-sm font-medium text-sidebar-text truncate">
+                {userName}
+              </p>
+              <p className="text-[11px] text-sidebar-text/50 truncate">
+                {session?.user?.email}
+              </p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-sidebar-text/30" />
+          </Link>
+        </div>
       </SheetContent>
     </Sheet>
   );

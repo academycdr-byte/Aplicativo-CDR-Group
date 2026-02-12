@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,21 +20,20 @@ export default function LoginPage() {
 
   const [loadingMessage, setLoadingMessage] = useState("");
 
-  async function attemptLogin(email: string, password: string): Promise<{ error?: string }> {
+  async function attemptSignIn(email: string, password: string): Promise<{ error?: string | null }> {
     return new Promise((resolve) => {
       const timeout = setTimeout(() => {
         resolve({ error: "__TIMEOUT__" });
       }, 30000);
 
-      loginUser({ email, password, loginType })
+      signIn("credentials", { email, password, redirect: false })
         .then((result) => {
           clearTimeout(timeout);
           resolve(result || {});
         })
         .catch(() => {
           clearTimeout(timeout);
-          // signIn redirects on success — catch is expected
-          resolve({});
+          resolve({ error: "Erro inesperado. Tente novamente." });
         });
     });
   }
@@ -56,13 +56,30 @@ export default function LoginPage() {
     setLoading(true);
     setLoadingMessage("Conectando...");
 
-    // First attempt
-    const result = await attemptLogin(email, password);
+    // Admin access check (server action)
+    if (loginType === "ADMIN") {
+      try {
+        const check = await loginUser({ email, loginType });
+        if (check?.error) {
+          setError(check.error);
+          setLoading(false);
+          setLoadingMessage("");
+          return;
+        }
+      } catch {
+        setError("Erro ao verificar acesso. Tente novamente.");
+        setLoading(false);
+        setLoadingMessage("");
+        return;
+      }
+    }
+
+    // Client-side signIn with timeout + auto-retry
+    const result = await attemptSignIn(email, password);
 
     if (result?.error === "__TIMEOUT__") {
-      // Auto-retry once — cold start should be resolved by now
       setLoadingMessage("Reconectando...");
-      const retry = await attemptLogin(email, password);
+      const retry = await attemptSignIn(email, password);
 
       if (retry?.error === "__TIMEOUT__") {
         setError("Servidor demorou para responder. Tente novamente em alguns segundos.");
@@ -72,14 +89,21 @@ export default function LoginPage() {
       }
 
       if (retry?.error) {
-        setError(retry.error);
+        setError("Email ou senha incorretos.");
+        setLoading(false);
+        setLoadingMessage("");
+        return;
       }
     } else if (result?.error) {
-      setError(result.error);
+      setError("Email ou senha incorretos.");
+      setLoading(false);
+      setLoadingMessage("");
+      return;
     }
 
-    setLoading(false);
-    setLoadingMessage("");
+    // Hard redirect — forces full page reload so SessionProvider fetches fresh session
+    setLoadingMessage("Redirecionando...");
+    window.location.href = "/dashboard";
   }
 
   return (
