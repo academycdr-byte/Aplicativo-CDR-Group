@@ -407,7 +407,7 @@ export async function syncFacebookAdsMetrics(
         await prisma.syncLog.update({
           where: { id: logId },
           data: { recordsSynced: totalSynced },
-        }).catch(() => {});
+        }).catch(() => { });
       }
       return {
         success: true,
@@ -459,7 +459,27 @@ export async function syncFacebookAdsMetrics(
       return { synced, timedOut: false };
     };
 
-    // PHASE 1: Last 7 days for ALL accounts (highest priority)
+    // PHASE 0: MANDATORY FRESHNESS (Yesterday + Today)
+    // Always run this first to ensure dashboard shows current data immediately
+    // Do not save cursor for this phase, as it must run on every sync start
+    if (currentPhase <= 1) { // Implicitly includes "start of sync"
+      console.log(`[Facebook Ads] Phase 0: Fetching recent data (Yesterday + Today) for freshness`);
+      for (const accountId of accountIds) {
+        if (!hasTimeLeft()) break; // If budget exhausted just by Phase 0, we'll resume Phase 1 next time
+        try {
+          // Fetch last 2 days (Yesterday + Today)
+          await fetchAndSavePageByPage(
+            buildUrl(accountId, daysAgo(1), daysAgo(0)),
+            accountId,
+          );
+        } catch (err) {
+          // Non-fatal, just log and continue to main phases
+          console.warn(`[Facebook Ads] Phase 0 freshness fetch failed for ${accountId}:`, err);
+        }
+      }
+    }
+
+    // PHASE 1: Last 7 days for ALL accounts (highest priority history)
     if (currentPhase <= 1) {
       const startIdx = (currentPhase === 1 && startAccountIndex !== undefined) ? startAccountIndex : 0;
       for (let ai = startIdx; ai < accountIds.length; ai++) {
@@ -607,7 +627,7 @@ export async function syncFacebookAdsMetrics(
       await prisma.syncLog.update({
         where: { id: logId },
         data: { status: "SUCCESS", recordsSynced: totalSynced, completedAt: new Date() },
-      }).catch(() => {});
+      }).catch(() => { });
     }
 
     return { success: true, synced: totalSynced, hasMore: false, syncLogId: logId };
@@ -617,13 +637,13 @@ export async function syncFacebookAdsMetrics(
     await prisma.integration.update({
       where: { id: integration.id },
       data: { syncStatus: "FAILED", errorMessage: errorMsg },
-    }).catch(() => {});
+    }).catch(() => { });
 
     if (logId) {
       await prisma.syncLog.update({
         where: { id: logId },
         data: { status: "FAILED", errorMessage: errorMsg, completedAt: new Date() },
-      }).catch(() => {});
+      }).catch(() => { });
     }
 
     return { error: errorMsg, synced: 0, hasMore: false };

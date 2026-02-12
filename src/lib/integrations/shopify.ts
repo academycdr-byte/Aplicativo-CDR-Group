@@ -429,6 +429,29 @@ export async function syncShopifyOrders(
 
   let totalSyncedThisCall = 0;
 
+  // FRESHNESS CHECK: Always fetch last 2 days of orders first
+  // This ensures "Today" on dashboard is updated even if we are backfilling 90 days of history
+  try {
+    const twoDaysAgo = new Date();
+    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+    const freshnessUrl = `https://${shop}/admin/api/${SHOPIFY_API_VERSION}/orders.json?status=any&limit=50&created_at_min=${twoDaysAgo.toISOString()}`;
+
+    console.log("[Shopify Sync] Performing freshness check (last 2 days)...");
+    const fRes = await fetch(freshnessUrl, {
+      headers: { "X-Shopify-Access-Token": accessToken, "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(10000), // Short timeout for freshness
+    });
+    if (fRes.ok) {
+      const fData = await fRes.json();
+      if (fData.orders?.length > 0) {
+        const saved = await upsertShopifyOrdersParallel(organizationId, fData.orders);
+        console.log(`[Shopify Sync] Freshness check saved ${saved} orders`);
+      }
+    }
+  } catch (err) {
+    console.warn("[Shopify Sync] Freshness check failed (non-fatal):", err);
+  }
+
   try {
     while (currentUrl) {
       // Check time budget BEFORE fetching next page
@@ -444,7 +467,7 @@ export async function syncShopifyOrders(
           await prisma.syncLog.update({
             where: { id: logId },
             data: { recordsSynced: totalSyncedThisCall },
-          }).catch(() => {});
+          }).catch(() => { });
         }
         return {
           success: true,
@@ -535,7 +558,7 @@ export async function syncShopifyOrders(
       await prisma.syncLog.update({
         where: { id: logId },
         data: { status: "SUCCESS", recordsSynced: totalSyncedThisCall, completedAt: new Date() },
-      }).catch(() => {});
+      }).catch(() => { });
     }
 
     return { success: true, synced: totalSyncedThisCall, hasMore: false, syncLogId: logId };
@@ -551,19 +574,19 @@ export async function syncShopifyOrders(
           errorMessage: errorMsg,
           metadata: { ...meta, syncCursor: { nextUrl: currentUrl, syncLogId: logId } } as unknown as Record<string, string | number | boolean | null>,
         },
-      }).catch(() => {});
+      }).catch(() => { });
     } else {
       await prisma.integration.update({
         where: { id: integration.id },
         data: { syncStatus: "FAILED", errorMessage: errorMsg },
-      }).catch(() => {});
+      }).catch(() => { });
     }
 
     if (logId) {
       await prisma.syncLog.update({
         where: { id: logId },
         data: { status: "FAILED", errorMessage: errorMsg, completedAt: new Date() },
-      }).catch(() => {});
+      }).catch(() => { });
     }
 
     return { error: errorMsg, synced: totalSyncedThisCall, hasMore: false };
