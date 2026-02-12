@@ -140,8 +140,65 @@ export function ProductCostTable({ costs }: { costs: ProductCost[] }) {
                 </Dialog>
             </div>
 
-            <div className="border rounded-md overflow-x-auto">
-                <Table className="min-w-[480px]">
+            {/* Mobile Cards */}
+            <div className="space-y-2 sm:hidden">
+                {costs.length === 0 ? (
+                    <div className="text-center py-8 text-sm text-muted-foreground border border-dashed rounded-lg">
+                        Nenhum custo cadastrado. Adicione produtos para calcular o lucro real.
+                    </div>
+                ) : (
+                    costs.map((cost) => (
+                        <div key={cost.id} className="p-3 rounded-lg border border-border/50 bg-card/30 space-y-2">
+                            {editingId === cost.id ? (
+                                <>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-bold text-muted-foreground">{cost.sku}</span>
+                                        <div className="flex items-center gap-1">
+                                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleSave}>
+                                                <Save className="w-3.5 h-3.5 text-emerald-500" />
+                                            </Button>
+                                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleCancel}>
+                                                <X className="w-3.5 h-3.5 text-red-500" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                    <Input
+                                        value={editForm.name || ""}
+                                        onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                                        className="h-8 text-sm"
+                                        placeholder="Nome do produto"
+                                    />
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        value={editForm.costPrice}
+                                        onChange={(e) => setEditForm({ ...editForm, costPrice: parseFloat(e.target.value) })}
+                                        className="h-8 text-sm"
+                                        placeholder="Custo R$"
+                                    />
+                                </>
+                            ) : (
+                                <div className="flex items-center gap-3">
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium truncate">{cost.name || cost.sku}</p>
+                                        <div className="flex items-center gap-2 mt-0.5">
+                                            <span className="text-[11px] text-muted-foreground">{cost.sku}</span>
+                                            <span className="text-sm font-bold text-amber-600">R$ {Number(cost.costPrice).toFixed(2)}</span>
+                                        </div>
+                                    </div>
+                                    <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" onClick={() => handleEdit(cost)}>
+                                        <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
+                    ))
+                )}
+            </div>
+
+            {/* Desktop Table */}
+            <div className="border rounded-md overflow-x-auto hidden sm:block">
+                <Table>
                     <TableHeader>
                         <TableRow>
                             <TableHead>SKU</TableHead>
