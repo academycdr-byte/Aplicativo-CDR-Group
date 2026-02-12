@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,14 +8,10 @@ import {
   DollarSign,
   ShoppingBag,
   TrendingUp,
-  ArrowUpRight,
-  ArrowDownRight,
   CheckCircle,
   Repeat,
   BarChart,
   Target,
-  Search,
-  ArrowRight,
   ShoppingCart,
   MousePointerClick,
   CreditCard,
@@ -34,10 +29,17 @@ import {
 } from "recharts";
 import { toast } from "sonner";
 import { loadAllDashboardData } from "@/actions/dashboard";
+import { getExchangeRates } from "@/actions/currency";
 import { syncAll } from "@/actions/sync";
 import { PeriodSelector, periodToParams, type PeriodValue } from "@/components/period-selector";
 import { EstimatedProfitCalendar } from "@/components/estimated-profit-calendar";
 import { FunnelVisual, type FunnelStep, type FunnelRate } from "@/components/funnel-visual";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
 type DashboardStats = {
@@ -99,6 +101,15 @@ const metricToggles = [
   { key: "roas", label: "ROAS", color: "#3b82f6", type: "line" },
 ] as const;
 
+type Currency = "BRL" | "USD" | "EUR" | "GBP";
+
+const CURRENCIES: Record<Currency, { locale: string; symbol: string; label: string }> = {
+  BRL: { locale: "pt-BR", symbol: "R$", label: "Real (BRL)" },
+  USD: { locale: "en-US", symbol: "$", label: "Dólar (USD)" },
+  EUR: { locale: "de-DE", symbol: "€", label: "Euro (EUR)" },
+  GBP: { locale: "en-GB", symbol: "£", label: "Libra (GBP)" },
+};
+
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [metricsData, setMetricsData] = useState<MetricPoint[]>([]);
@@ -110,6 +121,13 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [activeMetrics, setActiveMetrics] = useState<Set<string>>(new Set(["faturamento", "investimento"]));
   const [profitData, setProfitData] = useState<{ dailyProfits: { date: string; profit: number; revenue: number; costs: number }[]; totalProfit: number }>({ dailyProfits: [], totalProfit: 0 });
+
+  const [currency, setCurrency] = useState<Currency>("BRL");
+  const [exchangeRates, setExchangeRates] = useState<Record<string, number> | null>(null);
+
+  useEffect(() => {
+    getExchangeRates().then((r) => setExchangeRates(r));
+  }, []);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -166,13 +184,35 @@ export default function DashboardPage() {
   }
 
   function fmt(amount: number) {
-    return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(amount);
+    // If we have rates and currency is not BRL, convert
+    let value = amount;
+    let code: Currency = "BRL";
+
+    if (currency !== "BRL" && exchangeRates) {
+      value = amount * (exchangeRates[currency] || 1);
+      code = currency;
+    }
+
+    return new Intl.NumberFormat(CURRENCIES[code].locale, {
+      style: "currency",
+      currency: code,
+    }).format(value);
   }
 
   function fmtShort(v: number) {
-    if (v >= 1000000) return `R$ ${(v / 1000000).toFixed(1)}M`;
-    if (v >= 1000) return `R$ ${(v / 1000).toFixed(1)}k`;
-    return `R$ ${v.toFixed(0)}`;
+    let value = v;
+    let code: Currency = "BRL";
+
+    if (currency !== "BRL" && exchangeRates) {
+      value = v * (exchangeRates[currency] || 1);
+      code = currency;
+    }
+
+    const symbol = CURRENCIES[code].symbol;
+
+    if (value >= 1000000) return `${symbol} ${(value / 1000000).toFixed(1)}M`;
+    if (value >= 1000) return `${symbol} ${(value / 1000).toFixed(1)}k`;
+    return `${symbol} ${value.toFixed(0)}`;
   }
 
   function fmtNum(v: number) {
@@ -214,6 +254,23 @@ export default function DashboardPage() {
           change={stats?.revenueChange || "0%"}
           icon={TrendingUp}
           trend="up"
+          action={
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full -mr-1">
+                  <span className="sr-only">Trocar moeda</span>
+                  <span className="text-xs font-bold text-muted-foreground">{CURRENCIES[currency].symbol}</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {(Object.keys(CURRENCIES) as Currency[]).map((c) => (
+                  <DropdownMenuItem key={c} onClick={() => setCurrency(c)}>
+                    {CURRENCIES[c].label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          }
         />
         <KPICard
           label="INVESTIMENTO"
@@ -445,6 +502,7 @@ export default function DashboardPage() {
                 data={profitData.dailyProfits}
                 totalProfit={profitData.totalProfit}
                 currentMonthLabel={getMonthLabel()}
+                formatter={fmt}
               />
             </div>
           </CardContent>
@@ -533,8 +591,8 @@ function buildFunnelRates(f: FunnelData): FunnelRate[] {
 
 // Subcomponents
 
-function KPICard({ label, value, change, icon: Icon, trend }: {
-  label: string; value: string; change: string; icon: LucideIcon; trend: "up" | "down" | "neutral";
+function KPICard({ label, value, change, icon: Icon, trend, action }: {
+  label: string; value: string; change: string; icon: LucideIcon; trend: "up" | "down" | "neutral"; action?: React.ReactNode;
 }) {
   const isPositive = change && change.startsWith("+") || trend === "up";
   const isNegative = change && change.startsWith("-") || trend === "down";
@@ -549,15 +607,18 @@ function KPICard({ label, value, change, icon: Icon, trend }: {
           <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
             <Icon className="w-5 h-5" />
           </div>
-          {change && (
-            <Badge variant="outline" className={cn(
-              "font-mono text-sm px-2 py-0.5 h-6 border-transparent bg-secondary/50 font-semibold",
-              isPositive && "text-emerald-500 bg-emerald-500/10",
-              isNegative && "text-red-500 bg-red-500/10"
-            )}>
-              {change}
-            </Badge>
-          )}
+          <div className="flex items-center gap-2">
+            {change && (
+              <Badge variant="outline" className={cn(
+                "font-mono text-[10px] px-1.5 py-0 h-5 border-transparent bg-secondary/50",
+                isPositive && "text-emerald-500 bg-emerald-500/10",
+                isNegative && "text-red-500 bg-red-500/10"
+              )}>
+                {change}
+              </Badge>
+            )}
+            {action}
+          </div>
         </div>
         <div className="space-y-1">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>

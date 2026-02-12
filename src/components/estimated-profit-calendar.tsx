@@ -14,14 +14,16 @@ interface EstimatedProfitCalendarProps {
     data: DailyProfit[];
     totalProfit: number;
     currentMonthLabel: string;
+    formatter?: (value: number) => string;
 }
 
-function fmt(val: number) {
-    return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val);
-}
-
-export function EstimatedProfitCalendar({ data, totalProfit, currentMonthLabel }: EstimatedProfitCalendarProps) {
+export function EstimatedProfitCalendar({ data, totalProfit, currentMonthLabel, formatter }: EstimatedProfitCalendarProps) {
     const [selectedDay, setSelectedDay] = useState<DailyProfit | null>(null);
+
+    const formatMoney = (value: number) => {
+        if (formatter) return formatter(value);
+        return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
+    };
 
     const calendarDays = useMemo(() => {
         const sorted = [...data].sort((a, b) => a.date.localeCompare(b.date));
@@ -58,7 +60,7 @@ export function EstimatedProfitCalendar({ data, totalProfit, currentMonthLabel }
                         "text-2xl font-bold tracking-tight",
                         totalProfit >= 0 ? "text-emerald-600" : "text-red-600"
                     )}>
-                        {fmt(totalProfit)}
+                        {formatMoney(totalProfit)}
                     </p>
                 </div>
                 <div className="text-right">
@@ -75,11 +77,11 @@ export function EstimatedProfitCalendar({ data, totalProfit, currentMonthLabel }
                     <div className="grid grid-cols-3 gap-2">
                         <div>
                             <p className="text-[10px] text-muted-foreground">Receita</p>
-                            <p className="text-sm font-bold text-foreground">{fmt(selectedDay.revenue)}</p>
+                            <p className="text-sm font-bold text-foreground">{formatMoney(selectedDay.revenue)}</p>
                         </div>
                         <div>
                             <p className="text-[10px] text-muted-foreground">Custos</p>
-                            <p className="text-sm font-bold text-red-500">{fmt(selectedDay.costs)}</p>
+                            <p className="text-sm font-bold text-red-500">{formatMoney(selectedDay.costs)}</p>
                         </div>
                         <div>
                             <p className="text-[10px] text-muted-foreground">Lucro</p>
@@ -87,7 +89,7 @@ export function EstimatedProfitCalendar({ data, totalProfit, currentMonthLabel }
                                 "text-sm font-bold",
                                 selectedDay.profit >= 0 ? "text-emerald-600" : "text-red-600"
                             )}>
-                                {fmt(selectedDay.profit)}
+                                {formatMoney(selectedDay.profit)}
                             </p>
                         </div>
                     </div>
@@ -126,7 +128,7 @@ export function EstimatedProfitCalendar({ data, totalProfit, currentMonthLabel }
                         {/* Hover Tooltip */}
                         <div className="absolute opacity-0 hover:opacity-100 bottom-full mb-2 left-1/2 -translate-x-1/2 bg-popover/95 backdrop-blur-md text-popover-foreground text-xs px-3 py-1.5 rounded-lg shadow-floating border border-border/50 whitespace-nowrap z-50 pointer-events-none transition-opacity duration-200">
                             <div className="font-semibold text-center mb-0.5">{day.dayOfMonth}</div>
-                            {fmt(day.profit)}
+                            {formatMoney(day.profit)}
                         </div>
                     </div>
                 ))}
