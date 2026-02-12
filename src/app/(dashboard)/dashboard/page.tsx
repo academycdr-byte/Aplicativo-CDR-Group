@@ -221,9 +221,26 @@ export default function DashboardPage() {
       ...m,
       faturamento: getConvertedValue(m.faturamento),
       ticketMedio: getConvertedValue(m.ticketMedio),
-      roas: getConvertedValue(m.roas),
+      roas: m.roas, // Kept raw as per user request
     }));
   }, [metricsData, currency, exchangeRates]);
+
+  const convertedProfitData = useMemo(() => {
+    const daily = profitData.dailyProfits.map((d) => {
+      const revBRL = getConvertedValue(d.revenue);
+      const costBRL = d.costs; // Costs are already in BRL (AdSpend)
+      return {
+        ...d,
+        revenue: revBRL,
+        costs: costBRL,
+        profit: revBRL - costBRL,
+      };
+    });
+
+    const total = daily.reduce((acc, curr) => acc + curr.profit, 0);
+
+    return { dailyProfits: daily, totalProfit: total };
+  }, [profitData, currency, exchangeRates]);
 
   const getMonthLabel = () => {
     const date = new Date();
@@ -294,7 +311,7 @@ export default function DashboardPage() {
         />
         <KPICard
           label="ROAS"
-          value={`${getConvertedValue(stats?.roas || 0).toFixed(2)}x`}
+          value={`${(stats?.roas || 0).toFixed(2)}x`}
           change="0%" // TODO: Add real daily change if available
           icon={Target}
           trend="neutral"
@@ -505,8 +522,8 @@ export default function DashboardPage() {
           <CardContent className="p-0">
             <div className="p-4 pt-0">
               <EstimatedProfitCalendar
-                data={profitData.dailyProfits}
-                totalProfit={profitData.totalProfit}
+                data={convertedProfitData.dailyProfits}
+                totalProfit={convertedProfitData.totalProfit}
                 currentMonthLabel={getMonthLabel()}
                 formatter={fmtStandard}
               />
