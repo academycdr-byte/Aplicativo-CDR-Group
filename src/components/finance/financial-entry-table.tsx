@@ -119,7 +119,7 @@ export function FinancialEntryTable({
         setSaving(false);
 
         if (result && "error" in result && result.error) {
-            toast.error(result.error);
+            toast.error(String(result.error));
             return;
         }
 
@@ -141,7 +141,7 @@ export function FinancialEntryTable({
         setDeletingId(null);
 
         if (result && "error" in result && result.error) {
-            toast.error(result.error);
+            toast.error(String(result.error));
             return;
         }
 
