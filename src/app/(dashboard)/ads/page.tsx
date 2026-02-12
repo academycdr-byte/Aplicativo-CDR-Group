@@ -446,7 +446,7 @@ export default function AdsPage() {
 
     const displayValue = typeof value === "number"
       ? (prefix === "R$" ? fmt(value) : fmtNum(value))
-      : `${prefix}${value}${suffix}`;
+      : value;
 
     return (
       <Card className="border border-border shadow-none rounded-xl p-4 sm:p-5 hover:border-primary/30 transition-colors overflow-hidden">

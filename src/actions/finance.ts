@@ -416,33 +416,44 @@ export async function deleteSupplierPayment(id: string) {
  * Save a manual financial entry (cost or income)
  */
 export async function saveFinancialEntry(input: FinancialEntryInput) {
-    const ctx = await getSessionWithOrg();
-    if (!ctx) throw new Error("Nao autenticado");
+    try {
+        const ctx = await getSessionWithOrg();
+        if (!ctx) return { error: "Nao autenticado" };
 
-    if (isNaN(input.amount) || input.amount <= 0) {
-        throw new Error("Valor deve ser maior que zero");
+        const amount = Number(input.amount);
+        if (isNaN(amount) || amount <= 0) {
+            return { error: "Valor deve ser maior que zero" };
+        }
+
+        if (input.type !== "cost" && input.type !== "income") {
+            return { error: "Tipo deve ser 'cost' ou 'income'" };
+        }
+
+        if (!input.category) {
+            return { error: "Categoria e obrigatoria" };
+        }
+
+        // Parse entryDate from string if needed (avoids Date serialization issues)
+        const entryDate = typeof input.entryDate === "string"
+            ? new Date(input.entryDate)
+            : input.entryDate;
+
+        await db.financialEntry.create({
+            data: {
+                organizationId: ctx.organization.id,
+                type: input.type,
+                amount,
+                description: input.description || null,
+                category: input.category,
+                entryDate,
+            },
+        });
+
+        return { success: true };
+    } catch (err) {
+        console.error("[saveFinancialEntry] Error:", err);
+        return { error: "Erro ao salvar lancamento. Tente novamente." };
     }
-
-    if (input.type !== "cost" && input.type !== "income") {
-        throw new Error("Tipo deve ser 'cost' ou 'income'");
-    }
-
-    if (!input.category) {
-        throw new Error("Categoria e obrigatoria");
-    }
-
-    await db.financialEntry.create({
-        data: {
-            organizationId: ctx.organization.id,
-            type: input.type,
-            amount: input.amount,
-            description: input.description,
-            category: input.category,
-            entryDate: input.entryDate,
-        },
-    });
-
-    return { success: true };
 }
 
 /**
@@ -465,12 +476,17 @@ export async function getFinancialEntries(from: Date, to: Date) {
  * Delete a financial entry
  */
 export async function deleteFinancialEntry(id: string) {
-    const ctx = await getSessionWithOrg();
-    if (!ctx) throw new Error("Nao autenticado");
+    try {
+        const ctx = await getSessionWithOrg();
+        if (!ctx) return { error: "Nao autenticado" };
 
-    await db.financialEntry.delete({
-        where: { id },
-    });
+        await db.financialEntry.delete({
+            where: { id },
+        });
 
-    return { success: true };
+        return { success: true };
+    } catch (err) {
+        console.error("[deleteFinancialEntry] Error:", err);
+        return { error: "Erro ao remover lancamento." };
+    }
 }

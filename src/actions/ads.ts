@@ -63,7 +63,7 @@ export async function getAdMetrics(params?: FilterParams) {
   const ctx = await getSessionWithOrg();
   if (!ctx) return { metrics: [], totals: null, previousTotals: null };
 
-  const days = params?.days || 30;
+  const days = params?.days ?? 30;
 
   // Current Period
   const currentRange = getDateRange(days, params?.from, params?.to);
@@ -191,7 +191,7 @@ export async function getCreativePerformance(params?: FilterParams) {
   const ctx = await getSessionWithOrg();
   if (!ctx) return [];
 
-  const days = params?.days || 30;
+  const days = params?.days ?? 30;
   const dateFilter = buildDateFilter(getDateRange(days, params?.from, params?.to));
 
   const where = buildWhereClause(ctx.organization.id, dateFilter, params);
@@ -284,7 +284,7 @@ export async function getAdSetPerformance(params?: FilterParams) {
   const ctx = await getSessionWithOrg();
   if (!ctx) return [];
 
-  const days = params?.days || 30;
+  const days = params?.days ?? 30;
   const dateFilter = buildDateFilter(getDateRange(days, params?.from, params?.to));
   const where = buildWhereClause(ctx.organization.id, dateFilter, params);
 
