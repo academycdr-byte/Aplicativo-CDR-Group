@@ -16,7 +16,14 @@ export async function syncAll() {
   const ctx = await getSessionWithOrg();
   if (!ctx) return { error: "Not authenticated" };
 
-  const results = await syncAllPlatforms(ctx.organization.id);
+  const integrations = await prisma.integration.findMany({
+    where: { organizationId: ctx.organization.id, status: "CONNECTED" },
+    select: { platform: true },
+  });
+
+  const activePlatforms = integrations.map((i) => i.platform);
+
+  const results = await syncAllPlatforms(ctx.organization.id, activePlatforms);
   return { results };
 }
 
@@ -57,7 +64,7 @@ export async function smartSync(): Promise<{ triggered: boolean }> {
 
   const integrations = await prisma.integration.findMany({
     where: { organizationId: ctx.organization.id, status: "CONNECTED" },
-    select: { id: true, lastSyncAt: true, syncStatus: true, updatedAt: true, metadata: true },
+    select: { id: true, lastSyncAt: true, syncStatus: true, updatedAt: true, metadata: true, platform: true, status: true },
   });
 
   if (integrations.length === 0) return { triggered: false };
@@ -92,7 +99,9 @@ export async function smartSync(): Promise<{ triggered: boolean }> {
   );
   if (!hasStale) return { triggered: false };
 
-  syncAllPlatforms(ctx.organization.id).catch((error) => {
+  const activePlatforms = integrations.map((i) => i.platform);
+
+  syncAllPlatforms(ctx.organization.id, activePlatforms).catch((error) => {
     console.error("[smartSync] Background sync failed:", error);
   });
 

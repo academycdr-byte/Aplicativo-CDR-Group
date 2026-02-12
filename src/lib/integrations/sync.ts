@@ -34,11 +34,11 @@ async function withRetry<T>(
   throw lastError;
 }
 
-export async function syncAllPlatforms(organizationId: string): Promise<SyncResult[]> {
+export async function syncAllPlatforms(organizationId: string, activePlatforms?: string[]): Promise<SyncResult[]> {
   const results: SyncResult[] = [];
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const syncTasks: Array<{ platform: string; fn: () => Promise<any> }> = [
+  const allTasks: Array<{ platform: string; fn: () => Promise<any> }> = [
     { platform: "SHOPIFY", fn: () => syncShopifyOrders(organizationId) },
     { platform: "CARTPANDA", fn: () => syncCartpandaOrders(organizationId) },
     { platform: "YAMPI", fn: () => syncYampiOrders(organizationId) },
@@ -51,6 +51,17 @@ export async function syncAllPlatforms(organizationId: string): Promise<SyncResu
     { platform: "NUVEMSHOP_FUNNEL", fn: () => syncNuvemshopFunnel(organizationId) },
     { platform: "CARTPANDA_FUNNEL", fn: () => syncCartpandaFunnel(organizationId) },
   ];
+
+  // Filter tasks if activePlatforms is provided
+  const syncTasks = activePlatforms
+    ? allTasks.filter((t) =>
+      activePlatforms.some((p) => t.platform === p || t.platform.startsWith(`${p}_`))
+    )
+    : allTasks;
+
+  if (syncTasks.length === 0) {
+    return [];
+  }
 
   const settled = await Promise.allSettled(
     syncTasks.map((t) => withRetry(t.fn))
