@@ -586,6 +586,57 @@ export interface NuvemshopCollection {
   [key: string]: unknown;
 }
 
+/**
+ * Fetch specific products by their IDs from Nuvemshop.
+ * Uses individual product endpoint with controlled concurrency.
+ */
+export async function fetchNuvemshopProductsByIds(
+  integrationId: string,
+  productIds: string[]
+): Promise<NuvemshopProduct[]> {
+  if (productIds.length === 0) return [];
+
+  const integration = await prisma.integration.findUnique({
+    where: { id: integrationId },
+  });
+
+  if (!integration || !integration.accessToken || !integration.externalStoreId) {
+    return [];
+  }
+
+  const accessToken = decrypt(integration.accessToken);
+  const storeId = integration.externalStoreId;
+  const products: NuvemshopProduct[] = [];
+  const CONCURRENCY = 5;
+
+  for (let i = 0; i < productIds.length; i += CONCURRENCY) {
+    const batch = productIds.slice(i, i + CONCURRENCY);
+    const results = await Promise.allSettled(
+      batch.map(async (pid) => {
+        const url = `https://api.nuvemshop.com.br/v1/${storeId}/products/${pid}`;
+        const response = await fetch(url, {
+          headers: {
+            Authentication: `bearer ${accessToken}`,
+            "User-Agent": "CDR Group Hub (cdrgroup.com)",
+            "Content-Type": "application/json",
+          },
+          signal: AbortSignal.timeout(10000),
+        });
+        if (!response.ok) return null;
+        return response.json();
+      })
+    );
+
+    for (const result of results) {
+      if (result.status === "fulfilled" && result.value) {
+        products.push(result.value as NuvemshopProduct);
+      }
+    }
+  }
+
+  return products;
+}
+
 export async function fetchNuvemshopProducts(
   integrationId: string,
   collectionId?: string // This corresponds to 'category_id' in Nuvemshop

@@ -5,7 +5,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { decrypt } from "@/lib/encryption";
 import { fetchShopifyProducts, fetchShopifyCollections, type ShopifyProduct, type ShopifyCollection } from "@/lib/integrations/shopify";
-import { fetchNuvemshopProducts, fetchNuvemshopCollections, type NuvemshopProduct, type NuvemshopCollection } from "@/lib/integrations/nuvemshop";
+import { fetchNuvemshopProducts, fetchNuvemshopProductsByIds, fetchNuvemshopCollections, type NuvemshopProduct, type NuvemshopCollection } from "@/lib/integrations/nuvemshop";
 import { type Product, type Collection } from "@/lib/ecommerce-service";
 import { toBrasiliaStartOfDay, toBrasiliaEndOfDay, getBrazilToday } from "@/lib/date-utils";
 
@@ -165,15 +165,17 @@ export async function getBestSellersAction(
                 productsDetails = data.products || [];
             }
         } else {
-            // Nuvemshop: only call Products API when filtering by collection
-            // (the API paginates through all products which is slow).
-            // For the default view, rawData provides name + image instantly.
-            if (collectionId && collectionId !== "all") {
-                try {
+            // Nuvemshop: fetch product details by IDs (for images)
+            // When filtering by collection, use the collection endpoint
+            // Otherwise, fetch individual products by ID (fast, targeted)
+            try {
+                if (collectionId && collectionId !== "all") {
                     productsDetails = await fetchNuvemshopProducts(integration.id, collectionId);
-                } catch {
-                    productsDetails = [];
+                } else {
+                    productsDetails = await fetchNuvemshopProductsByIds(integration.id, topProductIds);
                 }
+            } catch {
+                productsDetails = [];
             }
         }
 
