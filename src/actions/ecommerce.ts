@@ -5,7 +5,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { decrypt } from "@/lib/encryption";
 import { fetchShopifyProducts, fetchShopifyCollections, type ShopifyProduct, type ShopifyCollection } from "@/lib/integrations/shopify";
-import { fetchNuvemshopProducts, fetchNuvemshopProductsByIds, fetchNuvemshopCollections, type NuvemshopProduct, type NuvemshopCollection } from "@/lib/integrations/nuvemshop";
+import { fetchNuvemshopProducts, fetchNuvemshopCollections, type NuvemshopProduct, type NuvemshopCollection } from "@/lib/integrations/nuvemshop";
 import { type Product, type Collection } from "@/lib/ecommerce-service";
 import { toBrasiliaStartOfDay, toBrasiliaEndOfDay, getBrazilToday } from "@/lib/date-utils";
 
@@ -165,16 +165,21 @@ export async function getBestSellersAction(
                 productsDetails = data.products || [];
             }
         } else {
-            // Nuvemshop: fetch product details by IDs (for images)
-            // When filtering by collection, use the collection endpoint
-            // Otherwise, fetch individual products by ID (fast, targeted)
+            // Nuvemshop: fetch ALL products from the Products API (includes images)
+            // Then filter to only the ones we need. This is the proven path that
+            // works for collections — now used for the default view too.
             try {
-                if (collectionId && collectionId !== "all") {
-                    productsDetails = await fetchNuvemshopProducts(integration.id, collectionId);
-                } else {
-                    productsDetails = await fetchNuvemshopProductsByIds(integration.id, topProductIds);
-                }
-            } catch {
+                const allNuvemProducts = await fetchNuvemshopProducts(
+                    integration.id,
+                    (collectionId && collectionId !== "all") ? collectionId : undefined
+                );
+                // Filter to only the products we need
+                const topIdSet = new Set(topProductIds);
+                productsDetails = allNuvemProducts.filter(
+                    (p) => topIdSet.has(String(p.id))
+                );
+            } catch (err) {
+                console.error("[BestSellers] Nuvemshop products fetch failed:", err);
                 productsDetails = [];
             }
         }
@@ -216,7 +221,11 @@ export async function getBestSellersAction(
 
                 if (details) {
                     const nuvemDetails = details as NuvemshopProduct;
+                    // Try first image object, then the full images array as fallback
                     imageUrl = extractNuvemshopImage(nuvemDetails.images?.[0]);
+                    if (!imageUrl && nuvemDetails.images) {
+                        imageUrl = extractNuvemshopImage(nuvemDetails.images);
+                    }
                     title = extractI18nName(nuvemDetails.name);
                     price = nuvemDetails.variants?.[0]?.price || "0.00";
                     vendor = nuvemDetails.brand || "";
@@ -261,17 +270,38 @@ function extractI18nName(nameField: unknown): string {
 
 const NUVEMSHOP_NO_PHOTO = "no-photo";
 
-/** Extract image URL from a Nuvemshop image field (object or string), filtering placeholders */
+/** Extract image URL from a Nuvemshop image field (object, string, or array), filtering placeholders */
 function extractNuvemshopImage(imageField: unknown): string {
     let src = "";
+
     if (typeof imageField === "string") {
         src = imageField;
+    } else if (Array.isArray(imageField)) {
+        // Handle case where images array is passed directly
+        const first = imageField[0];
+        if (first) {
+            if (typeof first === "string") {
+                src = first;
+            } else if (typeof first === "object" && first !== null) {
+                src = (first as Record<string, unknown>).src
+                    ? String((first as Record<string, unknown>).src)
+                    : (first as Record<string, unknown>).url
+                        ? String((first as Record<string, unknown>).url)
+                        : "";
+            }
+        }
     } else if (imageField && typeof imageField === "object") {
         const obj = imageField as Record<string, unknown>;
-        src = obj.src ? String(obj.src) : "";
+        // Try src first, then url as fallback
+        src = obj.src ? String(obj.src) : obj.url ? String(obj.url) : "";
     }
+
     // Filter out the Nuvemshop no-photo placeholder
     if (src && src.includes(NUVEMSHOP_NO_PHOTO)) return "";
+    // Nuvemshop API sometimes returns http:// URLs - upgrade to https://
+    if (src && src.startsWith("http://")) {
+        src = src.replace("http://", "https://");
+    }
     return src;
 }
 
