@@ -166,26 +166,47 @@ export async function getBestSellersAction(
             }
         } else {
             // Nuvemshop: fetch ALL products from the Products API (includes images)
-            // Then filter to only the ones we need. This is the proven path that
-            // works for collections — now used for the default view too.
+            // Then filter to only the ones we need.
+            console.log("[BestSellers] Nuvemshop: fetching products for", topProductIds.length, "top IDs:", topProductIds.slice(0, 5));
             try {
                 const allNuvemProducts = await fetchNuvemshopProducts(
                     integration.id,
                     (collectionId && collectionId !== "all") ? collectionId : undefined
                 );
+                console.log("[BestSellers] Nuvemshop Products API returned", allNuvemProducts.length, "products");
+                if (allNuvemProducts.length > 0) {
+                    const sample = allNuvemProducts[0];
+                    console.log("[BestSellers] Sample product:", JSON.stringify({
+                        id: sample.id,
+                        name: sample.name,
+                        hasImages: !!sample.images,
+                        imagesCount: sample.images?.length ?? 0,
+                        firstImage: sample.images?.[0] ? JSON.stringify(sample.images[0]).substring(0, 200) : "none",
+                    }));
+                }
                 // Filter to only the products we need
                 const topIdSet = new Set(topProductIds);
                 productsDetails = allNuvemProducts.filter(
                     (p) => topIdSet.has(String(p.id))
                 );
+                console.log("[BestSellers] Matched", productsDetails.length, "of", topProductIds.length, "top products");
             } catch (err) {
-                console.error("[BestSellers] Nuvemshop products fetch failed:", err);
+                console.error("[BestSellers] Nuvemshop products fetch FAILED:", err);
                 productsDetails = [];
             }
         }
 
         // 6. Join details with sales count
         const result: Product[] = [];
+
+        // Debug: log rawInfo for first few products
+        if (integration.platform === "NUVEMSHOP") {
+            const sampleIds = sortedProducts.slice(0, 3).map(([id]) => id);
+            for (const sid of sampleIds) {
+                const ri = productInfoFromOrders.get(sid);
+                console.log(`[BestSellers] rawInfo[${sid}]:`, JSON.stringify({ name: ri?.name, imageUrl: ri?.imageUrl?.substring(0, 80) || "EMPTY" }));
+            }
+        }
 
         for (const [id, qty] of sortedProducts) {
             const details = productsDetails.find((p) => String(p.id) === id);
