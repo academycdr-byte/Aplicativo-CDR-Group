@@ -5,7 +5,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { decrypt } from "@/lib/encryption";
 import { fetchShopifyProducts, fetchShopifyCollections, type ShopifyProduct, type ShopifyCollection } from "@/lib/integrations/shopify";
-import { fetchNuvemshopProducts, fetchNuvemshopCollections, type NuvemshopProduct, type NuvemshopCollection } from "@/lib/integrations/nuvemshop";
+import { fetchNuvemshopProductsByIds, fetchNuvemshopCollections, type NuvemshopProduct, type NuvemshopCollection } from "@/lib/integrations/nuvemshop";
 import { type Product, type Collection } from "@/lib/ecommerce-service";
 import { toBrasiliaStartOfDay, toBrasiliaEndOfDay, getBrazilToday } from "@/lib/date-utils";
 
@@ -165,48 +165,19 @@ export async function getBestSellersAction(
                 productsDetails = data.products || [];
             }
         } else {
-            // Nuvemshop: fetch ALL products from the Products API (includes images)
-            // Then filter to only the ones we need.
-            console.log("[BestSellers] Nuvemshop: fetching products for", topProductIds.length, "top IDs:", topProductIds.slice(0, 5));
+            // Nuvemshop: fetch specific products by ID (more reliable than fetching all)
             try {
-                const allNuvemProducts = await fetchNuvemshopProducts(
+                productsDetails = await fetchNuvemshopProductsByIds(
                     integration.id,
-                    (collectionId && collectionId !== "all") ? collectionId : undefined
+                    topProductIds
                 );
-                console.log("[BestSellers] Nuvemshop Products API returned", allNuvemProducts.length, "products");
-                if (allNuvemProducts.length > 0) {
-                    const sample = allNuvemProducts[0];
-                    console.log("[BestSellers] Sample product:", JSON.stringify({
-                        id: sample.id,
-                        name: sample.name,
-                        hasImages: !!sample.images,
-                        imagesCount: sample.images?.length ?? 0,
-                        firstImage: sample.images?.[0] ? JSON.stringify(sample.images[0]).substring(0, 200) : "none",
-                    }));
-                }
-                // Filter to only the products we need
-                const topIdSet = new Set(topProductIds);
-                productsDetails = allNuvemProducts.filter(
-                    (p) => topIdSet.has(String(p.id))
-                );
-                console.log("[BestSellers] Matched", productsDetails.length, "of", topProductIds.length, "top products");
-            } catch (err) {
-                console.error("[BestSellers] Nuvemshop products fetch FAILED:", err);
+            } catch {
                 productsDetails = [];
             }
         }
 
         // 6. Join details with sales count
         const result: Product[] = [];
-
-        // Debug: log rawInfo for first few products
-        if (integration.platform === "NUVEMSHOP") {
-            const sampleIds = sortedProducts.slice(0, 3).map(([id]) => id);
-            for (const sid of sampleIds) {
-                const ri = productInfoFromOrders.get(sid);
-                console.log(`[BestSellers] rawInfo[${sid}]:`, JSON.stringify({ name: ri?.name, imageUrl: ri?.imageUrl?.substring(0, 80) || "EMPTY" }));
-            }
-        }
 
         for (const [id, qty] of sortedProducts) {
             const details = productsDetails.find((p) => String(p.id) === id);
