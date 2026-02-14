@@ -297,6 +297,7 @@ export default function DashboardPage() {
           change={stats?.revenueChange || "0%"}
           icon={TrendingUp}
           trend="up"
+          tag="Pagos"
           action={
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -328,6 +329,7 @@ export default function DashboardPage() {
           change={stats?.ordersChange || "0%"}
           icon={ShoppingBag}
           trend="up"
+          tag="Pagos"
         />
         <KPICard
           label="ROAS"
@@ -636,14 +638,14 @@ function buildFunnelRates(f: FunnelData): FunnelRate[] {
 
 // Subcomponents
 
-function KPICard({ label, value, change, icon: Icon, trend, action }: {
-  label: string; value: string; change: string; icon: LucideIcon; trend: "up" | "down" | "neutral"; action?: React.ReactNode;
+function KPICard({ label, value, change, icon: Icon, trend, action, tag }: {
+  label: string; value: string; change: string; icon: LucideIcon; trend: "up" | "down" | "neutral"; action?: React.ReactNode; tag?: string;
 }) {
   const isPositive = change && change.startsWith("+") || trend === "up";
   const isNegative = change && change.startsWith("-") || trend === "down";
 
   return (
-    <Card className="shadow-sm group relative overflow-hidden" role="status" aria-label={`${label}: ${value}`}>
+    <Card className="shadow-sm group relative overflow-hidden" role="status" aria-label={`${label}${tag ? ` (${tag})` : ''}: ${value}`}>
       <div className="absolute right-0 top-0 p-3 opacity-5 group-hover:opacity-10 transition-opacity" aria-hidden="true">
         <Icon className="w-12 h-12 sm:w-16 sm:h-16" />
       </div>
@@ -666,7 +668,15 @@ function KPICard({ label, value, change, icon: Icon, trend, action }: {
           </div>
         </div>
         <div className="space-y-1">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
+            {tag && (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-500">
+                <CheckCircle className="w-2.5 h-2.5" aria-hidden="true" />
+                <span className="text-[9px] font-semibold uppercase tracking-wider leading-none">{tag}</span>
+              </span>
+            )}
+          </div>
           <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">{value}</h3>
         </div>
       </CardContent>
