@@ -588,7 +588,7 @@ export default function DashboardPage() {
           <RateCard
             title="Taxa de Pagamento"
             value={`${(rates?.paidRate || 0).toFixed(2)}%`}
-            subtext={`${rates?.paidOrders || 0} pagos`}
+            subtext={`${rates?.paidOrders || 0} Pedidos Pagos de ${rates?.totalOrders || 0} Pedidos Gerados`}
             progress={rates?.paidRate || 0}
             colorClass="bg-primary"
             icon={CheckCircle}
