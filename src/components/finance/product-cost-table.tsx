@@ -154,10 +154,10 @@ export function ProductCostTable({ costs }: { costs: ProductCost[] }) {
                                     <div className="flex items-center justify-between">
                                         <span className="text-xs font-bold text-muted-foreground">{cost.sku}</span>
                                         <div className="flex items-center gap-1">
-                                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleSave}>
+                                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleSave} aria-label="Salvar alterações">
                                                 <Save className="w-3.5 h-3.5 text-emerald-500" />
                                             </Button>
-                                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleCancel}>
+                                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleCancel} aria-label="Cancelar edição">
                                                 <X className="w-3.5 h-3.5 text-red-500" />
                                             </Button>
                                         </div>
@@ -186,7 +186,7 @@ export function ProductCostTable({ costs }: { costs: ProductCost[] }) {
                                             <span className="text-sm font-bold text-amber-600">R$ {Number(cost.costPrice).toFixed(2)}</span>
                                         </div>
                                     </div>
-                                    <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" onClick={() => handleEdit(cost)}>
+                                    <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" onClick={() => handleEdit(cost)} aria-label={`Editar custo de ${cost.name || cost.sku}`}>
                                         <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
                                     </Button>
                                 </div>
@@ -198,13 +198,13 @@ export function ProductCostTable({ costs }: { costs: ProductCost[] }) {
 
             {/* Desktop Table */}
             <div className="border rounded-md overflow-x-auto hidden sm:block">
-                <Table>
+                <Table aria-label="Custos de produtos cadastrados">
                     <TableHeader>
                         <TableRow>
-                            <TableHead>SKU</TableHead>
-                            <TableHead>Nome do Produto</TableHead>
-                            <TableHead className="text-right">Custo Unitário (R$)</TableHead>
-                            <TableHead className="w-[100px]"></TableHead>
+                            <TableHead scope="col">SKU</TableHead>
+                            <TableHead scope="col">Nome do Produto</TableHead>
+                            <TableHead scope="col" className="text-right">Custo Unitário (R$)</TableHead>
+                            <TableHead scope="col" className="w-[100px]"><span className="sr-only">Ações</span></TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -238,15 +238,15 @@ export function ProductCostTable({ costs }: { costs: ProductCost[] }) {
                                 <TableCell>
                                     {editingId === cost.id ? (
                                         <div className="flex items-center gap-2">
-                                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={handleSave}>
+                                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={handleSave} aria-label="Salvar alterações">
                                                 <Save className="w-4 h-4 text-emerald-500" />
                                             </Button>
-                                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={handleCancel}>
+                                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={handleCancel} aria-label="Cancelar edição">
                                                 <X className="w-4 h-4 text-red-500" />
                                             </Button>
                                         </div>
                                     ) : (
-                                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleEdit(cost)}>
+                                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleEdit(cost)} aria-label={`Editar custo de ${cost.name || cost.sku}`}>
                                             <Pencil className="w-4 h-4 text-muted-foreground" />
                                         </Button>
                                     )}

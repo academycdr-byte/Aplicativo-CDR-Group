@@ -75,7 +75,7 @@ export function FunnelVisual({ steps, rates }: FunnelVisualProps) {
                                     </div>
                                 </div>
 
-                                <div className="h-2.5 w-full bg-secondary/50 rounded-full overflow-hidden">
+                                <div className="h-2.5 w-full bg-secondary/50 rounded-full overflow-hidden" role="progressbar" aria-valuenow={Math.round(widthPct)} aria-valuemin={0} aria-valuemax={100} aria-label={`${step.label}: ${fmtNum(step.value)}`}>
                                     <div
                                         className={cn("h-full rounded-full transition-all duration-1000 ease-out", step.barColor)}
                                         style={{ width: `${widthPct}%` }}

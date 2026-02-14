@@ -5,7 +5,10 @@ const IV_LENGTH = 16;
 const TAG_LENGTH = 16;
 
 function getKey(): Buffer {
-  const secret = process.env.ENCRYPTION_KEY || process.env.AUTH_SECRET || "";
+  const secret = process.env.ENCRYPTION_KEY || process.env.AUTH_SECRET;
+  if (!secret) {
+    throw new Error("ENCRYPTION_KEY or AUTH_SECRET environment variable must be configured");
+  }
   return crypto.createHash("sha256").update(secret).digest();
 }
 

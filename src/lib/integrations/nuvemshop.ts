@@ -569,10 +569,27 @@ export async function exchangeNuvemshopToken(code: string) {
  * Fetch products from Nuvemshop (paginated — fetches all pages).
  * Supports filtering by category (collection).
  */
+/** Nuvemshop product shape (fields used in the codebase) */
+export interface NuvemshopProduct {
+  id: number | string;
+  name: Record<string, string> | string;
+  brand?: string;
+  variants?: Array<{ price: string; [key: string]: unknown }>;
+  images?: Array<{ src?: string; [key: string]: unknown }>;
+  [key: string]: unknown;
+}
+
+/** Nuvemshop collection/category shape */
+export interface NuvemshopCollection {
+  id: number | string;
+  name: Record<string, string> | string;
+  [key: string]: unknown;
+}
+
 export async function fetchNuvemshopProducts(
   integrationId: string,
   collectionId?: string // This corresponds to 'category_id' in Nuvemshop
-): Promise<any[]> {
+): Promise<NuvemshopProduct[]> {
   const integration = await prisma.integration.findUnique({
     where: { id: integrationId },
   });
@@ -586,7 +603,7 @@ export async function fetchNuvemshopProducts(
 
   const PER_PAGE = 200;
   const MAX_PAGES = 10; // Safety limit: 2000 products max
-  const allProducts: any[] = [];
+  const allProducts: NuvemshopProduct[] = [];
 
   for (let page = 1; page <= MAX_PAGES; page++) {
     let url = `https://api.nuvemshop.com.br/v1/${storeId}/products?per_page=${PER_PAGE}&page=${page}`;
@@ -622,7 +639,7 @@ export async function fetchNuvemshopProducts(
 /**
  * Fetch categories (collections) from Nuvemshop
  */
-export async function fetchNuvemshopCollections(integrationId: string): Promise<any[]> {
+export async function fetchNuvemshopCollections(integrationId: string): Promise<NuvemshopCollection[]> {
   const integration = await prisma.integration.findUnique({
     where: { id: integrationId },
   });

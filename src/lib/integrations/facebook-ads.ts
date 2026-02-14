@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { encrypt, decrypt } from "@/lib/encryption";
 import { toBrasiliaDateStr, toBrasiliaStartOfDay } from "@/lib/date-utils";
@@ -112,7 +113,8 @@ async function fetchAdVideoUrls(
         const adToVideoMap: Record<string, string> = {};
 
         for (const [adId, adData] of Object.entries(data)) {
-          const creative = (adData as any)?.creative;
+          const typedAdData = adData as { creative?: { video_id?: string; object_story_spec?: { video_data?: { video_id?: string } } } };
+          const creative = typedAdData?.creative;
           if (!creative) continue;
 
           const videoId = creative.video_id || creative.object_story_spec?.video_data?.video_id;
@@ -150,11 +152,37 @@ async function fetchAdVideoUrls(
   return videoUrls;
 }
 
+/** Single insight record from Facebook Ads API */
+interface FbInsightRecord {
+  date_start: string;
+  campaign_id?: string;
+  campaign_name?: string;
+  adset_id?: string;
+  adset_name?: string;
+  ad_id?: string;
+  ad_name?: string;
+  impressions?: string;
+  reach?: string;
+  clicks?: string;
+  spend?: string;
+  actions?: Array<{ action_type: string; value: string }>;
+  action_values?: Array<{ action_type: string; value: string }>;
+  cost_per_action_type?: Array<{ action_type: string; value: string }>;
+  [key: string]: unknown;
+}
+
+/** Facebook API paginated response shape */
+interface FbPaginatedInsightsResponse {
+  data?: FbInsightRecord[];
+  error?: { message: string; type: string; code: number };
+  paging?: { next?: string };
+}
+
 /**
  * Fetch all paginated insights from a single API URL.
  */
-async function fetchAllInsights(url: string): Promise<any[]> {
-  const results: any[] = [];
+async function fetchAllInsights(url: string): Promise<FbInsightRecord[]> {
+  const results: FbInsightRecord[] = [];
   const response = await fetch(url);
 
   if (!response.ok) {
@@ -163,7 +191,7 @@ async function fetchAllInsights(url: string): Promise<any[]> {
     return results;
   }
 
-  const data = await response.json();
+  const data: FbPaginatedInsightsResponse = await response.json();
   if (data.error) {
     console.error("[Facebook Ads] API error:", JSON.stringify(data.error));
     return results;
@@ -175,7 +203,7 @@ async function fetchAllInsights(url: string): Promise<any[]> {
   while (nextUrl) {
     const nextResponse = await fetch(nextUrl);
     if (!nextResponse.ok) break;
-    const nextData = await nextResponse.json();
+    const nextData: FbPaginatedInsightsResponse = await nextResponse.json();
     if (nextData.error) break;
     if (nextData.data) results.push(...nextData.data);
     nextUrl = nextData.paging?.next;
@@ -188,7 +216,7 @@ async function fetchAllInsights(url: string): Promise<any[]> {
  * Process and save insights to database. Returns number of records saved.
  */
 async function saveInsightsToDB(
-  insights: any[],
+  insights: FbInsightRecord[],
   organizationId: string,
   thumbnails: Record<string, string>,
   videoUrls: Record<string, string>,
@@ -222,6 +250,8 @@ async function saveInsightsToDB(
         const addToCart = parseInt(addToCartAction?.value || "0");
         const initiateCheckout = parseInt(initiateCheckoutAction?.value || "0");
 
+        const adId = insight.ad_id || "unknown";
+
         return prisma.adMetric.upsert({
           where: {
             organizationId_platform_accountId_campaignId_adId_date: {
@@ -229,7 +259,7 @@ async function saveInsightsToDB(
               platform: "FACEBOOK_ADS",
               accountId: accountId || "unknown",
               campaignId: insight.campaign_id || "unknown",
-              adId: insight.ad_id || "unknown",
+              adId,
               date: toBrasiliaStartOfDay(insight.date_start),
             },
           },
@@ -242,8 +272,8 @@ async function saveInsightsToDB(
             adSetName: insight.adset_name,
             adId: insight.ad_id,
             adName: insight.ad_name,
-            thumbnailUrl: thumbnails[insight.ad_id] || null,
-            videoUrl: videoUrls[insight.ad_id] || null,
+            thumbnailUrl: thumbnails[adId] || null,
+            videoUrl: videoUrls[adId] || null,
             accountId: accountId || "unknown",
             // IMPORTANTE: Converter para Inicio do Dia em Brasilia (03:00 UTC)
             // Se usar new Date(date_start), fica 00:00 UTC, que eh "Ontem" as 21:00 no Brasil
@@ -258,14 +288,14 @@ async function saveInsightsToDB(
             initiateCheckout,
             revenue,
             currency: "BRL",
-            rawData: insight,
+            rawData: insight as unknown as Prisma.InputJsonValue,
           },
           update: {
             campaignName: insight.campaign_name,
             adSetName: insight.adset_name,
             adName: insight.ad_name,
-            thumbnailUrl: thumbnails[insight.ad_id] || null,
-            videoUrl: videoUrls[insight.ad_id] || null,
+            thumbnailUrl: thumbnails[adId] || null,
+            videoUrl: videoUrls[adId] || null,
             accountId: accountId || "unknown",
             impressions: parseInt(insight.impressions || "0"),
             reach: parseInt(insight.reach || "0"),
@@ -275,7 +305,7 @@ async function saveInsightsToDB(
             addToCart,
             initiateCheckout,
             revenue,
-            rawData: insight,
+            rawData: insight as unknown as Prisma.InputJsonValue,
           },
         });
       })
@@ -442,14 +472,14 @@ export async function syncFacebookAdsMetrics(
           break;
         }
 
-        const data: { data?: Record<string, unknown>[]; error?: unknown; paging?: { next?: string } } = await response.json();
+        const data: FbPaginatedInsightsResponse = await response.json();
         if (data.error) {
           console.error("[Facebook Ads] API error:", JSON.stringify(data.error));
           break;
         }
 
         if (data.data && data.data.length > 0) {
-          synced += await saveInsightsToDB(data.data as any[], organizationId, noMedia, noMedia, adAccountId);
+          synced += await saveInsightsToDB(data.data, organizationId, noMedia, noMedia, adAccountId);
         }
 
         pageUrl = data.paging?.next || null;

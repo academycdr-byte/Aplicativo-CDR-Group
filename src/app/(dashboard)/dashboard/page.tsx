@@ -360,6 +360,8 @@ export default function DashboardPage() {
                 <button
                   key={m.key}
                   onClick={() => toggleMetric(m.key)}
+                  aria-pressed={activeMetrics.has(m.key)}
+                  aria-label={`Métrica ${m.label}: ${activeMetrics.has(m.key) ? "ativa" : "inativa"}`}
                   className={cn(
                     "flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] uppercase tracking-wide font-semibold border transition-all duration-200",
                     activeMetrics.has(m.key)
@@ -380,7 +382,7 @@ export default function DashboardPage() {
 
           <CardContent className="px-1 sm:px-6 pb-4 sm:pb-6">
             {metricsData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={280} className="sm:!h-[360px]">
+              <ResponsiveContainer width="100%" height={280} className="sm:!h-[360px]" aria-label="Gráfico de performance das campanhas ao longo do tempo">
                 <ComposedChart data={convertedMetrics} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
                   <defs>
                     <linearGradient id="gradFaturamento" x1="0" y1="0" x2="0" y2="1">
@@ -647,8 +649,8 @@ function KPICard({ label, value, change, icon: Icon, trend, action }: {
   const isNegative = change && change.startsWith("-") || trend === "down";
 
   return (
-    <Card className="shadow-sm group relative overflow-hidden">
-      <div className="absolute right-0 top-0 p-3 opacity-5 group-hover:opacity-10 transition-opacity">
+    <Card className="shadow-sm group relative overflow-hidden" role="status" aria-label={`${label}: ${value}`}>
+      <div className="absolute right-0 top-0 p-3 opacity-5 group-hover:opacity-10 transition-opacity" aria-hidden="true">
         <Icon className="w-12 h-12 sm:w-16 sm:h-16" />
       </div>
       <CardContent className="p-4 sm:p-6 relative z-10">
@@ -687,10 +689,10 @@ function RateCard({ title, value, subtext, progress, colorClass, icon: Icon }: {
   icon: React.ComponentType<{ className?: string }>;
 }) {
   return (
-    <Card className="shadow-sm flex flex-col justify-between p-6">
+    <Card className="shadow-sm flex flex-col justify-between p-6" role="status" aria-label={`${title}: ${value}`}>
       <div className="flex items-center justify-between mb-4">
         <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{title}</span>
-        <Icon className="w-4 h-4 text-muted-foreground/50" />
+        <Icon className="w-4 h-4 text-muted-foreground/50" aria-hidden="true" />
       </div>
 
       <div className="space-y-3">
@@ -698,7 +700,7 @@ function RateCard({ title, value, subtext, progress, colorClass, icon: Icon }: {
           <div className="text-2xl font-bold tracking-tight">{value}</div>
         </div>
 
-        <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
+        <div className="h-2 w-full bg-secondary rounded-full overflow-hidden" role="progressbar" aria-valuenow={Math.min(progress, 100)} aria-valuemin={0} aria-valuemax={100} aria-label={`${title} progresso`}>
           <div className={`h-full rounded-full transition-all duration-500 ${colorClass}`} style={{ width: `${Math.min(progress, 100)}%` }} />
         </div>
         <p className="text-xs text-muted-foreground font-medium">{subtext}</p>

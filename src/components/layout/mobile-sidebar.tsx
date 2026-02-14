@@ -85,6 +85,7 @@ export function MobileSidebar() {
       <Link
         href={item.href}
         onClick={() => setOpen(false)}
+        aria-current={isActive ? "page" : undefined}
         className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[14px] font-medium transition-all relative ${isActive
             ? "bg-primary/10 text-primary font-semibold"
             : "text-sidebar-text/70 hover:text-sidebar-text hover:bg-sidebar-hover"
@@ -102,7 +103,7 @@ export function MobileSidebar() {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button variant="ghost" size="icon" className="md:hidden">
+        <Button variant="ghost" size="icon" className="md:hidden" aria-label="Abrir menu de navegação">
           <Menu className="w-5 h-5" />
         </Button>
       </SheetTrigger>
@@ -122,7 +123,7 @@ export function MobileSidebar() {
             </div>
           </SheetTitle>
         </SheetHeader>
-        <nav className="flex-1 overflow-y-auto px-3 pt-4 pb-4 space-y-4 sm:space-y-6">
+        <nav className="flex-1 overflow-y-auto px-3 pt-4 pb-4 space-y-4 sm:space-y-6" aria-label="Navegação principal">
           <div className="space-y-1">
             <p className="px-3 mb-3 text-[11px] font-semibold uppercase tracking-widest text-sidebar-text/40">
               CDR AI
@@ -156,6 +157,7 @@ export function MobileSidebar() {
           <Link
             href="/settings"
             onClick={() => setOpen(false)}
+            aria-label={`Perfil de ${userName} - Configurações`}
             className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-white/5 transition-colors"
           >
             <Avatar className="h-9 w-9 border border-white/10 shadow-sm">

@@ -58,11 +58,11 @@ export async function POST(request: NextRequest) {
             success: true,
             messageId: result.messageId || "sent",
         });
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Send message error:", error);
         return NextResponse.json({
             success: false,
-            error: error.message,
+            error: error instanceof Error ? error.message : "Unknown error",
         }, { status: 500 });
     }
 }

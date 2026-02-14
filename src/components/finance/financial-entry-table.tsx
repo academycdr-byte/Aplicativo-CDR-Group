@@ -347,6 +347,7 @@ export function FinancialEntryTable({
                                 className="h-8 w-8 shrink-0"
                                 disabled={deletingId === entry.id}
                                 onClick={() => handleDelete(entry.id)}
+                                aria-label={`Excluir lançamento de ${fmt(Number(entry.amount))}`}
                             >
                                 <Trash2 className="w-3.5 h-3.5 text-red-500" />
                             </Button>
@@ -357,15 +358,15 @@ export function FinancialEntryTable({
 
             {/* Desktop Table */}
             <div className="border rounded-md overflow-x-auto hidden sm:block">
-                <Table>
+                <Table aria-label="Lançamentos financeiros manuais">
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Data</TableHead>
-                            <TableHead>Tipo</TableHead>
-                            <TableHead>Categoria</TableHead>
-                            <TableHead>Descricao</TableHead>
-                            <TableHead className="text-right">Valor</TableHead>
-                            <TableHead className="w-[60px]"></TableHead>
+                            <TableHead scope="col">Data</TableHead>
+                            <TableHead scope="col">Tipo</TableHead>
+                            <TableHead scope="col">Categoria</TableHead>
+                            <TableHead scope="col">Descricao</TableHead>
+                            <TableHead scope="col" className="text-right">Valor</TableHead>
+                            <TableHead scope="col" className="w-[60px]"><span className="sr-only">Ações</span></TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -398,6 +399,7 @@ export function FinancialEntryTable({
                                         className="h-8 w-8"
                                         disabled={deletingId === entry.id}
                                         onClick={() => handleDelete(entry.id)}
+                                        aria-label={`Excluir lançamento de ${fmt(Number(entry.amount))}`}
                                     >
                                         <Trash2 className="w-4 h-4 text-red-500" />
                                     </Button>

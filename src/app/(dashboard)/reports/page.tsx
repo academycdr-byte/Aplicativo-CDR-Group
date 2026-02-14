@@ -641,14 +641,14 @@ function CreateReportTab({ clients, onRefresh }: { clients: Client[]; onRefresh:
                   <p className="text-sm font-medium">📈 Comparar Períodos</p>
                   <p className="text-xs text-muted-foreground">Mostrar variação vs período anterior</p>
                 </div>
-                <Switch checked={comparePeriods} onCheckedChange={setComparePeriods} />
+                <Switch checked={comparePeriods} onCheckedChange={setComparePeriods} aria-label="Comparar períodos" />
               </div>
               <div className="flex items-center justify-between p-3 rounded-lg border">
                 <div>
                   <p className="text-sm font-medium">🏆 Ranking de Criativos</p>
                   <p className="text-xs text-muted-foreground">Top 3 criativos por ROAS</p>
                 </div>
-                <Switch checked={rankingCreatives} onCheckedChange={setRankingCreatives} />
+                <Switch checked={rankingCreatives} onCheckedChange={setRankingCreatives} aria-label="Ranking de criativos" />
               </div>
             </div>
           </div>
@@ -1041,16 +1041,16 @@ function ClientsTab({ clients, onRefresh }: { clients: Client[]; onRefresh: () =
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-          <Table className="min-w-[700px]">
+          <Table className="min-w-[700px]" aria-label="Lista de clientes">
             <TableHeader>
               <TableRow>
-                <TableHead>Cliente</TableHead>
-                <TableHead>Responsável</TableHead>
-                <TableHead>WhatsApp</TableHead>
-                <TableHead>Plano</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Início</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
+                <TableHead scope="col">Cliente</TableHead>
+                <TableHead scope="col">Responsável</TableHead>
+                <TableHead scope="col">WhatsApp</TableHead>
+                <TableHead scope="col">Plano</TableHead>
+                <TableHead scope="col">Status</TableHead>
+                <TableHead scope="col">Início</TableHead>
+                <TableHead scope="col" className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -1090,7 +1090,7 @@ function ClientsTab({ clients, onRefresh }: { clients: Client[]; onRefresh: () =
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" aria-label={`Ações para ${client.name}`}>
                           <MoreHorizontal className="w-4 h-4" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -1708,15 +1708,15 @@ function SchedulesTab({
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-          <Table className="min-w-[600px]">
+          <Table className="min-w-[600px]" aria-label="Agendamentos de envio">
             <TableHeader>
               <TableRow>
-                <TableHead>Cliente</TableHead>
-                <TableHead>Frequência</TableHead>
-                <TableHead>Horário</TableHead>
-                <TableHead>Próximo Envio</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
+                <TableHead scope="col">Cliente</TableHead>
+                <TableHead scope="col">Frequência</TableHead>
+                <TableHead scope="col">Horário</TableHead>
+                <TableHead scope="col">Próximo Envio</TableHead>
+                <TableHead scope="col">Status</TableHead>
+                <TableHead scope="col" className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -1736,7 +1736,7 @@ function SchedulesTab({
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" aria-label={`Ações para agendamento de ${schedule.client.name}`}>
                           <MoreHorizontal className="w-4 h-4" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -1860,15 +1860,15 @@ function HistoryTab({
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-          <Table className="min-w-[600px]">
+          <Table className="min-w-[600px]" aria-label="Histórico de envios">
             <TableHeader>
               <TableRow>
-                <TableHead>Data/Hora</TableHead>
-                <TableHead>Cliente</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Métricas</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
+                <TableHead scope="col">Data/Hora</TableHead>
+                <TableHead scope="col">Cliente</TableHead>
+                <TableHead scope="col">Tipo</TableHead>
+                <TableHead scope="col">Status</TableHead>
+                <TableHead scope="col">Métricas</TableHead>
+                <TableHead scope="col" className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

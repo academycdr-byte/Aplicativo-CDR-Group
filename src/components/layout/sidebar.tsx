@@ -37,6 +37,7 @@ function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
   return (
     <Link
       href={item.href}
+      aria-current={isActive ? "page" : undefined}
       className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg text-[14px] font-medium transition-all duration-200 relative ${isActive
         ? "bg-primary/10 text-primary font-semibold"
         : "text-sidebar-text/70 hover:text-sidebar-text hover:bg-sidebar-hover"
@@ -92,7 +93,7 @@ export function Sidebar() {
   }, [isInternal]);
 
   return (
-    <aside className="hidden md:flex md:w-[260px] md:flex-col bg-sidebar-bg border-r border-sidebar-border h-screen sticky top-0 z-30">
+    <aside className="hidden md:flex md:w-[260px] md:flex-col bg-sidebar-bg border-r border-sidebar-border h-screen sticky top-0 z-30" role="navigation" aria-label="Menu principal">
       {/* Brand */}
       <div className="flex items-center gap-3 px-6 py-6 mb-2">
         <Image
@@ -110,7 +111,7 @@ export function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-4 space-y-10 overflow-y-auto no-scrollbar py-2">
+      <nav className="flex-1 px-4 space-y-10 overflow-y-auto no-scrollbar py-2" aria-label="Navegacao principal">
         {filteredAiNav.length > 0 && (
           <div className="space-y-1">
             <p className="px-3 mb-3 text-[11px] font-semibold uppercase tracking-widest text-sidebar-text/40">
@@ -149,6 +150,7 @@ export function Sidebar() {
       <div className="px-4 py-4 border-t border-sidebar-border mt-auto bg-black/10">
         <Link
           href="/settings"
+          aria-label={`Perfil de ${session?.user?.name || "Usuário"} - Configurações`}
           className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-white/5 transition-colors cursor-pointer group"
         >
           <Avatar className="h-10 w-10 border border-white/10 shadow-sm">

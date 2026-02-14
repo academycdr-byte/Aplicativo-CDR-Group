@@ -1,18 +1,52 @@
 // Report message builder utility
 
+interface ReportMetrics {
+    faturamento: number;
+    investimento: number;
+    roas: number;
+    cpa: number;
+    ticketMedio: number;
+    [key: string]: number;
+}
+
+interface ReportFunnel {
+    sessions: number;
+    addToCart: number;
+    checkout: number;
+    pedidosGerados: number;
+    pedidosPagos: number;
+    taxaPagamento: number;
+}
+
+interface ReportComparison {
+    faturamento: number;
+    faturamentoPercent: number;
+    roas: number;
+    pedidosGerados: number;
+    pedidosPagos: number;
+}
+
+interface ReportCreative {
+    adId: string | null;
+    adName: string | null;
+    spend: number;
+    revenue: number;
+    roas: number;
+}
+
 export function buildReportMessage(
     clientName: string,
     period: { from: Date; to: Date },
-    metrics: any,
+    metrics: ReportMetrics,
     options: {
         selectedMetrics: string[];
         comparePeriods: boolean;
         rankingCreatives: boolean;
         customHeader?: string;
     },
-    funnel: any,
-    comparison: any,
-    topCreatives: any[]
+    funnel: ReportFunnel,
+    comparison: ReportComparison,
+    topCreatives: ReportCreative[]
 ): string {
     const formatDate = (d: Date) =>
         d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });

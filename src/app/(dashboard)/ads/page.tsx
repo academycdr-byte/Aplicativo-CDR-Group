@@ -596,7 +596,7 @@ export default function AdsPage() {
             </CardHeader>
             <CardContent className="flex-1 min-h-[260px] sm:min-h-[300px] p-3 sm:p-5">
               {dayData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" aria-label="Gráfico de evolução temporal dos anúncios">
                   <LineChart data={dayData} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} opacity={0.15} />
                     <XAxis
@@ -741,6 +741,16 @@ export default function AdsPage() {
                   setSelectedCreative(c);
                   setIsModalOpen(true);
                 }}
+                role="button"
+                tabIndex={0}
+                aria-label={`Criativo ${c.adName || "Sem Título"} - ROAS ${c.roas.toFixed(2)}x, Gasto ${fmt(c.spend)}`}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setSelectedCreative(c);
+                    setIsModalOpen(true);
+                  }
+                }}
               >
                 {/* Thumbnail */}
                 <div className="relative aspect-video bg-muted flex items-center justify-center overflow-hidden">
@@ -813,8 +823,8 @@ export default function AdsPage() {
               Página {creativesPage} de {Math.ceil(sortedCreatives.length / creativesPerPage)}
             </p>
             <div className="flex gap-2">
-              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCreativesPage(p => Math.max(1, p - 1))} disabled={creativesPage === 1}><ChevronLeft className="w-4 h-4" /></Button>
-              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCreativesPage(p => Math.min(Math.ceil(sortedCreatives.length / creativesPerPage), p + 1))} disabled={creativesPage >= Math.ceil(sortedCreatives.length / creativesPerPage)}><ChevronRight className="w-4 h-4" /></Button>
+              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCreativesPage(p => Math.max(1, p - 1))} disabled={creativesPage === 1} aria-label="Página anterior de criativos"><ChevronLeft className="w-4 h-4" /></Button>
+              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCreativesPage(p => Math.min(Math.ceil(sortedCreatives.length / creativesPerPage), p + 1))} disabled={creativesPage >= Math.ceil(sortedCreatives.length / creativesPerPage)} aria-label="Próxima página de criativos"><ChevronRight className="w-4 h-4" /></Button>
             </div>
           </div>
         )}
@@ -831,19 +841,19 @@ export default function AdsPage() {
           </div>
         </CardHeader>
         <CardContent className="p-0 overflow-x-auto">
-          <Table>
+          <Table aria-label="Performance por públicos">
             <TableHeader>
               <TableRow className="hover:bg-transparent border-b border-border/50">
-                <TableHead className="w-[280px]">Público</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-center">Anúncios</TableHead>
-                <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("spend", adSetsSortKey, adSetsSortDir, setAdSetsSortKey, setAdSetsSortDir)}>Gasto <ArrowUpDown className="inline w-3 h-3 ml-1" /></TableHead>
-                <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("clicks", adSetsSortKey, adSetsSortDir, setAdSetsSortKey, setAdSetsSortDir)}>Cliques</TableHead>
-                <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("ctr", adSetsSortKey, adSetsSortDir, setAdSetsSortKey, setAdSetsSortDir)}>CTR</TableHead>
-                <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("conversions", adSetsSortKey, adSetsSortDir, setAdSetsSortKey, setAdSetsSortDir)}>Conv.</TableHead>
-                <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("cpa", adSetsSortKey, adSetsSortDir, setAdSetsSortKey, setAdSetsSortDir)}>CPA</TableHead>
-                <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("roas", adSetsSortKey, adSetsSortDir, setAdSetsSortKey, setAdSetsSortDir)}>ROAS <ArrowUpDown className="inline w-3 h-3 ml-1" /></TableHead>
-                <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("revenue", adSetsSortKey, adSetsSortDir, setAdSetsSortKey, setAdSetsSortDir)}>Receita</TableHead>
+                <TableHead scope="col" className="w-[280px]">Público</TableHead>
+                <TableHead scope="col">Status</TableHead>
+                <TableHead scope="col" className="text-center">Anúncios</TableHead>
+                <TableHead scope="col" className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("spend", adSetsSortKey, adSetsSortDir, setAdSetsSortKey, setAdSetsSortDir)} role="button" aria-label="Ordenar por gasto">Gasto <ArrowUpDown className="inline w-3 h-3 ml-1" aria-hidden="true" /></TableHead>
+                <TableHead scope="col" className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("clicks", adSetsSortKey, adSetsSortDir, setAdSetsSortKey, setAdSetsSortDir)} role="button" aria-label="Ordenar por cliques">Cliques</TableHead>
+                <TableHead scope="col" className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("ctr", adSetsSortKey, adSetsSortDir, setAdSetsSortKey, setAdSetsSortDir)} role="button" aria-label="Ordenar por CTR">CTR</TableHead>
+                <TableHead scope="col" className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("conversions", adSetsSortKey, adSetsSortDir, setAdSetsSortKey, setAdSetsSortDir)} role="button" aria-label="Ordenar por conversões">Conv.</TableHead>
+                <TableHead scope="col" className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("cpa", adSetsSortKey, adSetsSortDir, setAdSetsSortKey, setAdSetsSortDir)} role="button" aria-label="Ordenar por CPA">CPA</TableHead>
+                <TableHead scope="col" className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("roas", adSetsSortKey, adSetsSortDir, setAdSetsSortKey, setAdSetsSortDir)} role="button" aria-label="Ordenar por ROAS">ROAS <ArrowUpDown className="inline w-3 h-3 ml-1" aria-hidden="true" /></TableHead>
+                <TableHead scope="col" className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("revenue", adSetsSortKey, adSetsSortDir, setAdSetsSortKey, setAdSetsSortDir)} role="button" aria-label="Ordenar por receita">Receita</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -887,8 +897,8 @@ export default function AdsPage() {
                 Página {adSetsPage} de {Math.ceil(sortedAdSets.length / adSetsPerPage)}
               </p>
               <div className="flex gap-2">
-                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setAdSetsPage(p => Math.max(1, p - 1))} disabled={adSetsPage === 1}><ChevronLeft className="w-4 h-4" /></Button>
-                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setAdSetsPage(p => Math.min(Math.ceil(sortedAdSets.length / adSetsPerPage), p + 1))} disabled={adSetsPage >= Math.ceil(sortedAdSets.length / adSetsPerPage)}><ChevronRight className="w-4 h-4" /></Button>
+                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setAdSetsPage(p => Math.max(1, p - 1))} disabled={adSetsPage === 1} aria-label="Página anterior de públicos"><ChevronLeft className="w-4 h-4" /></Button>
+                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setAdSetsPage(p => Math.min(Math.ceil(sortedAdSets.length / adSetsPerPage), p + 1))} disabled={adSetsPage >= Math.ceil(sortedAdSets.length / adSetsPerPage)} aria-label="Próxima página de públicos"><ChevronRight className="w-4 h-4" /></Button>
               </div>
             </div>
           )}
@@ -954,18 +964,18 @@ export default function AdsPage() {
           </div>
         </CardHeader>
         <CardContent className="p-0 overflow-x-auto">
-          <Table>
+          <Table aria-label="Detalhamento completo dos anúncios">
             <TableHeader>
               <TableRow className="hover:bg-transparent border-b border-border/50">
-                <TableHead className="w-[300px]">Anúncio</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("spend", metricsSortKey, metricsSortDir, setMetricsSortKey, setMetricsSortDir)}>Gasto <ArrowUpDown className="inline w-3 h-3 ml-1" /></TableHead>
-                <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("impressions", metricsSortKey, metricsSortDir, setMetricsSortKey, setMetricsSortDir)}>Impr.</TableHead>
-                <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("clicks", metricsSortKey, metricsSortDir, setMetricsSortKey, setMetricsSortDir)}>Cliques</TableHead>
-                <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("ctr", metricsSortKey, metricsSortDir, setMetricsSortKey, setMetricsSortDir)}>CTR</TableHead>
-                <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("cpa", metricsSortKey, metricsSortDir, setMetricsSortKey, setMetricsSortDir)}>CPA</TableHead>
-                <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("roas", metricsSortKey, metricsSortDir, setMetricsSortKey, setMetricsSortDir)}>ROAS</TableHead>
-                <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("revenue", metricsSortKey, metricsSortDir, setMetricsSortKey, setMetricsSortDir)}>Receita</TableHead>
+                <TableHead scope="col" className="w-[300px]">Anúncio</TableHead>
+                <TableHead scope="col">Status</TableHead>
+                <TableHead scope="col" className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("spend", metricsSortKey, metricsSortDir, setMetricsSortKey, setMetricsSortDir)} role="button" aria-label="Ordenar por gasto">Gasto <ArrowUpDown className="inline w-3 h-3 ml-1" aria-hidden="true" /></TableHead>
+                <TableHead scope="col" className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("impressions", metricsSortKey, metricsSortDir, setMetricsSortKey, setMetricsSortDir)} role="button" aria-label="Ordenar por impressões">Impr.</TableHead>
+                <TableHead scope="col" className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("clicks", metricsSortKey, metricsSortDir, setMetricsSortKey, setMetricsSortDir)} role="button" aria-label="Ordenar por cliques">Cliques</TableHead>
+                <TableHead scope="col" className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("ctr", metricsSortKey, metricsSortDir, setMetricsSortKey, setMetricsSortDir)} role="button" aria-label="Ordenar por CTR">CTR</TableHead>
+                <TableHead scope="col" className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("cpa", metricsSortKey, metricsSortDir, setMetricsSortKey, setMetricsSortDir)} role="button" aria-label="Ordenar por CPA">CPA</TableHead>
+                <TableHead scope="col" className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("roas", metricsSortKey, metricsSortDir, setMetricsSortKey, setMetricsSortDir)} role="button" aria-label="Ordenar por ROAS">ROAS</TableHead>
+                <TableHead scope="col" className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("revenue", metricsSortKey, metricsSortDir, setMetricsSortKey, setMetricsSortDir)} role="button" aria-label="Ordenar por receita">Receita</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -1002,8 +1012,8 @@ export default function AdsPage() {
                 Página {metricsPage} de {Math.ceil(sortedMetrics.length / metricsPerPage)}
               </p>
               <div className="flex gap-2">
-                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setMetricsPage(p => Math.max(1, p - 1))} disabled={metricsPage === 1}><ChevronLeft className="w-4 h-4" /></Button>
-                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setMetricsPage(p => Math.min(Math.ceil(sortedMetrics.length / metricsPerPage), p + 1))} disabled={metricsPage >= Math.ceil(sortedMetrics.length / metricsPerPage)}><ChevronRight className="w-4 h-4" /></Button>
+                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setMetricsPage(p => Math.max(1, p - 1))} disabled={metricsPage === 1} aria-label="Página anterior de detalhamento"><ChevronLeft className="w-4 h-4" /></Button>
+                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setMetricsPage(p => Math.min(Math.ceil(sortedMetrics.length / metricsPerPage), p + 1))} disabled={metricsPage >= Math.ceil(sortedMetrics.length / metricsPerPage)} aria-label="Próxima página de detalhamento"><ChevronRight className="w-4 h-4" /></Button>
               </div>
             </div>
           )}

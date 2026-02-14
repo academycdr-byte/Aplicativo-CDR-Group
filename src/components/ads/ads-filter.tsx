@@ -71,6 +71,7 @@ export function AdsFilter({ onSearchChange, onExcludeChange, className }: AdsFil
                         value={searchValue}
                         onChange={(e) => setSearchValue(e.target.value)}
                         className="pl-9 bg-card/50"
+                        aria-label="Buscar por titulo do anuncio"
                     />
                 </div>
 
@@ -84,10 +85,11 @@ export function AdsFilter({ onSearchChange, onExcludeChange, className }: AdsFil
                             onChange={(e) => setExcludeInputValue(e.target.value)}
                             onKeyDown={handleKeyDown}
                             onBlur={() => {
-                                // Optional: Auto-add on blur if there's content? 
+                                // Optional: Auto-add on blur if there's content?
                                 // Better to require Enter or explicit action to avoid accidental filters
                             }}
                             className="pl-9 bg-card/50 pr-12"
+                            aria-label="Excluir anuncios por titulo"
                         />
                         <Button
                             size="icon"
@@ -95,6 +97,7 @@ export function AdsFilter({ onSearchChange, onExcludeChange, className }: AdsFil
                             className="absolute right-1 top-1 h-7 w-7"
                             onClick={handleAddExclude}
                             disabled={!excludeInputValue.trim()}
+                            aria-label="Adicionar termo de exclusao"
                         >
                             <Plus className="h-4 w-4" />
                         </Button>
@@ -112,6 +115,7 @@ export function AdsFilter({ onSearchChange, onExcludeChange, className }: AdsFil
                             <button
                                 onClick={() => handleRemoveExclude(term)}
                                 className="ml-1 hover:bg-background/20 rounded-full p-0.5"
+                                aria-label={`Remover exclusao: ${term}`}
                             >
                                 <X className="h-3 w-3 text-[#aaff00]" />
                             </button>

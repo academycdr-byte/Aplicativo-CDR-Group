@@ -148,7 +148,7 @@ export default function SalesPage() {
         </CardHeader>
         <CardContent>
           {dailyData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={300} aria-label="Gráfico de receita ao longo do tempo">
               <AreaChart data={dailyData}>
                 <defs>
                   <linearGradient id="salesRevenueGradient" x1="0" y1="0" x2="0" y2="1">
@@ -218,7 +218,7 @@ export default function SalesPage() {
           </CardHeader>
           <CardContent>
             {stats && stats.byPlatform.length > 0 ? (
-              <ResponsiveContainer width="100%" height={256}>
+              <ResponsiveContainer width="100%" height={256} aria-label="Gráfico de vendas por plataforma">
                 <BarChart data={stats.byPlatform}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} opacity={0.3} />
                   <XAxis
@@ -264,7 +264,7 @@ export default function SalesPage() {
           </CardHeader>
           <CardContent>
             {statusData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={256}>
+              <ResponsiveContainer width="100%" height={256} aria-label="Gráfico de pedidos por status">
                 <BarChart data={statusData} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} opacity={0.3} />
                   <XAxis

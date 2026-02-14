@@ -62,18 +62,18 @@ export async function GET(request: NextRequest) {
                     instanceName,
                 });
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("Z-API Status Error:", error);
             return NextResponse.json({
                 status: "DISCONNECTED",
-                error: "Erro ao conectar com Z-API: " + error.message
+                error: "Erro ao conectar com Z-API: " + (error instanceof Error ? error.message : "Unknown")
             });
         }
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("WhatsApp GET error:", error);
         return NextResponse.json({
             status: "ERROR",
-            error: error.message
+            error: error instanceof Error ? error.message : "Unknown"
         }, { status: 500 });
     }
 }
@@ -87,11 +87,11 @@ export async function POST(request: NextRequest) {
 
         if (action === "create" || action === "init" || action === "connect") {
             try {
-                const qrData: any = await getZApiQrCode().catch(async (err) => {
+                const qrData = await getZApiQrCode().catch(async (err) => {
                     const status = await getZApiStatus();
-                    if (status.connected) return { connected: true };
+                    if (status.connected) return { connected: true } as { connected: boolean; qrcode?: string };
                     throw err;
-                });
+                }) as { connected?: boolean; qrcode?: string };
 
                 if (qrData.connected) {
                     return NextResponse.json({
@@ -108,11 +108,11 @@ export async function POST(request: NextRequest) {
                     qrcode: qrData.qrcode,
                     status: "CONNECTING",
                 });
-            } catch (error: any) {
+            } catch (error: unknown) {
                 console.error("Z-API Connect Error:", error);
                 return NextResponse.json({
                     success: false,
-                    error: "Erro Z-API: " + error.message
+                    error: "Erro Z-API: " + (error instanceof Error ? error.message : "Unknown")
                 }, { status: 400 });
             }
         }
@@ -124,10 +124,10 @@ export async function POST(request: NextRequest) {
                     success: true,
                     status: "DISCONNECTED",
                 });
-            } catch (error: any) {
+            } catch (error: unknown) {
                 return NextResponse.json({
                     success: false,
-                    error: "Erro ao desconectar Z-API: " + error.message
+                    error: "Erro ao desconectar Z-API: " + (error instanceof Error ? error.message : "Unknown")
                 }, { status: 400 });
             }
         }
@@ -136,11 +136,11 @@ export async function POST(request: NextRequest) {
             success: false,
             error: "Ação inválida"
         }, { status: 400 });
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("WhatsApp POST error:", error);
         return NextResponse.json({
             success: false,
-            error: error.message
+            error: error instanceof Error ? error.message : "Unknown"
         }, { status: 500 });
     }
 }

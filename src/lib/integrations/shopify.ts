@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { decrypt } from "@/lib/encryption";
 import { toDateKeyBrasilia } from "@/lib/date-utils";
@@ -239,8 +240,7 @@ export async function fetchShopifyOrders(integrationId: string) {
   const accessToken = decrypt(integration.accessToken);
   const shop = integration.externalStoreId;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let allOrders: any[] = [];
+  let allOrders: Record<string, unknown>[] = [];
   const ninetyDaysAgo = new Date();
   ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
   let url: string | null = `https://${shop}/admin/api/${SHOPIFY_API_VERSION}/orders.json?status=any&limit=250&created_at_min=${ninetyDaysAgo.toISOString()}`;
@@ -313,12 +313,12 @@ interface ShopifySyncResult {
   syncLogId?: string;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function buildShopifyOrderUpsertArgs(organizationId: string, order: any) {
-  const customer = order.customer;
+function buildShopifyOrderUpsertArgs(organizationId: string, order: Record<string, unknown>) {
+  const customer = order.customer as Record<string, unknown> | undefined;
   const customerName = customer
     ? `${customer.first_name || ""} ${customer.last_name || ""}`.trim() || null
     : null;
+  const lineItems = order.line_items as unknown[] | undefined;
   return {
     where: {
       organizationId_platform_externalOrderId: {
@@ -331,31 +331,30 @@ function buildShopifyOrderUpsertArgs(organizationId: string, order: any) {
       organizationId,
       platform: "SHOPIFY" as const,
       externalOrderId: String(order.id),
-      status: mapShopifyStatus(order.financial_status),
+      status: mapShopifyStatus(String(order.financial_status || "")),
       customerName,
-      customerEmail: customer?.email || null,
-      totalAmount: parseFloat(order.current_total_price || order.total_price || "0"),
-      currency: order.currency || "BRL",
-      itemCount: order.line_items?.length || 0,
-      orderDate: parseShopifyLocalDate(order.created_at),
-      rawData: order,
+      customerEmail: (customer?.email as string) || null,
+      totalAmount: parseFloat(String(order.current_total_price || order.total_price || "0")),
+      currency: (order.currency as string) || "BRL",
+      itemCount: lineItems?.length || 0,
+      orderDate: parseShopifyLocalDate(String(order.created_at)),
+      rawData: order as Prisma.InputJsonValue,
     },
     update: {
-      status: mapShopifyStatus(order.financial_status),
-      totalAmount: parseFloat(order.current_total_price || order.total_price || "0"),
+      status: mapShopifyStatus(String(order.financial_status || "")),
+      totalAmount: parseFloat(String(order.current_total_price || order.total_price || "0")),
       customerName,
-      customerEmail: customer?.email || null,
-      itemCount: order.line_items?.length || 0,
-      orderDate: parseShopifyLocalDate(order.created_at),
-      rawData: order,
+      customerEmail: (customer?.email as string) || null,
+      itemCount: lineItems?.length || 0,
+      orderDate: parseShopifyLocalDate(String(order.created_at)),
+      rawData: order as Prisma.InputJsonValue,
     },
   };
 }
 
 async function upsertShopifyOrdersParallel(
   organizationId: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  orders: any[],
+  orders: Record<string, unknown>[],
   concurrency = 5
 ): Promise<number> {
   let saved = 0;
@@ -1142,10 +1141,31 @@ async function fetchAbandonedCheckoutsByDate(
  * 
  * Shopify Admin API (REST) /admin/api/2025-01/products.json
  */
+/** Shopify product shape (fields used in the codebase) */
+export interface ShopifyProduct {
+  id: number | string;
+  title: string;
+  vendor?: string;
+  brand?: string;
+  status?: string;
+  image?: { src: string } | null;
+  images?: Array<{ src: string }>;
+  variants?: Array<{ price: string; [key: string]: unknown }>;
+  [key: string]: unknown;
+}
+
+/** Shopify collection shape (fields used in the codebase) */
+export interface ShopifyCollection {
+  id: number | string;
+  title: string;
+  handle?: string;
+  [key: string]: unknown;
+}
+
 export async function fetchShopifyProducts(
   integrationId: string,
   collectionId?: string
-): Promise<any[]> {
+): Promise<ShopifyProduct[]> {
   const integration = await prisma.integration.findUnique({
     where: { id: integrationId },
   });
@@ -1188,7 +1208,7 @@ export async function fetchShopifyProducts(
 /**
  * Fetch smart and custom collections from Shopify
  */
-export async function fetchShopifyCollections(integrationId: string): Promise<any[]> {
+export async function fetchShopifyCollections(integrationId: string): Promise<ShopifyCollection[]> {
   const integration = await prisma.integration.findUnique({
     where: { id: integrationId },
   });
@@ -1212,7 +1232,7 @@ export async function fetchShopifyCollections(integrationId: string): Promise<an
     })
   ]);
 
-  let collections: any[] = [];
+  let collections: ShopifyCollection[] = [];
 
   if (smartRes.ok) {
     const data = await smartRes.json();

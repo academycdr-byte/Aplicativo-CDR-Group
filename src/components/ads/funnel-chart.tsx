@@ -83,7 +83,7 @@ export function FunnelChart({ data, className }: FunnelChartProps) {
             <CardHeader className="pb-2">
                 <CardTitle className="text-base flex items-center gap-2">
                     Funil de Conversao Meta Ads
-                    <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                    <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" aria-hidden="true" />
                 </CardTitle>
             </CardHeader>
             <CardContent>
@@ -103,7 +103,7 @@ export function FunnelChart({ data, className }: FunnelChartProps) {
                             </div>
 
                             {/* Bar Container */}
-                            <div className="h-8 w-full bg-muted/20 rounded-sm relative overflow-hidden">
+                            <div className="h-8 w-full bg-muted/20 rounded-sm relative overflow-hidden" role="progressbar" aria-valuenow={step.value} aria-valuemin={0} aria-valuemax={data.impressions} aria-label={`${step.label}: ${fmt(step.value)}`}>
                                 {/* Funnel Bar */}
                                 <div
                                     className={cn("h-full transition-all duration-500 ease-out rounded-r-sm", step.color, step.opacity)}

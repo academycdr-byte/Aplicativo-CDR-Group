@@ -1,5 +1,6 @@
 "use server";
 
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
@@ -54,13 +55,14 @@ export async function getReportClients() {
             where: { organizationId },
             orderBy: { createdAt: "desc" },
         });
-    } catch (error: any) {
+    } catch (error: unknown) {
         // If table doesn't exist yet, return empty array
-        if (error.code === 'P2021' || error.message?.includes('does not exist')) {
+        const err = error as { code?: string; message?: string };
+        if (err.code === 'P2021' || err.message?.includes('does not exist')) {
             return [];
         }
         // Re-throw auth errors
-        if (error.message?.includes('Não autenticado') || error.message?.includes('Acesso negado')) {
+        if (err.message?.includes('Não autenticado') || err.message?.includes('Acesso negado')) {
             throw error;
         }
         console.error("getReportClients error:", error);
@@ -137,11 +139,12 @@ export async function getWhatsAppSession() {
         return await prisma.whatsAppSession.findUnique({
             where: { organizationId },
         });
-    } catch (error: any) {
-        if (error.code === 'P2021' || error.message?.includes('does not exist')) {
+    } catch (error: unknown) {
+        const err = error as { code?: string; message?: string };
+        if (err.code === 'P2021' || err.message?.includes('does not exist')) {
             return null;
         }
-        if (error.message?.includes('Não autenticado') || error.message?.includes('Acesso negado')) {
+        if (err.message?.includes('Não autenticado') || err.message?.includes('Acesso negado')) {
             throw error;
         }
         console.error("getWhatsAppSession error:", error);
@@ -196,11 +199,12 @@ export async function getReportSchedules() {
             include: { client: true },
             orderBy: { createdAt: "desc" },
         });
-    } catch (error: any) {
-        if (error.code === 'P2021' || error.message?.includes('does not exist')) {
+    } catch (error: unknown) {
+        const err = error as { code?: string; message?: string };
+        if (err.code === 'P2021' || err.message?.includes('does not exist')) {
             return [];
         }
-        if (error.message?.includes('Não autenticado') || error.message?.includes('Acesso negado')) {
+        if (err.message?.includes('Não autenticado') || err.message?.includes('Acesso negado')) {
             throw error;
         }
         console.error("getReportSchedules error:", error);
@@ -228,7 +232,7 @@ export async function createReportSchedule(data: {
     const schedule = await prisma.reportSchedule.create({
         data: {
             ...data,
-            config: data.config as any,
+            config: data.config as Prisma.InputJsonValue,
         },
     });
 
@@ -243,7 +247,7 @@ export async function updateReportSchedule(
         time: string;
         dayOfWeek: number;
         dayOfMonth: number;
-        config: any;
+        config: Prisma.InputJsonValue;
         isActive: boolean;
     }>
 ) {
@@ -291,11 +295,12 @@ export async function getReportLogs(filters?: {
             orderBy: { sentAt: "desc" },
             take: 200,
         });
-    } catch (error: any) {
-        if (error.code === 'P2021' || error.message?.includes('does not exist')) {
+    } catch (error: unknown) {
+        const err = error as { code?: string; message?: string };
+        if (err.code === 'P2021' || err.message?.includes('does not exist')) {
             return [];
         }
-        if (error.message?.includes('Não autenticado') || error.message?.includes('Acesso negado')) {
+        if (err.message?.includes('Não autenticado') || err.message?.includes('Acesso negado')) {
             throw error;
         }
         console.error("getReportLogs error:", error);
@@ -307,7 +312,7 @@ export async function createReportLog(data: {
     clientId: string;
     type: "MANUAL" | "SCHEDULED";
     status: "SUCCESS" | "FAILED" | "PENDING";
-    metrics: any;
+    metrics: Prisma.InputJsonValue;
     error?: string;
 }) {
     await requireAdmin();

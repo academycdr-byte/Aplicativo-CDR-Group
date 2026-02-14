@@ -191,6 +191,7 @@ export default function OrdersPage() {
                   type="date"
                   value={dateFrom}
                   onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
+                  aria-label="Data inicial do filtro"
                   className="bg-transparent h-9 text-sm outline-none w-[110px]"
                 />
               </div>
@@ -200,12 +201,13 @@ export default function OrdersPage() {
                   type="date"
                   value={dateTo}
                   onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
+                  aria-label="Data final do filtro"
                   className="bg-transparent h-9 text-sm outline-none w-[110px]"
                 />
               </div>
 
               {hasFilters && (
-                <Button variant="ghost" size="icon" onClick={clearFilters} title="Limpar Filtros">
+                <Button variant="ghost" size="icon" onClick={clearFilters} title="Limpar Filtros" aria-label="Limpar filtros">
                   <X className="w-4 h-4" />
                 </Button>
               )}
@@ -248,15 +250,15 @@ export default function OrdersPage() {
         ) : (
           <>
             <div className="overflow-x-auto">
-              <Table>
+              <Table aria-label="Lista de pedidos">
                 <TableHeader>
                   <TableRow className="hover:bg-transparent border-b border-border/50 bg-muted/40">
-                    <TableHead className="w-[140px]">Pedido</TableHead>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Plataforma</TableHead>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Valor</TableHead>
+                    <TableHead scope="col" className="w-[140px]">Pedido</TableHead>
+                    <TableHead scope="col">Cliente</TableHead>
+                    <TableHead scope="col">Plataforma</TableHead>
+                    <TableHead scope="col">Data</TableHead>
+                    <TableHead scope="col">Status</TableHead>
+                    <TableHead scope="col" className="text-right">Valor</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -310,6 +312,7 @@ export default function OrdersPage() {
                     className="h-8 w-8"
                     disabled={page === 1}
                     onClick={() => setPage(page - 1)}
+                    aria-label="Página anterior"
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </Button>
@@ -319,6 +322,7 @@ export default function OrdersPage() {
                     className="h-8 w-8"
                     disabled={page === totalPages}
                     onClick={() => setPage(page + 1)}
+                    aria-label="Próxima página"
                   >
                     <ChevronRight className="w-4 h-4" />
                   </Button>

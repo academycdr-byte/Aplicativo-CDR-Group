@@ -4,8 +4,8 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { decrypt } from "@/lib/encryption";
-import { fetchShopifyProducts, fetchShopifyCollections } from "@/lib/integrations/shopify";
-import { fetchNuvemshopProducts, fetchNuvemshopCollections } from "@/lib/integrations/nuvemshop";
+import { fetchShopifyProducts, fetchShopifyCollections, type ShopifyProduct, type ShopifyCollection } from "@/lib/integrations/shopify";
+import { fetchNuvemshopProducts, fetchNuvemshopCollections, type NuvemshopProduct, type NuvemshopCollection } from "@/lib/integrations/nuvemshop";
 import { type Product, type Collection } from "@/lib/ecommerce-service";
 import { toBrasiliaStartOfDay, toBrasiliaEndOfDay, getBrazilToday } from "@/lib/date-utils";
 
@@ -144,8 +144,7 @@ export async function getBestSellersAction(
         const topProductIds = sortedProducts.map(p => p[0]);
 
         // 5. Fetch details only for these top products
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let productsDetails: any[] = [];
+        let productsDetails: (ShopifyProduct | NuvemshopProduct)[] = [];
 
         if (integration.platform === "SHOPIFY") {
             // Shopify allows fetching by IDs: ids=123,456
@@ -182,8 +181,7 @@ export async function getBestSellersAction(
         const result: Product[] = [];
 
         for (const [id, qty] of sortedProducts) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const details = productsDetails.find((p: any) => String(p.id) === id);
+            const details = productsDetails.find((p) => String(p.id) === id);
             const rawInfo = productInfoFromOrders.get(id);
 
             // Skip only if we have neither API details nor rawData info
@@ -191,18 +189,19 @@ export async function getBestSellersAction(
 
             if (integration.platform === "SHOPIFY") {
                 if (!details) continue;
-                const imageUrl = details.image?.src || details.images?.[0]?.src || "";
-                const price = details.variants?.[0]?.price || "0.00";
+                const shopifyDetails = details as ShopifyProduct;
+                const imageUrl = shopifyDetails.image?.src || shopifyDetails.images?.[0]?.src || "";
+                const price = shopifyDetails.variants?.[0]?.price || "0.00";
                 const rev = revenueMap.get(id) || 0;
 
                 result.push({
-                    id: String(details.id),
-                    title: details.title,
+                    id: String(shopifyDetails.id),
+                    title: shopifyDetails.title,
                     price: parseFloat(price),
                     currency: "BRL",
                     imageUrl: imageUrl || "",
                     collection: "all",
-                    vendor: details.vendor,
+                    vendor: shopifyDetails.vendor || "",
                     totalSold: qty,
                     totalRevenue: rev
                 });
@@ -214,10 +213,11 @@ export async function getBestSellersAction(
                 let vendor = "";
 
                 if (details) {
-                    imageUrl = extractNuvemshopImage(details.images?.[0]);
-                    title = extractI18nName(details.name);
-                    price = details.variants?.[0]?.price || "0.00";
-                    vendor = details.brand || "";
+                    const nuvemDetails = details as NuvemshopProduct;
+                    imageUrl = extractNuvemshopImage(nuvemDetails.images?.[0]);
+                    title = extractI18nName(nuvemDetails.name);
+                    price = nuvemDetails.variants?.[0]?.price || "0.00";
+                    vendor = nuvemDetails.brand || "";
                 }
 
                 // Fallback to rawData info when Products API doesn't have this product
@@ -332,23 +332,24 @@ export async function getCollectionsAction(): Promise<Collection[]> {
     if (!integration) return [];
 
     try {
-        let rawCollections: any[] = [];
-
         if (integration.platform === "SHOPIFY") {
-            rawCollections = await fetchShopifyCollections(integration.id);
+            const shopifyCollections: ShopifyCollection[] = await fetchShopifyCollections(integration.id);
 
-            return rawCollections.map((c: any) => ({
+            return shopifyCollections.map((c) => ({
                 id: String(c.id),
                 title: c.title
             }));
 
         } else if (integration.platform === "NUVEMSHOP") {
-            rawCollections = await fetchNuvemshopCollections(integration.id);
+            const nuvemCollections: NuvemshopCollection[] = await fetchNuvemshopCollections(integration.id);
 
-            return rawCollections.map((c: any) => ({
-                id: String(c.id),
-                title: c.name?.pt || c.name?.es || c.name || "Sem nome"
-            }));
+            return nuvemCollections.map((c) => {
+                const name = c.name;
+                const title = typeof name === "string"
+                    ? name
+                    : (name?.pt || name?.es || Object.values(name || {})[0] || "Sem nome");
+                return { id: String(c.id), title };
+            });
         }
 
         return [];

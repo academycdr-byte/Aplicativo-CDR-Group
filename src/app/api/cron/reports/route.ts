@@ -54,7 +54,13 @@ export async function GET(request: NextRequest) {
         const client = schedule.client;
         if (!client || client.status !== "ACTIVE") continue;
 
-        const config = schedule.config as any;
+        const config = schedule.config as {
+          period?: string;
+          metrics?: string[];
+          comparePeriods?: boolean;
+          rankingCreatives?: boolean;
+          customHeader?: string;
+        } | null;
         const orgId = client.organizationId;
 
         // Calculate date range using Brazil timezone
@@ -204,8 +210,9 @@ export async function GET(request: NextRequest) {
         });
 
         results.push({ scheduleId: schedule.id, clientName: client.name, status: "sent" });
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error(`Schedule ${schedule.id} failed:`, err);
+        const errMsg = err instanceof Error ? err.message : "Unknown error";
 
         await prisma.reportLog.create({
           data: {
@@ -213,11 +220,11 @@ export async function GET(request: NextRequest) {
             type: "SCHEDULED",
             status: "FAILED",
             metrics: {},
-            error: err.message,
+            error: errMsg,
           },
         }).catch(() => {});
 
-        results.push({ scheduleId: schedule.id, status: "failed", error: err.message });
+        results.push({ scheduleId: schedule.id, status: "failed", error: errMsg });
       }
     }
 

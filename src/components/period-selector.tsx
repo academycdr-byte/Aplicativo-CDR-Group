@@ -67,7 +67,7 @@ export function PeriodSelector({ value, onChange, onRefresh, refreshing }: Perio
   return (
     <div className="flex items-center gap-2">
       {/* Preset pills */}
-      <div className="flex items-center flex-wrap bg-muted rounded-lg p-0.5">
+      <div className="flex items-center flex-wrap bg-muted rounded-lg p-0.5" role="group" aria-label="Seletor de período">
         {presets.map((p) => (
           <button
             key={p.days}
@@ -75,6 +75,8 @@ export function PeriodSelector({ value, onChange, onRefresh, refreshing }: Perio
               setRange(undefined);
               onChange({ type: "preset", days: p.days });
             }}
+            aria-pressed={value.type === "preset" && value.days === p.days}
+            aria-label={`Período: ${p.label}`}
             className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
               value.type === "preset" && value.days === p.days
                 ? "bg-primary text-primary-foreground shadow-sm"
@@ -89,6 +91,7 @@ export function PeriodSelector({ value, onChange, onRefresh, refreshing }: Perio
         <Popover open={calendarOpen} onOpenChange={handleOpenChange}>
           <PopoverTrigger asChild>
             <button
+              aria-label={isCustom ? `Período personalizado: ${formatCustomLabel()}` : "Selecionar período personalizado"}
               className={`px-2 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1 ${
                 isCustom
                   ? "bg-primary text-primary-foreground shadow-sm"

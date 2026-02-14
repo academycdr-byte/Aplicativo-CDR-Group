@@ -25,7 +25,7 @@ export function Header() {
   const userInitial = userName.charAt(0).toUpperCase();
 
   return (
-    <header className="sticky top-0 z-20 h-14 md:h-16 w-full flex items-center gap-2 md:gap-4 border-b border-border/40 bg-background/80 backdrop-blur-xl px-3 sm:px-6">
+    <header className="sticky top-0 z-20 h-14 md:h-16 w-full flex items-center gap-2 md:gap-4 border-b border-border/40 bg-background/80 backdrop-blur-xl px-3 sm:px-6" role="banner">
       <div className="flex items-center gap-3 md:hidden">
         <MobileSidebar />
         <span className="text-sm font-semibold">CDR Group</span>
@@ -36,13 +36,14 @@ export function Header() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Buscar..."
+            aria-label="Buscar no sistema"
             className="pl-9 h-10 w-full bg-muted/50 border-transparent rounded-xl focus:bg-background focus:border-primary/20 transition-all"
           />
         </div>
       </div>
 
       <div className="ml-auto flex items-center gap-2">
-        <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-foreground rounded-full">
+        <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-foreground rounded-full" aria-label="Notificações">
           <Bell className="w-[18px] h-[18px]" />
         </Button>
         <ThemeToggle />
@@ -51,7 +52,7 @@ export function Header() {
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="relative h-9 w-9 rounded-full focus-visible:ring-offset-0">
+            <Button variant="ghost" className="relative h-9 w-9 rounded-full focus-visible:ring-offset-0" aria-label="Menu do usuário">
               <Avatar className="h-9 w-9 border border-border/50">
                 <AvatarImage src={avatarUrl || ""} />
                 <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">

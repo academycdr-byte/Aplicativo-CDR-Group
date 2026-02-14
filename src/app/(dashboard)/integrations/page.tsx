@@ -704,6 +704,7 @@ function IntegrationsContent() {
                         variant="outline"
                         size="sm"
                         onClick={() => handleDisconnect(platform.platform)}
+                        aria-label={`Desconectar ${platform.name}`}
                       >
                         <Unlink className="w-4 h-4" />
                       </Button>
@@ -829,6 +830,7 @@ function IntegrationsContent() {
             placeholder="Pesquisar por nome ou ID..."
             value={fbSearch}
             onChange={(e) => setFbSearch(e.target.value)}
+            aria-label="Pesquisar contas de anúncio"
           />
 
           <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
@@ -914,6 +916,7 @@ function IntegrationsContent() {
             placeholder="Pesquisar por nome ou ID..."
             value={gaSearch}
             onChange={(e) => setGaSearch(e.target.value)}
+            aria-label="Pesquisar propriedades GA4"
           />
 
           <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">

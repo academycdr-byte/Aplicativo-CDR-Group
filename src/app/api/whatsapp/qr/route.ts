@@ -62,11 +62,11 @@ export async function GET(request: NextRequest) {
             qrcode: data.base64 || null,
             pairingCode: data.pairingCode || null,
         });
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("QR GET error:", error);
         return NextResponse.json({
             status: "ERROR",
-            error: error.message
+            error: error instanceof Error ? error.message : "Unknown error"
         }, { status: 500 });
     }
 }

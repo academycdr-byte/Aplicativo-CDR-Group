@@ -225,6 +225,7 @@ export default function ProfilePage() {
             accept="image/jpeg,image/png,image/webp"
             onChange={handleFileChange}
             className="hidden"
+            aria-label="Selecionar foto de perfil"
           />
         </CardContent>
       </Card>

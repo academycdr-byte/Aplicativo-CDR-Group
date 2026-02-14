@@ -243,13 +243,13 @@ export default function OrganizationPage() {
           )}
 
           {/* Members table */}
-          <Table>
+          <Table aria-label="Membros da equipe">
             <TableHeader>
               <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Funcao</TableHead>
-                {isOwnerOrAdmin && <TableHead className="w-[80px]">Acoes</TableHead>}
+                <TableHead scope="col">Nome</TableHead>
+                <TableHead scope="col">Email</TableHead>
+                <TableHead scope="col">Funcao</TableHead>
+                {isOwnerOrAdmin && <TableHead scope="col" className="w-[80px]">Acoes</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -288,6 +288,7 @@ export default function OrganizationPage() {
                           size="icon"
                           className="text-destructive hover:text-destructive"
                           onClick={() => handleRemoveMember(member.id)}
+                          aria-label={`Remover ${member.name || member.email} da equipe`}
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>

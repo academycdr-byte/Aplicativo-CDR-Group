@@ -149,13 +149,13 @@ export function SupplierPaymentTable({
             </div>
 
             <div className="border rounded-md overflow-x-auto">
-                <Table className="min-w-[420px]">
+                <Table className="min-w-[420px]" aria-label="Pagamentos ao fornecedor">
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Data</TableHead>
-                            <TableHead>Descricao</TableHead>
-                            <TableHead className="text-right">Valor</TableHead>
-                            <TableHead className="w-[60px]"></TableHead>
+                            <TableHead scope="col">Data</TableHead>
+                            <TableHead scope="col">Descricao</TableHead>
+                            <TableHead scope="col" className="text-right">Valor</TableHead>
+                            <TableHead scope="col" className="w-[60px]"><span className="sr-only">Ações</span></TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -171,6 +171,7 @@ export function SupplierPaymentTable({
                                         className="h-8 w-8"
                                         disabled={deletingId === payment.id}
                                         onClick={() => handleDelete(payment.id)}
+                                        aria-label={`Excluir pagamento de ${fmt(Number(payment.amount))}`}
                                     >
                                         <Trash2 className="w-4 h-4 text-red-500" />
                                     </Button>

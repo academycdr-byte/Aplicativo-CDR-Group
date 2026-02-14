@@ -26,6 +26,10 @@ const nextConfig: NextConfig = {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=()",
           },
+          {
+            key: "Content-Security-Policy",
+            value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.shopify.com https://placehold.co https://*.cloudfront.net https://*.tiendanube.com https://*.nuvemshop.com.br https://imgur.com https://*.imgur.com; font-src 'self'; connect-src 'self' https://*.neon.tech https://*.vercel.app; frame-ancestors 'none';",
+          },
         ],
       },
     ];
