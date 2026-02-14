@@ -129,6 +129,12 @@ export function getDateRange(
     untilStr = getBrazilToday();
     if (days === 0) {
       sinceStr = untilStr;
+    } else if (days === -1) {
+      // Yesterday only: both since and until point to yesterday
+      const ref = parseDateUTC(untilStr);
+      ref.setUTCDate(ref.getUTCDate() - 1);
+      sinceStr = ref.toISOString().split("T")[0];
+      untilStr = sinceStr;
     } else {
       const ref = parseDateUTC(untilStr);
       ref.setUTCDate(ref.getUTCDate() - days);

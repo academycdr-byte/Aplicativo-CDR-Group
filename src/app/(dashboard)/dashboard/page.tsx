@@ -160,16 +160,9 @@ export default function DashboardPage() {
   // Auto-sync when "Today" is selected to ensure real-time data
   useEffect(() => {
     if (period.type === "preset" && period.days === 0) {
-      console.log("Selecionado Hoje - Iniciando Sincronizacao em Segundo Plano...");
-      toast.info("Verificando dados recentes...");
-
-      // Trigger sync without blocking UI
-      syncAll().then((res) => {
-        if (!res?.error) {
-          toast.success("Dados atualizados!");
-          // Reload dashboard data to reflect the new sync
-          loadData();
-        }
+      // Use syncRecent (lightweight) instead of syncAll (heavy full sync)
+      syncRecent().then(() => {
+        loadData();
       });
     }
   }, [period, loadData]);

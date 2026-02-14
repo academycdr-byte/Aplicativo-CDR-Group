@@ -19,8 +19,9 @@ export type PeriodValue =
 
 const presets = [
   { days: 0, label: "Hoje" },
+  { days: -1, label: "Ontem" },
   { days: 7, label: "7d" },
-  { days: 30, label: "Mes" },
+  { days: 30, label: "30d" },
   { days: 90, label: "90d" },
 ];
 
