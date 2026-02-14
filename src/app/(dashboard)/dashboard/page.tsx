@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -113,7 +113,7 @@ const CURRENCIES: Record<Currency, { locale: string; symbol: string; label: stri
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [metricsData, setMetricsData] = useState<MetricPoint[]>([]);
-  const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
+  const [_recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [funnel, setFunnel] = useState<FunnelData | null>(null);
   const [rates, setRates] = useState<RatesData | null>(null);
   const [period, setPeriod] = useState<PeriodValue>({ type: "preset", days: 30 });
@@ -163,12 +163,23 @@ export default function DashboardPage() {
   }, [loadData]);
 
   // Background sync for "Hoje": sync then silently refresh (no spinner)
+  // Also auto-refresh every 5 minutes when viewing "Hoje"
   useEffect(() => {
-    if (period.type === "preset" && period.days === 0) {
+    const isToday = period.type === "preset" && period.days === 0;
+    if (!isToday) return;
+
+    // Initial sync when switching to "Hoje"
+    syncRecent().then(() => loadData(true));
+
+    // Auto-refresh every 5 minutes to keep data fresh
+    // eslint-disable-next-line no-undef
+    const intervalId = setInterval(() => {
       syncRecent().then(() => loadData(true));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [period]);
+    }, 5 * 60 * 1000);
+
+    // eslint-disable-next-line no-undef
+    return () => clearInterval(intervalId);
+  }, [period, syncRecent, loadData]);
 
   async function handleSync() {
     setSyncing(true);
