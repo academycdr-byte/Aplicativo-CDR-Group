@@ -129,14 +129,14 @@ export default function DashboardPage() {
     getExchangeRates().then((r) => setExchangeRates(r));
   }, []);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  const loadData = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     const { days, from, to } = periodToParams(period);
 
     try {
       const data = await loadAllDashboardData(days, from, to);
       if (!data) {
-        setLoading(false);
+        if (!silent) setLoading(false);
         return;
       }
 
@@ -147,38 +147,28 @@ export default function DashboardPage() {
       setRates(data.rates);
       if (data.profitData) setProfitData(data.profitData);
 
-      if (data.failedCount > 0) {
+      if (!silent && data.failedCount > 0) {
         toast.error(`Erro ao carregar ${data.failedCount} seção(ões) do dashboard`);
       }
     } catch {
-      toast.error("Erro ao carregar dados do dashboard");
+      if (!silent) toast.error("Erro ao carregar dados do dashboard");
     }
 
-    setLoading(false);
+    if (!silent) setLoading(false);
   }, [period]);
 
-  // Auto-sync when "Today" is selected to ensure real-time data
-  useEffect(() => {
-    if (period.type === "preset" && period.days === 0) {
-      // Use syncRecent (lightweight) instead of syncAll (heavy full sync)
-      syncRecent().then(() => {
-        loadData();
-      });
-    }
-  }, [period, loadData]);
-
+  // Load data on period change
   useEffect(() => {
     loadData();
-
-    // Speculative sync on mount to ensure "Today" data is fresh 
-    // without user needing to click "Today" or "Sync"
-    console.log("Dashboard mounted: triggering background freshness check...");
-    syncRecent().then(() => {
-      console.log("Background freshness check completed.");
-      // Optional: reload data silently if we want to confirm freshness
-      // loadData(); 
-    });
   }, [loadData]);
+
+  // Background sync for "Hoje": sync then silently refresh (no spinner)
+  useEffect(() => {
+    if (period.type === "preset" && period.days === 0) {
+      syncRecent().then(() => loadData(true));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [period]);
 
   async function handleSync() {
     setSyncing(true);
