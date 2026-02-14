@@ -119,7 +119,7 @@ export function EstimatedProfitCalendar({ data, totalProfit, currentMonthLabel, 
                         role="button"
                         tabIndex={0}
                         aria-pressed={selectedDay?.date === day.date}
-                        aria-label={`Dia ${day.dayOfMonth}: lucro ${fmt(day.profit)}`}
+                        aria-label={`Dia ${day.dayOfMonth}: lucro ${formatMoney(day.profit)}`}
                         className={cn(
                             "w-full aspect-square rounded-xl flex items-center justify-center text-[10px] font-semibold transition-all duration-300 relative cursor-pointer border",
                             day.profit >= 0
