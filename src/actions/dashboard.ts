@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { getSessionWithOrg } from "@/lib/session";
-import { getDateRange, getPreviousDateRange, buildDateFilter, toDateKeyBrasilia, toDateKeyDateOnly } from "@/lib/date-utils";
+import { getDateRange, getPreviousDateRange, buildDateFilter, buildDateOnlyFilter, toDateKeyBrasilia, toDateKeyDateOnly } from "@/lib/date-utils";
 
 export async function getDashboardData(days: number = 30, from?: string, to?: string) {
   const ctx = await getSessionWithOrg();
@@ -11,8 +11,10 @@ export async function getDashboardData(days: number = 30, from?: string, to?: st
   const orgId = ctx.organization.id;
   const range = getDateRange(days, from, to);
   const dateFilter = buildDateFilter(range);
+  const dateOnlyFilter = buildDateOnlyFilter(range);
   const prevRange = getPreviousDateRange(days, from, to);
   const prevDateFilter = buildDateFilter(prevRange);
+  const prevDateOnlyFilter = buildDateOnlyFilter(prevRange);
 
   const [
     totalOrders,
@@ -38,15 +40,15 @@ export async function getDashboardData(days: number = 30, from?: string, to?: st
       _sum: { totalAmount: true },
     }),
     prisma.adMetric.aggregate({
-      where: { organizationId: orgId, date: dateFilter },
+      where: { organizationId: orgId, date: dateOnlyFilter },
       _sum: { spend: true },
     }),
     prisma.adMetric.aggregate({
-      where: { organizationId: orgId, date: prevDateFilter },
+      where: { organizationId: orgId, date: prevDateOnlyFilter },
       _sum: { spend: true },
     }),
     prisma.adMetric.aggregate({
-      where: { organizationId: orgId, date: dateFilter },
+      where: { organizationId: orgId, date: dateOnlyFilter },
       _sum: { revenue: true },
     }),
   ]);
@@ -135,7 +137,9 @@ export async function getMetricsAnalysis(days: number = 30, from?: string, to?: 
   if (!ctx) return [];
 
   const orgId = ctx.organization.id;
-  const dateFilter = buildDateFilter(getDateRange(days, from, to));
+  const range = getDateRange(days, from, to);
+  const dateFilter = buildDateFilter(range);
+  const dateOnlyFilter = buildDateOnlyFilter(range);
 
   const [orders, adMetrics] = await Promise.all([
     prisma.order.findMany({
@@ -144,7 +148,7 @@ export async function getMetricsAnalysis(days: number = 30, from?: string, to?: 
       orderBy: { orderDate: "asc" },
     }),
     prisma.adMetric.findMany({
-      where: { organizationId: orgId, date: dateFilter },
+      where: { organizationId: orgId, date: dateOnlyFilter },
       select: { date: true, spend: true, conversions: true, revenue: true },
       orderBy: { date: "asc" },
     }),
@@ -205,10 +209,11 @@ export async function getFunnelData(days: number = 30, from?: string, to?: strin
   if (!ctx) return null;
 
   const orgId = ctx.organization.id;
-  const dateFilter = buildDateFilter(getDateRange(days, from, to));
+  const range = getDateRange(days, from, to);
+  const dateOnlyFilter = buildDateOnlyFilter(range);
 
   const adAgg = await prisma.adMetric.aggregate({
-    where: { organizationId: orgId, date: dateFilter },
+    where: { organizationId: orgId, date: dateOnlyFilter },
     _sum: { clicks: true, addToCart: true, initiateCheckout: true, conversions: true, impressions: true, reach: true },
   }).catch(() => null);
 
@@ -242,7 +247,9 @@ export async function getPaidAndRepurchaseRates(days: number = 30, from?: string
   if (!ctx) return null;
 
   const orgId = ctx.organization.id;
-  const dateFilter = buildDateFilter(getDateRange(days, from, to));
+  const range = getDateRange(days, from, to);
+  const dateFilter = buildDateFilter(range);
+  const dateOnlyFilter = buildDateOnlyFilter(range);
 
   // Core paid rate queries (always work - these tables haven't changed)
   const [totalOrders, paidOrders, ordersInPeriod] = await Promise.all([
@@ -261,7 +268,7 @@ export async function getPaidAndRepurchaseRates(days: number = 30, from?: string
 
   try {
     const funnelData = await prisma.storeFunnel.findMany({
-      where: { organizationId: orgId, platform: "SHOPIFY", date: dateFilter },
+      where: { organizationId: orgId, platform: "SHOPIFY", date: dateOnlyFilter },
       select: { totalCustomers: true, returningCustomers: true },
     });
     const hasFunnelCustomerData = funnelData.some((f) => f.totalCustomers > 0);
@@ -424,8 +431,9 @@ export async function getDailyProfit(days: number = 30, from?: string, to?: stri
   if (!ctx) return { dailyProfits: [], totalProfit: 0 };
 
   const orgId = ctx.organization.id;
-  const dateFilter = buildDateFilter(getDateRange(days, from, to));
   const range = getDateRange(days, from, to);
+  const dateFilter = buildDateFilter(range);
+  const dateOnlyFilter = buildDateOnlyFilter(range);
 
   // Load financial config
   const config = await prisma.financialConfig.findUnique({
@@ -454,7 +462,7 @@ export async function getDailyProfit(days: number = 30, from?: string, to?: stri
 
   // Fetch ad spend
   const adMetrics = await prisma.adMetric.findMany({
-    where: { organizationId: orgId, date: dateFilter },
+    where: { organizationId: orgId, date: dateOnlyFilter },
     select: { date: true, spend: true },
     orderBy: { date: "asc" },
   });

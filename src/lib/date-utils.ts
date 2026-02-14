@@ -178,3 +178,17 @@ export function getPreviousDateRange(
 export function buildDateFilter(range: { since: Date; until: Date }) {
   return { gte: range.since, lte: range.until };
 }
+
+/**
+ * Build a Prisma date filter for @db.Date columns (stored as midnight UTC).
+ * Converts Brasilia-based range back to UTC midnight boundaries so that
+ * "Ontem" (yesterday) doesn't accidentally include today's records.
+ */
+export function buildDateOnlyFilter(range: { since: Date; until: Date }) {
+  const sinceDate = range.since.toLocaleDateString("en-CA", { timeZone: BRAZIL_TZ });
+  const untilDate = range.until.toLocaleDateString("en-CA", { timeZone: BRAZIL_TZ });
+  return {
+    gte: new Date(sinceDate + "T00:00:00Z"),
+    lte: new Date(untilDate + "T00:00:00Z"),
+  };
+}
