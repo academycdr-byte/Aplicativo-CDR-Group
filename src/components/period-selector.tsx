@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarDays, RefreshCw } from "lucide-react";
+import { CalendarDays, RefreshCw, Check } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
+import { ptBR as dateFnsPtBR } from "date-fns/locale";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import type { DateRange } from "react-day-picker";
@@ -30,9 +32,10 @@ interface PeriodSelectorProps {
   onChange: (value: PeriodValue) => void;
   onRefresh?: () => void;
   refreshing?: boolean;
+  lastSyncAt?: Date | null;
 }
 
-export function PeriodSelector({ value, onChange, onRefresh, refreshing }: PeriodSelectorProps) {
+export function PeriodSelector({ value, onChange, onRefresh, refreshing, lastSyncAt }: PeriodSelectorProps) {
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [range, setRange] = useState<DateRange | undefined>(
     value.type === "custom" ? { from: value.from, to: value.to } : undefined
@@ -150,18 +153,30 @@ export function PeriodSelector({ value, onChange, onRefresh, refreshing }: Perio
         </Popover>
       </div>
 
-      {/* Refresh button */}
+      {/* Refresh button + last sync indicator */}
       {onRefresh && (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onRefresh}
-          disabled={refreshing}
-          className="gap-2"
-        >
-          <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
-          <span className="hidden sm:inline">Atualizar</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onRefresh}
+            disabled={refreshing}
+            className="gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+            <span className="hidden sm:inline">Atualizar</span>
+          </Button>
+          <span className="hidden sm:flex items-center gap-1 text-[11px] text-muted-foreground whitespace-nowrap">
+            {refreshing ? (
+              "Sincronizando..."
+            ) : lastSyncAt ? (
+              <>
+                <Check className="w-3 h-3 text-emerald-500" />
+                {formatDistanceToNow(new Date(lastSyncAt), { addSuffix: true, locale: dateFnsPtBR })}
+              </>
+            ) : null}
+          </span>
+        </div>
       )}
     </div>
   );

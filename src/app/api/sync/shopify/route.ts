@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
         const result = await syncShopifyOrders(orgId, {
             nextUrl: body.nextUrl,
             syncLogId: body.syncLogId,
-            timeBudgetMs: 45000,
+            timeBudgetMs: 8000,
         });
 
         return NextResponse.json({

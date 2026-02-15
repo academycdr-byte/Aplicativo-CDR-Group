@@ -39,11 +39,11 @@ export async function syncAllPlatforms(organizationId: string, activePlatforms?:
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const allTasks: Array<{ platform: string; fn: () => Promise<any> }> = [
-    { platform: "SHOPIFY", fn: () => syncShopifyOrders(organizationId) },
+    { platform: "SHOPIFY", fn: () => syncShopifyOrders(organizationId, { timeBudgetMs: 45000 }) },
     { platform: "CARTPANDA", fn: () => syncCartpandaOrders(organizationId) },
     { platform: "YAMPI", fn: () => syncYampiOrders(organizationId) },
-    { platform: "NUVEMSHOP", fn: () => syncNuvemshopOrders(organizationId) },
-    { platform: "FACEBOOK_ADS", fn: () => syncFacebookAdsMetrics(organizationId) },
+    { platform: "NUVEMSHOP", fn: () => syncNuvemshopOrders(organizationId, { timeBudgetMs: 45000 }) },
+    { platform: "FACEBOOK_ADS", fn: () => syncFacebookAdsMetrics(organizationId, { timeBudgetMs: 45000 }) },
     { platform: "GOOGLE_ADS", fn: () => syncGoogleAdsMetrics(organizationId) },
     { platform: "GOOGLE_ANALYTICS", fn: () => syncGoogleAnalyticsMetrics(organizationId) },
     { platform: "REPORTANA", fn: () => syncReportanaMetrics(organizationId) },

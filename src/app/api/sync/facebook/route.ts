@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
             startPhase: body.startPhase,
             accountIndex: body.accountIndex,
             syncLogId: body.syncLogId,
-            timeBudgetMs: 45000,
+            timeBudgetMs: 8000,
         });
 
         return NextResponse.json({

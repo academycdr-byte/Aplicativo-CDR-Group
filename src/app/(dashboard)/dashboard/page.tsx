@@ -30,7 +30,7 @@ import {
 import { toast } from "sonner";
 import { loadAllDashboardData } from "@/actions/dashboard";
 import { getExchangeRates } from "@/actions/currency";
-import { syncAll, syncRecent } from "@/actions/sync";
+import { syncAll, syncRecent, getLastSyncTime } from "@/actions/sync";
 import { PeriodSelector, periodToParams, type PeriodValue } from "@/components/period-selector";
 import { EstimatedProfitCalendar } from "@/components/estimated-profit-calendar";
 import { FunnelVisual, type FunnelStep, type FunnelRate } from "@/components/funnel-visual";
@@ -122,11 +122,14 @@ export default function DashboardPage() {
   const [activeMetrics, setActiveMetrics] = useState<Set<string>>(new Set(["faturamento", "investimento"]));
   const [profitData, setProfitData] = useState<{ dailyProfits: { date: string; profit: number; revenue: number; costs: number }[]; totalProfit: number }>({ dailyProfits: [], totalProfit: 0 });
 
+  const [lastSyncAt, setLastSyncAt] = useState<Date | null>(null);
+
   const [currency, setCurrency] = useState<Currency>("BRL");
   const [exchangeRates, setExchangeRates] = useState<Record<string, number> | null>(null);
 
   useEffect(() => {
     getExchangeRates().then((r) => setExchangeRates(r));
+    getLastSyncTime().then((r) => setLastSyncAt(r.lastSyncAt));
   }, []);
 
   const loadData = useCallback(async (silent = false) => {
@@ -162,30 +165,57 @@ export default function DashboardPage() {
     loadData();
   }, [loadData]);
 
-  // Background sync for "Hoje": sync then silently refresh (no spinner)
-  // Also auto-refresh every 5 minutes when viewing "Hoje"
+  // Listen for BackgroundSync completion events
   useEffect(() => {
-    const isToday = period.type === "preset" && period.days === 0;
-    if (!isToday) return;
+    const handleSyncComplete = () => {
+      loadData(true);
+      getLastSyncTime().then((r) => setLastSyncAt(r.lastSyncAt));
+    };
+    window.addEventListener("sync-complete", handleSyncComplete);
+    return () => window.removeEventListener("sync-complete", handleSyncComplete);
+  }, [loadData]);
 
-    // Initial sync when switching to "Hoje"
-    syncRecent().then(() => loadData(true));
+  // Auto-sync + refresh for ALL periods (adaptive interval)
+  useEffect(() => {
+    const isYesterday = period.type === "preset" && period.days === -1;
+    if (isYesterday) return; // Yesterday data doesn't change
 
-    // Auto-refresh every 5 minutes to keep data fresh
-    // eslint-disable-next-line no-undef
+    // Adaptive interval based on period
+    let intervalMs: number;
+    if (period.type === "preset" && period.days === 0) {
+      intervalMs = 3 * 60 * 1000; // Hoje: 3 min
+    } else if (period.type === "preset" && period.days === 7) {
+      intervalMs = 5 * 60 * 1000; // 7d: 5 min
+    } else if (period.type === "preset" && period.days === 30) {
+      intervalMs = 10 * 60 * 1000; // 30d: 10 min
+    } else {
+      intervalMs = 15 * 60 * 1000; // 90d / Custom: 15 min
+    }
+
+    // Initial sync when mounting or changing period
+    syncRecent().then(() => {
+      loadData(true);
+      getLastSyncTime().then((r) => setLastSyncAt(r.lastSyncAt));
+    });
+
+    // Auto-refresh at adaptive interval
     const intervalId = setInterval(() => {
-      syncRecent().then(() => loadData(true));
-    }, 5 * 60 * 1000);
+      syncRecent().then(() => {
+        loadData(true);
+        getLastSyncTime().then((r) => setLastSyncAt(r.lastSyncAt));
+      });
+    }, intervalMs);
 
-    // eslint-disable-next-line no-undef
     return () => clearInterval(intervalId);
-  }, [period, syncRecent, loadData]);
+  }, [period, loadData]);
 
   async function handleSync() {
     setSyncing(true);
     try {
       await syncAll();
       await loadData();
+      const syncTime = await getLastSyncTime();
+      setLastSyncAt(syncTime.lastSyncAt);
       toast.success("Dados sincronizados com sucesso!");
     } catch {
       toast.error("Erro ao sincronizar dados.");
@@ -286,6 +316,7 @@ export default function DashboardPage() {
           onChange={setPeriod}
           onRefresh={handleSync}
           refreshing={syncing}
+          lastSyncAt={lastSyncAt}
         />
       </div>
 

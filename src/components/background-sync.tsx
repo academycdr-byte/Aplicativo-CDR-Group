@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useCallback } from "react";
-import { smartSync } from "@/actions/sync";
+import { smartSync, getLastSyncTime } from "@/actions/sync";
 
 /* eslint-disable no-undef */
 
 const SYNC_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
+const POLL_INTERVAL_MS = 5 * 1000; // 5 seconds
+const POLL_MAX_DURATION_MS = 90 * 1000; // 90 seconds max polling
 
 export function BackgroundSync() {
   const isSyncing = useRef(false);
@@ -16,8 +18,34 @@ export function BackgroundSync() {
 
     try {
       const result = await smartSync();
+
       if (result.triggered) {
-        console.log("[BackgroundSync] Sync triggered in background");
+        // Sync was triggered in the background — poll to detect completion
+        const beforeSync = result.lastSyncAt?.getTime() || 0;
+        const pollStart = Date.now();
+
+        const pollId = setInterval(async () => {
+          // Stop polling after max duration
+          if (Date.now() - pollStart > POLL_MAX_DURATION_MS) {
+            clearInterval(pollId);
+            // Emit anyway so UI refreshes with whatever data is available
+            window.dispatchEvent(new CustomEvent("sync-complete"));
+            return;
+          }
+
+          try {
+            const current = await getLastSyncTime();
+            const currentTime = current.lastSyncAt?.getTime() || 0;
+
+            // Sync completed: lastSyncAt moved forward
+            if (currentTime > beforeSync) {
+              clearInterval(pollId);
+              window.dispatchEvent(new CustomEvent("sync-complete"));
+            }
+          } catch {
+            // Ignore polling errors
+          }
+        }, POLL_INTERVAL_MS);
       }
     } catch (error) {
       console.warn("[BackgroundSync] Failed to check sync:", error);

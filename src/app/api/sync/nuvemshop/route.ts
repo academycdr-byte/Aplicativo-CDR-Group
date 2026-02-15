@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
         const result = await syncNuvemshopOrders(orgId, {
             startPage: body.startPage,
             syncLogId: body.syncLogId,
-            timeBudgetMs: 45000,
+            timeBudgetMs: 8000,
         });
 
         return NextResponse.json({

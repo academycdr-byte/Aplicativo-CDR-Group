@@ -55,22 +55,29 @@ export async function syncPlatform(platform: string) {
   }
 }
 
-const STALE_THRESHOLD_MS = 15 * 60 * 1000; // 15 minutes
+const STALE_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes
 const STUCK_SYNCING_THRESHOLD_MS = 3 * 60 * 1000; // 3 minutes (reduced from 5)
 const STUCK_WITH_CURSOR_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes for cursor-based syncs
 
-export async function smartSync(): Promise<{ triggered: boolean }> {
+export async function smartSync(): Promise<{ triggered: boolean; lastSyncAt: Date | null }> {
   const ctx = await getSessionWithOrg();
-  if (!ctx) return { triggered: false };
+  if (!ctx) return { triggered: false, lastSyncAt: null };
 
   const integrations = await prisma.integration.findMany({
     where: { organizationId: ctx.organization.id, status: "CONNECTED" },
     select: { id: true, lastSyncAt: true, syncStatus: true, updatedAt: true, metadata: true, platform: true, status: true },
   });
 
-  if (integrations.length === 0) return { triggered: false };
+  if (integrations.length === 0) return { triggered: false, lastSyncAt: null };
 
   const now = Date.now();
+
+  // Snapshot current lastSyncAt for change detection
+  const currentLastSync = integrations.reduce<Date | null>((latest, i) => {
+    if (!i.lastSyncAt) return latest;
+    if (!latest) return i.lastSyncAt;
+    return i.lastSyncAt > latest ? i.lastSyncAt : latest;
+  }, null);
 
   // Recover from stuck SYNCING status (e.g. killed by Vercel timeout)
   // Two thresholds: short for normal syncs, longer for cursor-based (FB Ads multi-call)
@@ -108,21 +115,21 @@ export async function smartSync(): Promise<{ triggered: boolean }> {
     if (stuckSyncing.some((s) => s.id === i.id)) return false;
     return now - i.updatedAt.getTime() <= STUCK_SYNCING_THRESHOLD_MS;
   });
-  if (activelySyncing) return { triggered: false };
+  if (activelySyncing) return { triggered: false, lastSyncAt: currentLastSync };
 
   const hasStale = integrations.some(
     (i) => !i.lastSyncAt || now - i.lastSyncAt.getTime() > STALE_THRESHOLD_MS
   );
-  if (!hasStale) return { triggered: false };
+  if (!hasStale) return { triggered: false, lastSyncAt: currentLastSync };
 
   const activePlatforms = integrations.map((i) => i.platform);
 
+  // Fire-and-forget: sync runs in background, doesn't block the server action
   syncAllPlatforms(ctx.organization.id, activePlatforms).catch((error) => {
-    // eslint-disable-next-line no-undef
     console.error("[smartSync] Background sync failed:", error);
   });
 
-  return { triggered: true };
+  return { triggered: true, lastSyncAt: currentLastSync };
 }
 
 export async function syncRecent() {
@@ -138,19 +145,21 @@ export async function syncRecent() {
   });
 
   const connectedPlatforms = new Set(integrations.map((i) => i.platform));
-  const TIME_BUDGET = 20000;
+  const TIME_BUDGET = 8000; // 8s per platform — short calls, auto-refresh handles rest
 
   // Build sync tasks dynamically based on connected platforms
+  // ALL platforms get timeBudgetMs to prevent unbounded execution
   const syncTasks: Promise<unknown>[] = [];
 
   if (connectedPlatforms.has("FACEBOOK_ADS")) {
-    syncTasks.push(syncFacebookAdsMetrics(orgId, { freshnessOnly: true, timeBudgetMs: TIME_BUDGET }));
+    // Full phased sync (not freshnessOnly) — phases handle time budget internally
+    syncTasks.push(syncFacebookAdsMetrics(orgId, { timeBudgetMs: TIME_BUDGET }));
   }
   if (connectedPlatforms.has("SHOPIFY")) {
     syncTasks.push(syncShopifyOrders(orgId, { timeBudgetMs: TIME_BUDGET }));
   }
   if (connectedPlatforms.has("NUVEMSHOP")) {
-    syncTasks.push(syncNuvemshopOrders(orgId));
+    syncTasks.push(syncNuvemshopOrders(orgId, { timeBudgetMs: TIME_BUDGET }));
   }
   if (connectedPlatforms.has("GOOGLE_ADS")) {
     syncTasks.push(syncGoogleAdsMetrics(orgId));
@@ -178,4 +187,26 @@ export async function syncRecent() {
     success: true,
     results: results.map(r => r.status === "fulfilled" ? r.value : { error: r.reason }),
   };
+}
+
+export async function getLastSyncTime(): Promise<{ lastSyncAt: Date | null; syncing: boolean }> {
+  const ctx = await getSessionWithOrg();
+  if (!ctx) return { lastSyncAt: null, syncing: false };
+
+  const integrations = await prisma.integration.findMany({
+    where: { organizationId: ctx.organization.id, status: "CONNECTED" },
+    select: { lastSyncAt: true, syncStatus: true },
+  });
+
+  if (integrations.length === 0) return { lastSyncAt: null, syncing: false };
+
+  const syncing = integrations.some((i) => i.syncStatus === "SYNCING");
+
+  const lastSyncAt = integrations.reduce<Date | null>((latest, i) => {
+    if (!i.lastSyncAt) return latest;
+    if (!latest) return i.lastSyncAt;
+    return i.lastSyncAt > latest ? i.lastSyncAt : latest;
+  }, null);
+
+  return { lastSyncAt, syncing };
 }
