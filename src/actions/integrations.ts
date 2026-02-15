@@ -35,17 +35,17 @@ export async function connectApiKeyIntegration(data: {
   externalStoreId?: string;
 }) {
   const ctx = await getSessionWithOrg();
-  if (!ctx) return { error: "Nao autenticado." };
+  if (!ctx) return { error: "Não autenticado." };
 
   if (ctx.role !== "OWNER" && ctx.role !== "ADMIN") {
-    return { error: "Voce nao tem permissao para gerenciar integracoes." };
+    return { error: "Você não tem permissão para gerenciar integrações." };
   }
 
   // Validate Cartpanda credentials before saving
   if (data.platform === "CARTPANDA" && data.apiKey && data.externalStoreId) {
     const validation = await validateCartpandaCredentials(data.apiKey, data.externalStoreId);
     if (!validation.valid) {
-      return { error: validation.error || "Credenciais da Cartpanda invalidas." };
+      return { error: validation.error || "Credenciais da Cartpanda inválidas." };
     }
   }
 
@@ -91,10 +91,10 @@ export async function connectApiKeyIntegration(data: {
 
 export async function saveShopifyCredentials(shop: string, clientId: string, clientSecret: string) {
   const ctx = await getSessionWithOrg();
-  if (!ctx) return { error: "Nao autenticado." };
+  if (!ctx) return { error: "Não autenticado." };
 
   if (ctx.role !== "OWNER" && ctx.role !== "ADMIN") {
-    return { error: "Voce nao tem permissao para gerenciar integracoes." };
+    return { error: "Você não tem permissão para gerenciar integrações." };
   }
 
   let domain = shop.trim().toLowerCase();
@@ -103,7 +103,7 @@ export async function saveShopifyCredentials(shop: string, clientId: string, cli
   }
 
   if (!clientId.trim() || !clientSecret.trim()) {
-    return { error: "Client ID e Client Secret sao obrigatorios." };
+    return { error: "Client ID e Client Secret são obrigatórios." };
   }
 
   await prisma.integration.upsert({
@@ -135,13 +135,13 @@ export async function saveShopifyCredentials(shop: string, clientId: string, cli
 
 export async function connectShopifyDirect(shop: string, accessToken: string) {
   const ctx = await getSessionWithOrg();
-  if (!ctx) return { error: "Nao autenticado." };
+  if (!ctx) return { error: "Não autenticado." };
 
   if (ctx.role !== "OWNER" && ctx.role !== "ADMIN") {
-    return { error: "Voce nao tem permissao para gerenciar integracoes." };
+    return { error: "Você não tem permissão para gerenciar integrações." };
   }
 
-  // Normalizar dominio
+  // Normalizar domínio
   let domain = shop.trim().toLowerCase();
   if (!domain.includes(".myshopify.com")) {
     domain = `${domain}.myshopify.com`;
@@ -149,7 +149,7 @@ export async function connectShopifyDirect(shop: string, accessToken: string) {
 
   const token = accessToken.trim();
   if (!token) {
-    return { error: "Access Token e obrigatorio." };
+    return { error: "Access Token é obrigatório." };
   }
 
   try {
@@ -157,10 +157,10 @@ export async function connectShopifyDirect(shop: string, accessToken: string) {
     const validation = await validateShopifyAccessToken(domain, token);
 
     if (!validation.valid) {
-      return { error: validation.error || "Token invalido." };
+      return { error: validation.error || "Token inválido." };
     }
 
-    // Salvar integracao
+    // Salvar integração
     await prisma.integration.upsert({
       where: {
         organizationId_platform: {
@@ -192,10 +192,10 @@ export async function connectShopifyDirect(shop: string, accessToken: string) {
 
 export async function disconnectIntegration(platform: Platform) {
   const ctx = await getSessionWithOrg();
-  if (!ctx) return { error: "Nao autenticado." };
+  if (!ctx) return { error: "Não autenticado." };
 
   if (ctx.role !== "OWNER" && ctx.role !== "ADMIN") {
-    return { error: "Voce nao tem permissao para gerenciar integracoes." };
+    return { error: "Você não tem permissão para gerenciar integrações." };
   }
 
   const integration = await prisma.integration.findUnique({
@@ -208,7 +208,7 @@ export async function disconnectIntegration(platform: Platform) {
   });
 
   if (!integration) {
-    return { error: "Integracao nao encontrada." };
+    return { error: "Integração não encontrada." };
   }
 
   // Delete all data associated with this platform
@@ -259,7 +259,7 @@ export async function disconnectIntegration(platform: Platform) {
 
 export async function selectFacebookAdAccount(accountId: string) {
   const ctx = await getSessionWithOrg();
-  if (!ctx) return { error: "Nao autenticado." };
+  if (!ctx) return { error: "Não autenticado." };
 
   const integration = await prisma.integration.findUnique({
     where: {
@@ -271,7 +271,7 @@ export async function selectFacebookAdAccount(accountId: string) {
   });
 
   if (!integration || !integration.accessToken) {
-    return { error: "Facebook Ads nao conectado. Faca login novamente." };
+    return { error: "Facebook Ads não conectado. Faça login novamente." };
   }
 
   // Validate that the accountId is in the list of available accounts
@@ -280,7 +280,7 @@ export async function selectFacebookAdAccount(accountId: string) {
   const selected = accounts.find((a) => a.id === accountId);
 
   if (!selected) {
-    return { error: "Conta de anuncio nao encontrada." };
+    return { error: "Conta de anúncio não encontrada." };
   }
 
   // Update integration with selected account (primary account for backward compat)
@@ -305,7 +305,7 @@ export async function selectFacebookAdAccount(accountId: string) {
  */
 export async function selectMultipleFacebookAdAccounts(accountIds: string[]) {
   const ctx = await getSessionWithOrg();
-  if (!ctx) return { error: "Nao autenticado." };
+  if (!ctx) return { error: "Não autenticado." };
 
   const integration = await prisma.integration.findUnique({
     where: {
@@ -317,7 +317,7 @@ export async function selectMultipleFacebookAdAccounts(accountIds: string[]) {
   });
 
   if (!integration || !integration.accessToken) {
-    return { error: "Facebook Ads nao conectado. Faca login novamente." };
+    return { error: "Facebook Ads não conectado. Faça login novamente." };
   }
 
   const metadata = integration.metadata as { adAccounts?: { id: string; name: string }[]; selectedAccounts?: { id: string; name: string }[] } | null;
@@ -328,7 +328,7 @@ export async function selectMultipleFacebookAdAccounts(accountIds: string[]) {
     .filter((a): a is { id: string; name: string } => a !== undefined);
 
   if (selectedAccounts.length === 0) {
-    return { error: "Nenhuma conta valida selecionada." };
+    return { error: "Nenhuma conta válida selecionada." };
   }
 
   // Primary account = first selected
@@ -384,7 +384,7 @@ export async function getSelectedFacebookAccounts() {
 
 export async function selectGoogleAnalyticsProperty(propertyId: string) {
   const ctx = await getSessionWithOrg();
-  if (!ctx) return { error: "Nao autenticado." };
+  if (!ctx) return { error: "Não autenticado." };
 
   const integration = await prisma.integration.findUnique({
     where: {
@@ -396,7 +396,7 @@ export async function selectGoogleAnalyticsProperty(propertyId: string) {
   });
 
   if (!integration || !integration.accessToken) {
-    return { error: "Google Analytics nao conectado. Faca login novamente." };
+    return { error: "Google Analytics não conectado. Faça login novamente." };
   }
 
   const metadata = integration.metadata as { properties?: { id: string; name: string }[] } | null;
@@ -404,7 +404,7 @@ export async function selectGoogleAnalyticsProperty(propertyId: string) {
   const selected = properties.find((p) => p.id === propertyId);
 
   if (!selected) {
-    return { error: "Propriedade nao encontrada." };
+    return { error: "Propriedade não encontrada." };
   }
 
   await prisma.integration.update({

@@ -79,7 +79,7 @@ export async function getFinancialMetrics({
     to: Date;
 }) {
     const ctx = await getSessionWithOrg();
-    if (!ctx) throw new Error("Nao autenticado");
+    if (!ctx) throw new Error("Não autenticado");
     const organizationId = ctx.organization.id;
 
     // Fetch Financial Config
@@ -270,7 +270,7 @@ export async function getProductCosts() {
  */
 export async function saveProductCost(input: ProductCostInput) {
     const ctx = await getSessionWithOrg();
-    if (!ctx) throw new Error("Nao autenticado");
+    if (!ctx) throw new Error("Não autenticado");
     const orgId = ctx.organization.id;
 
     await db.productCost.upsert({
@@ -315,7 +315,7 @@ export async function getFinancialConfig() {
  */
 export async function saveFinancialConfig(input: FinancialConfigInput) {
     const ctx = await getSessionWithOrg();
-    if (!ctx) throw new Error("Nao autenticado");
+    if (!ctx) throw new Error("Não autenticado");
     const orgId = ctx.organization.id;
 
     if (isNaN(input.defaultTaxRate) || input.defaultTaxRate < 0 || input.defaultTaxRate > 100) {
@@ -360,7 +360,7 @@ export async function saveFinancialConfig(input: FinancialConfigInput) {
  */
 export async function saveSupplierPayment(input: SupplierPaymentInput) {
     const ctx = await getSessionWithOrg();
-    if (!ctx) throw new Error("Nao autenticado");
+    if (!ctx) throw new Error("Não autenticado");
 
     if (isNaN(input.amount) || input.amount <= 0) {
         throw new Error("Valor deve ser maior que zero");
@@ -400,7 +400,7 @@ export async function getSupplierPayments(from: Date, to: Date) {
  */
 export async function deleteSupplierPayment(id: string) {
     const ctx = await getSessionWithOrg();
-    if (!ctx) throw new Error("Nao autenticado");
+    if (!ctx) throw new Error("Não autenticado");
 
     await db.supplierPayment.delete({
         where: { id },
@@ -418,7 +418,7 @@ export async function deleteSupplierPayment(id: string) {
 export async function saveFinancialEntry(input: FinancialEntryInput) {
     try {
         const ctx = await getSessionWithOrg();
-        if (!ctx) return { error: "Nao autenticado" };
+        if (!ctx) return { error: "Não autenticado" };
 
         const amount = Number(input.amount);
         if (isNaN(amount) || amount <= 0) {
@@ -430,7 +430,7 @@ export async function saveFinancialEntry(input: FinancialEntryInput) {
         }
 
         if (!input.category) {
-            return { error: "Categoria e obrigatoria" };
+            return { error: "Categoria é obrigatória" };
         }
 
         // Parse entryDate from string if needed (avoids Date serialization issues)
@@ -452,7 +452,7 @@ export async function saveFinancialEntry(input: FinancialEntryInput) {
         return { success: true };
     } catch (err) {
         console.error("[saveFinancialEntry] Error:", err);
-        return { error: "Erro ao salvar lancamento. Tente novamente." };
+        return { error: "Erro ao salvar lançamento. Tente novamente." };
     }
 }
 
@@ -478,7 +478,7 @@ export async function getFinancialEntries(from: Date, to: Date) {
 export async function deleteFinancialEntry(id: string) {
     try {
         const ctx = await getSessionWithOrg();
-        if (!ctx) return { error: "Nao autenticado" };
+        if (!ctx) return { error: "Não autenticado" };
 
         await db.financialEntry.delete({
             where: { id },
@@ -487,6 +487,6 @@ export async function deleteFinancialEntry(id: string) {
         return { success: true };
     } catch (err) {
         console.error("[deleteFinancialEntry] Error:", err);
-        return { error: "Erro ao remover lancamento." };
+        return { error: "Erro ao remover lançamento." };
     }
 }

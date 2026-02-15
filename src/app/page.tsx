@@ -30,7 +30,7 @@ export default function Home() {
           <div className="max-w-3xl text-center">
             <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6">
               Todas as suas plataformas em um{" "}
-              <span className="text-primary">unico lugar</span>
+              <span className="text-primary">único lugar</span>
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
               Conecte Shopify, Nuvemshop, Cartpanda, Yampi, Facebook Ads, Google
@@ -42,7 +42,7 @@ export default function Home() {
                 <Link href="/register">Comece agora gratis</Link>
               </Button>
               <Button size="lg" variant="outline" asChild>
-                <Link href="/login">Ja tenho conta</Link>
+                <Link href="/login">Já tenho conta</Link>
               </Button>
             </div>
           </div>
@@ -52,7 +52,7 @@ export default function Home() {
         <section className="px-6 py-16 bg-muted/30">
           <div className="max-w-5xl mx-auto">
             <h2 className="text-2xl md:text-3xl font-bold text-center mb-12">
-              Tudo que voce precisa para gerenciar suas vendas
+              Tudo que você precisa para gerenciar suas vendas
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               <FeatureCard
@@ -63,12 +63,12 @@ export default function Home() {
               <FeatureCard
                 icon={BarChart3}
                 title="Dashboard Unificado"
-                description="Veja receita, pedidos, gastos com anuncios e ROAS em um unico painel com graficos interativos."
+                description="Veja receita, pedidos, gastos com anúncios e ROAS em um único painel com gráficos interativos."
               />
               <FeatureCard
                 icon={ShoppingBag}
                 title="Pedidos Centralizados"
-                description="Todos os pedidos de todas as lojas em uma unica tabela com filtros e paginacao."
+                description="Todos os pedidos de todas as lojas em uma única tabela com filtros e paginação."
               />
               <FeatureCard
                 icon={Megaphone}
@@ -78,12 +78,12 @@ export default function Home() {
               <FeatureCard
                 icon={TrendingUp}
                 title="Analytics de Vendas"
-                description="Graficos de receita ao longo do tempo, vendas por plataforma e analise por status."
+                description="Gráficos de receita ao longo do tempo, vendas por plataforma e análise por status."
               />
               <FeatureCard
                 icon={Shield}
                 title="Seguro e Criptografado"
-                description="Seus tokens e credenciais sao criptografados com AES-256-GCM. Seus dados estao seguros."
+                description="Seus tokens e credenciais são criptografados com AES-256-GCM. Seus dados estão seguros."
               />
             </div>
           </div>

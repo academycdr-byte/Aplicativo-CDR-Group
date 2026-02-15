@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
 
   if (!membership) {
     return NextResponse.redirect(
-      new URL("/integrations?error=facebook_oauth_failed&detail=Organizacao+nao+encontrada", request.url)
+      new URL("/integrations?error=facebook_oauth_failed&detail=Organização+não+encontrada", request.url)
     );
   }
 

@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
 
     if (properties.length === 0) {
       return NextResponse.redirect(
-        new URL("/integrations?error=google_analytics_oauth_failed&detail=Nenhuma+propriedade+GA4+encontrada.+Verifique+se+voce+tem+acesso+a+alguma+propriedade+do+Google+Analytics+4.", request.url)
+        new URL("/integrations?error=google_analytics_oauth_failed&detail=Nenhuma+propriedade+GA4+encontrada.+Verifique+se+você+tem+acesso+a+alguma+propriedade+do+Google+Analytics+4.", request.url)
       );
     }
 

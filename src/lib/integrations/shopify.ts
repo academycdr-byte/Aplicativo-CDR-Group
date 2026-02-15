@@ -14,7 +14,7 @@ const SHOPIFY_SCOPES = "read_orders,read_products,read_customers,read_reports";
  */
 export function getShopifyAuthUrl(shop: string, redirectUri: string, state: string, clientId?: string): string {
   const id = clientId?.trim() || process.env.SHOPIFY_CLIENT_ID?.trim();
-  if (!id) throw new Error("SHOPIFY_CLIENT_ID nao configurado");
+  if (!id) throw new Error("SHOPIFY_CLIENT_ID não configurado");
 
   const params = new URLSearchParams({
     client_id: id,
@@ -40,7 +40,7 @@ export async function exchangeShopifyCode(
   const clientSecret = credentials?.clientSecret?.trim() || process.env.SHOPIFY_CLIENT_SECRET?.trim();
 
   if (!clientId || !clientSecret) {
-    throw new Error("Client ID ou Client Secret nao configurado");
+    throw new Error("Client ID ou Client Secret não configurado");
   }
 
   const body = new URLSearchParams({
@@ -126,13 +126,13 @@ export async function validateShopifyAccessToken(
       console.error("[Shopify] Token validation failed:", response.status, errorBody);
 
       if (response.status === 401) {
-        return { valid: false, error: "Access Token invalido." };
+        return { valid: false, error: "Access Token inválido." };
       }
       if (response.status === 403) {
-        return { valid: false, error: "Token sem permissao. Verifique os escopos." };
+        return { valid: false, error: "Token sem permissão. Verifique os escopos." };
       }
       if (response.status === 404) {
-        return { valid: false, error: "Loja nao encontrada. Verifique o dominio." };
+        return { valid: false, error: "Loja não encontrada. Verifique o domínio." };
       }
       return { valid: false, error: `Erro Shopify (${response.status})` };
     }
@@ -140,7 +140,7 @@ export async function validateShopifyAccessToken(
     const data = await response.json();
     return { valid: true, shopName: data.shop?.name };
   } catch (error) {
-    const msg = error instanceof Error ? error.message : "Erro de conexao";
+    const msg = error instanceof Error ? error.message : "Erro de conexão";
     return { valid: false, error: `Erro ao conectar: ${msg}` };
   }
 }
@@ -155,7 +155,7 @@ export async function registerShopifyWebhooks(
 ): Promise<void> {
   const baseUrl = process.env.AUTH_URL || process.env.NEXTAUTH_URL;
   if (!baseUrl) {
-    console.error("[Shopify Webhooks] AUTH_URL nao configurado, pulando registro de webhooks");
+    console.error("[Shopify Webhooks] AUTH_URL não configurado, pulando registro de webhooks");
     return;
   }
 
@@ -234,7 +234,7 @@ export async function fetchShopifyOrders(integrationId: string) {
   }
 
   if (!integration.accessToken) {
-    throw new Error("Access token nao encontrado. Reconecte a loja Shopify.");
+    throw new Error("Access token não encontrado. Reconecte a loja Shopify.");
   }
 
   const accessToken = decrypt(integration.accessToken);
@@ -263,10 +263,10 @@ export async function fetchShopifyOrders(integrationId: string) {
           where: { id: integrationId },
           data: {
             status: "DISCONNECTED",
-            errorMessage: "Token expirado ou invalido. Reconecte a Shopify.",
+            errorMessage: "Token expirado ou inválido. Reconecte a Shopify.",
           },
         });
-        throw new Error("Token Shopify expirado. Reconecte a integracao.");
+        throw new Error("Token Shopify expirado. Reconecte a integração.");
       }
 
       throw new Error(`Shopify API error: ${response.status}`);
@@ -493,9 +493,9 @@ export async function syncShopifyOrders(
         if (response.status === 401) {
           await prisma.integration.update({
             where: { id: integration.id },
-            data: { status: "DISCONNECTED", errorMessage: "Token expirado ou invalido. Reconecte a Shopify." },
+            data: { status: "DISCONNECTED", errorMessage: "Token expirado ou inválido. Reconecte a Shopify." },
           });
-          throw new Error("Token Shopify expirado. Reconecte a integracao.");
+          throw new Error("Token Shopify expirado. Reconecte a integração.");
         }
 
         if (response.status === 429) {

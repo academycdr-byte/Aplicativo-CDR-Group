@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     const organizationId = session.user.organizationId;
     if (!organizationId) {
       return NextResponse.redirect(
-        new URL("/integrations?error=shopify_config_error&detail=Organizacao+nao+encontrada", request.url)
+        new URL("/integrations?error=shopify_config_error&detail=Organização+não+encontrada", request.url)
       );
     }
 
@@ -47,13 +47,13 @@ export async function GET(request: NextRequest) {
 
     if (!clientId) {
       return NextResponse.redirect(
-        new URL("/integrations?error=shopify_config_error&detail=Client+ID+nao+encontrado.+Preencha+as+credenciais+novamente.", request.url)
+        new URL("/integrations?error=shopify_config_error&detail=Client+ID+não+encontrado.+Preencha+as+credenciais+novamente.", request.url)
       );
     }
 
     const state = generateOAuthState();
     const baseUrl = process.env.AUTH_URL || process.env.NEXTAUTH_URL;
-    if (!baseUrl) throw new Error("AUTH_URL nao configurado");
+    if (!baseUrl) throw new Error("AUTH_URL não configurado");
     const redirectUri = `${baseUrl}/api/integrations/shopify/callback`;
 
     // Salvar state e shop em cookies para validar no callback

@@ -9,11 +9,11 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
   title: {
-    default: "CDR Group - Painel de Gestao",
+    default: "CDR Group - Painel de Gestão",
     template: "%s | CDR Group",
   },
   description:
-    "Centralize seus dados de e-commerce e anuncios em um unico lugar. Conecte Shopify, Nuvemshop, Cartpanda, Yampi, Facebook Ads, Google Ads e Reportana.",
+    "Centralize seus dados de e-commerce e anúncios em um único lugar. Conecte Shopify, Nuvemshop, Cartpanda, Yampi, Facebook Ads, Google Ads e Reportana.",
   keywords: [
     "e-commerce",
     "dashboard",
@@ -25,13 +25,13 @@ export const metadata: Metadata = {
     "google ads",
     "reportana",
     "vendas",
-    "anuncios",
+    "anúncios",
   ],
   authors: [{ name: "CDR Group" }],
   openGraph: {
-    title: "CDR Group - Painel de Gestao",
+    title: "CDR Group - Painel de Gestão",
     description:
-      "Centralize seus dados de e-commerce e anuncios em um unico lugar.",
+      "Centralize seus dados de e-commerce e anúncios em um único lugar.",
     type: "website",
     locale: "pt_BR",
   },

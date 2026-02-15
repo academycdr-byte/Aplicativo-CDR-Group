@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
   if (!savedState || state !== savedState) {
     console.error("[Shopify OAuth] State mismatch:", { state, savedState });
     return NextResponse.redirect(
-      new URL("/integrations?error=shopify_oauth_failed&detail=State+invalido", request.url)
+      new URL("/integrations?error=shopify_oauth_failed&detail=State+inválido", request.url)
     );
   }
 
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
   const organizationId = session.user.organizationId;
   if (!organizationId) {
     return NextResponse.redirect(
-      new URL("/integrations?error=shopify_oauth_failed&detail=Organizacao+nao+encontrada", request.url)
+      new URL("/integrations?error=shopify_oauth_failed&detail=Organização+não+encontrada", request.url)
     );
   }
 
@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
     if (!validateShopifyHmac(queryObj, clientSecret)) {
       console.error("[Shopify OAuth] HMAC validation failed");
       return NextResponse.redirect(
-        new URL("/integrations?error=shopify_oauth_failed&detail=HMAC+invalido", request.url)
+        new URL("/integrations?error=shopify_oauth_failed&detail=HMAC+inválido", request.url)
       );
     }
   }
@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
 
     if (!membership) {
       return NextResponse.redirect(
-        new URL("/integrations?error=shopify_oauth_failed&detail=Sem+acesso+a+organizacao", request.url)
+        new URL("/integrations?error=shopify_oauth_failed&detail=Sem+acesso+à+organização", request.url)
       );
     }
 

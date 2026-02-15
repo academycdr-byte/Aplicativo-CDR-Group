@@ -107,14 +107,14 @@ export function PeriodSelector({ value, onChange, onRefresh, refreshing }: Perio
           </PopoverTrigger>
           <PopoverContent className="w-auto max-w-[95vw] p-0" align="end" sideOffset={8}>
             <div className="p-3 pb-0">
-              <p className="text-sm font-medium mb-1">Selecione o periodo</p>
+              <p className="text-sm font-medium mb-1">Selecione o período</p>
               <p className="text-xs text-muted-foreground">
-                {!range?.from && "Clique na data de inicio"}
+                {!range?.from && "Clique na data de início"}
                 {range?.from && !range?.to && (
-                  <>Inicio: <strong>{format(range.from, "dd/MM/yyyy", { locale: ptBR })}</strong> — agora clique na data final</>
+                  <>Início: <strong>{format(range.from, "dd/MM/yyyy", { locale: ptBR })}</strong> — agora clique na data final</>
                 )}
                 {range?.from && range?.to && (
-                  <><strong>{format(range.from, "dd/MM/yyyy", { locale: ptBR })}</strong> ate <strong>{format(range.to, "dd/MM/yyyy", { locale: ptBR })}</strong></>
+                  <><strong>{format(range.from, "dd/MM/yyyy", { locale: ptBR })}</strong> até <strong>{format(range.to, "dd/MM/yyyy", { locale: ptBR })}</strong></>
                 )}
               </p>
             </div>

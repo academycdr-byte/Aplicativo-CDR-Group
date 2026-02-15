@@ -29,7 +29,7 @@ export function AdAccountFilter({
 
     return (
         <Select value={value} onValueChange={onChange}>
-            <SelectTrigger className="w-full sm:w-[200px]" aria-label="Filtrar por conta de anuncios">
+            <SelectTrigger className="w-full sm:w-[200px]" aria-label="Filtrar por conta de anúncios">
                 <SelectValue placeholder="Todas as contas" />
             </SelectTrigger>
             <SelectContent>

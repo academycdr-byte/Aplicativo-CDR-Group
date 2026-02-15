@@ -46,11 +46,11 @@ export function FinancialConfigDialog({ config, onSave }: { config: FinancialCon
                 cmvMethod: formData.cmvMethod,
                 averageCostPerOrder: Number(formData.averageCostPerOrder),
             });
-            toast.success("Configuracoes salvas com sucesso!");
+            toast.success("Configurações salvas com sucesso!");
             setIsOpen(false);
             onSave?.();
         } catch {
-            toast.error("Erro ao salvar configuracoes");
+            toast.error("Erro ao salvar configurações");
         }
     };
 
@@ -64,16 +64,16 @@ export function FinancialConfigDialog({ config, onSave }: { config: FinancialCon
             </DialogTrigger>
             <DialogContent className="max-w-lg">
                 <DialogHeader>
-                    <DialogTitle>Configuracoes Financeiras</DialogTitle>
+                    <DialogTitle>Configurações Financeiras</DialogTitle>
                     <DialogDescription>
-                        Defina taxas, custos e metodo de calculo de CMV.
+                        Defina taxas, custos e método de cálculo de CMV.
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
                     {/* CMV Method Selection */}
                     <div className="space-y-2">
-                        <Label className="text-sm font-medium">Metodo de Calculo do CMV</Label>
+                        <Label className="text-sm font-medium">Método de Cálculo do CMV</Label>
                         <div className="grid grid-cols-1 gap-2">
                             <label
                                 className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
@@ -113,8 +113,8 @@ export function FinancialConfigDialog({ config, onSave }: { config: FinancialCon
                                 />
                                 <Calculator className="w-4 h-4 text-blue-500 shrink-0" />
                                 <div>
-                                    <span className="text-xs font-medium">Custo Medio por Pedido</span>
-                                    <p className="text-[10px] text-muted-foreground">Valor medio multiplicado pela quantidade de pedidos</p>
+                                    <span className="text-xs font-medium">Custo Médio por Pedido</span>
+                                    <p className="text-[10px] text-muted-foreground">Valor médio multiplicado pela quantidade de pedidos</p>
                                 </div>
                             </label>
                             <label
@@ -144,7 +144,7 @@ export function FinancialConfigDialog({ config, onSave }: { config: FinancialCon
                     {/* Average Cost Per Order - only visible when method is "average" */}
                     {formData.cmvMethod === "average" && (
                         <div className="space-y-1.5 p-3 rounded-lg border border-blue-500/20 bg-blue-500/5">
-                            <Label htmlFor="averageCostPerOrder">Custo Medio por Pedido (R$)</Label>
+                            <Label htmlFor="averageCostPerOrder">Custo Médio por Pedido (R$)</Label>
                             <Input
                                 id="averageCostPerOrder"
                                 type="number"
@@ -154,7 +154,7 @@ export function FinancialConfigDialog({ config, onSave }: { config: FinancialCon
                                 onChange={(e) => setFormData({ ...formData, averageCostPerOrder: parseFloat(e.target.value) || 0 })}
                             />
                             <p className="text-[10px] text-muted-foreground">
-                                Este valor sera multiplicado pela quantidade de pedidos no periodo. Ex: R$ 45,00 x 200 pedidos = CMV de R$ 9.000
+                                Este valor será multiplicado pela quantidade de pedidos no período. Ex: R$ 45,00 x 200 pedidos = CMV de R$ 9.000
                             </p>
                         </div>
                     )}
@@ -265,7 +265,7 @@ export function FinancialConfigDialog({ config, onSave }: { config: FinancialCon
                             value={formData.chargebackRate}
                             onChange={(e) => setFormData({ ...formData, chargebackRate: parseFloat(e.target.value) || 0 })}
                         />
-                        <p className="text-[10px] text-muted-foreground">Calcula: ticket medio x porcentagem informada</p>
+                        <p className="text-[10px] text-muted-foreground">Calcula: ticket médio x porcentagem informada</p>
                     </div>
                 </div>
 

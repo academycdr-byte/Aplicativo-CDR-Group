@@ -50,7 +50,7 @@ const platforms: PlatformConfig[] = [
   {
     name: "Facebook Ads",
     platform: "FACEBOOK_ADS",
-    description: "Conecte sua conta de anuncios do Facebook/Meta.",
+    description: "Conecte sua conta de anúncios do Facebook/Meta.",
     authType: "oauth",
     color: "#1877F2",
     fields: [],
@@ -139,7 +139,7 @@ function IntegrationsContent() {
     } else if (error === "shopify_oauth_failed") {
       toast.error(`Erro ao conectar Shopify${detail ? `: ${detail}` : ""}`, { duration: 10000 });
     } else if (error === "shopify_config_error") {
-      toast.error(`Configuracao Shopify incorreta${detail ? `: ${detail}` : ""}`, { duration: 10000 });
+      toast.error(`Configuração Shopify incorreta${detail ? `: ${detail}` : ""}`, { duration: 10000 });
     } else if (success === "facebook") {
       toast.success("Facebook Ads conectado com sucesso! Sincronizando metricas...");
       syncFacebookWithContinuation();
@@ -165,9 +165,9 @@ function IntegrationsContent() {
     } else if (error === "missing_params") {
       toast.error("Erro no fluxo OAuth: parametros ausentes");
     } else if (error === "missing_shop") {
-      toast.error("Dominio da loja nao informado");
+      toast.error("Domínio da loja não informado");
     } else if (error === "unauthorized") {
-      toast.error("Voce nao tem permissao para esta integracao");
+      toast.error("Você não tem permissão para esta integração");
     }
 
     // Handle account/property selection after OAuth
@@ -197,7 +197,7 @@ function IntegrationsContent() {
         }
         setIntegrations(data);
       });
-      toast.info("Selecione as contas de anuncio que deseja conectar.");
+      toast.info("Selecione as contas de anúncio que deseja conectar.");
     }
   }, [searchParams]);
 
@@ -536,7 +536,7 @@ function IntegrationsContent() {
     if ("error" in result && result.error) {
       toast.error(`Erro ao sincronizar: ${result.error}`);
     } else {
-      toast.success("Sincronizacao concluida!");
+      toast.success("Sincronização concluída!");
       loadIntegrations();
     }
     setSyncing(null);
@@ -632,7 +632,7 @@ function IntegrationsContent() {
   }
 
   async function handleDisconnect(platform: Platform) {
-    if (!confirm("Tem certeza que deseja desconectar esta integracao?")) return;
+    if (!confirm("Tem certeza que deseja desconectar esta integração?")) return;
     const result = await disconnectIntegration(platform);
     if (result.error) {
       toast.error(result.error);
@@ -771,13 +771,13 @@ function IntegrationsContent() {
             <ol className="text-xs space-y-1 ml-6 list-decimal">
               <li>Acesse o <strong>Dev Dashboard</strong> da Shopify (dev.shopify.com)</li>
               <li>Selecione ou crie um app para a loja</li>
-              <li>Va em <strong>Configuracoes</strong> do app</li>
+              <li>Va em <strong>Configurações</strong> do app</li>
               <li>Copie o <strong>ID do cliente</strong> e a <strong>Chave secreta</strong></li>
             </ol>
           </div>
           <form onSubmit={handleShopifyConnect} className="space-y-4">
             <div className="space-y-2">
-              <Label>Dominio da loja</Label>
+              <Label>Domínio da loja</Label>
               <Input
                 value={shopDomain}
                 onChange={(e) => setShopDomain(e.target.value)}
@@ -820,7 +820,7 @@ function IntegrationsContent() {
       <Dialog open={fbAccountDialog} onOpenChange={(open) => { setFbAccountDialog(open); if (!open) setFbSearch(""); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Selecione as Contas de Anuncio</DialogTitle>
+            <DialogTitle>Selecione as Contas de Anúncio</DialogTitle>
             <DialogDescription>
               {fbAccounts.length} conta{fbAccounts.length !== 1 ? "s" : ""} encontrada{fbAccounts.length !== 1 ? "s" : ""}. Selecione uma ou mais contas para conectar.
             </DialogDescription>

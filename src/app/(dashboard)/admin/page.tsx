@@ -89,7 +89,7 @@ export default function AdminPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <h2 className="text-2xl font-bold tracking-tight">Administracao</h2>
+        <h2 className="text-2xl font-bold tracking-tight">Administração</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
             <Card key={i}>
@@ -109,11 +109,11 @@ export default function AdminPage() {
   if (!stats) {
     return (
       <div className="space-y-6">
-        <h2 className="text-2xl font-bold tracking-tight">Administracao</h2>
+        <h2 className="text-2xl font-bold tracking-tight">Administração</h2>
         <Card>
           <CardContent className="py-16 text-center">
             <p className="text-muted-foreground">
-              Voce nao tem permissao para acessar esta pagina.
+              Você não tem permissão para acessar esta página.
             </p>
           </CardContent>
         </Card>
@@ -124,9 +124,9 @@ export default function AdminPage() {
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div>
-        <h2 className="text-2xl font-bold tracking-tight">Administracao</h2>
+        <h2 className="text-2xl font-bold tracking-tight">Administração</h2>
         <p className="text-muted-foreground text-sm mt-1">
-          Visao geral do sistema e monitoramento de sincronizacoes.
+          Visão geral do sistema e monitoramento de sincronizações.
         </p>
       </div>
 
@@ -135,7 +135,7 @@ export default function AdminPage() {
         <Card>
           <CardContent className="pt-5">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-muted-foreground">Usuarios</p>
+              <p className="text-sm text-muted-foreground">Usuários</p>
               <Users className="w-4 h-4 text-muted-foreground" />
             </div>
             <p className="text-2xl font-bold">{stats.totalUsers}</p>
@@ -144,7 +144,7 @@ export default function AdminPage() {
         <Card>
           <CardContent className="pt-5">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-muted-foreground">Organizacoes</p>
+              <p className="text-sm text-muted-foreground">Organizações</p>
               <Building2 className="w-4 h-4 text-muted-foreground" />
             </div>
             <p className="text-2xl font-bold">{stats.totalOrganizations}</p>
@@ -162,7 +162,7 @@ export default function AdminPage() {
         <Card>
           <CardContent className="pt-5">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-muted-foreground">Integracoes Ativas</p>
+              <p className="text-sm text-muted-foreground">Integrações Ativas</p>
               <Link2 className="w-4 h-4 text-muted-foreground" />
             </div>
             <p className="text-2xl font-bold">
@@ -178,14 +178,14 @@ export default function AdminPage() {
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2 text-destructive">
               <AlertTriangle className="w-5 h-5" />
-              Sincronizacoes com falha (ultimas 24h)
+              Sincronizações com falha (últimas 24h)
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Organizacao</TableHead>
+                  <TableHead>Organização</TableHead>
                   <TableHead>Plataforma</TableHead>
                   <TableHead>Erro</TableHead>
                   <TableHead>Data</TableHead>
@@ -215,17 +215,17 @@ export default function AdminPage() {
       {/* Recent Sync Logs */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Historico de sincronizacoes recentes</CardTitle>
+          <CardTitle className="text-base">Histórico de sincronizações recentes</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Organizacao</TableHead>
+                <TableHead>Organização</TableHead>
                 <TableHead>Plataforma</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Registros</TableHead>
-                <TableHead>Inicio</TableHead>
+                <TableHead>Início</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -249,7 +249,7 @@ export default function AdminPage() {
               {stats.recentSyncLogs.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                    Nenhuma sincronizacao registrada.
+                    Nenhuma sincronização registrada.
                   </TableCell>
                 </TableRow>
               )}

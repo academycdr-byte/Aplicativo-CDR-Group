@@ -82,7 +82,7 @@ export function FunnelChart({ data, className }: FunnelChartProps) {
         <Card className={cn("overflow-hidden", className)}>
             <CardHeader className="pb-2">
                 <CardTitle className="text-base flex items-center gap-2">
-                    Funil de Conversao Meta Ads
+                    Funil de Conversão Meta Ads
                     <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" aria-hidden="true" />
                 </CardTitle>
             </CardHeader>
@@ -122,7 +122,7 @@ export function FunnelChart({ data, className }: FunnelChartProps) {
                 {data.addToCart === 0 && data.initiateCheckout === 0 && (
                     <div className="mt-4 p-3 bg-muted/30 rounded border border-dashed border-muted text-xs text-center text-muted-foreground">
                         <p>Seus dados de Carrinho e Checkout parecem estar zerados.</p>
-                        <p>Verifique se o Pixel do Meta Ads esta enviando os eventos 'AddToCart' e 'InitiateCheckout'.</p>
+                        <p>Verifique se o Pixel do Meta Ads está enviando os eventos 'AddToCart' e 'InitiateCheckout'.</p>
                     </div>
                 )}
             </CardContent>

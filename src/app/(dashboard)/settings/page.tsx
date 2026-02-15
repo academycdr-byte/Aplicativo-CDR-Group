@@ -15,9 +15,9 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div>
-        <h2 className="text-2xl font-bold tracking-tight">Configuracoes</h2>
+        <h2 className="text-2xl font-bold tracking-tight">Configurações</h2>
         <p className="text-muted-foreground text-sm mt-1">
-          Gerencie as configuracoes da sua conta e organizacao.
+          Gerencie as configurações da sua conta e organização.
         </p>
       </div>
 

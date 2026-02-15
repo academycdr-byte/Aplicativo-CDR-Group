@@ -106,7 +106,7 @@ export function SupplierPaymentTable({
                         <DialogHeader>
                             <DialogTitle>Registrar Pagamento ao Fornecedor</DialogTitle>
                             <DialogDescription>
-                                Registre um pagamento feito ao fornecedor para calculo do CMV.
+                                Registre um pagamento feito ao fornecedor para cálculo do CMV.
                             </DialogDescription>
                         </DialogHeader>
                         <div className="grid gap-4 py-4">
@@ -123,7 +123,7 @@ export function SupplierPaymentTable({
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="paymentDesc">Descricao</Label>
+                                <Label htmlFor="paymentDesc">Descrição</Label>
                                 <Input
                                     id="paymentDesc"
                                     value={newPayment.description}
@@ -153,7 +153,7 @@ export function SupplierPaymentTable({
                     <TableHeader>
                         <TableRow>
                             <TableHead scope="col">Data</TableHead>
-                            <TableHead scope="col">Descricao</TableHead>
+                            <TableHead scope="col">Descrição</TableHead>
                             <TableHead scope="col" className="text-right">Valor</TableHead>
                             <TableHead scope="col" className="w-[60px]"><span className="sr-only">Ações</span></TableHead>
                         </TableRow>
@@ -181,7 +181,7 @@ export function SupplierPaymentTable({
                         {payments.length === 0 && (
                             <TableRow>
                                 <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                                    Nenhum pagamento registrado no periodo. Clique em &quot;Registrar Pagamento&quot; para adicionar.
+                                    Nenhum pagamento registrado no período. Clique em &quot;Registrar Pagamento&quot; para adicionar.
                                 </TableCell>
                             </TableRow>
                         )}
@@ -192,7 +192,7 @@ export function SupplierPaymentTable({
             {payments.length > 0 && (
                 <div className="flex justify-end">
                     <div className="text-sm font-medium">
-                        Total no periodo: <span className="text-base font-bold">{fmt(total)}</span>
+                        Total no período: <span className="text-base font-bold">{fmt(total)}</span>
                     </div>
                 </div>
             )}

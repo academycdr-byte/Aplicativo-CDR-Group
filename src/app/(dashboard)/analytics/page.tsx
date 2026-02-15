@@ -147,7 +147,7 @@ export default function AnalyticsPage() {
                     <CardContent className="flex flex-col items-center justify-center py-16 gap-4">
                         <Globe className="w-12 h-12 text-muted-foreground opacity-50" />
                         <div className="text-center">
-                            <p className="font-medium text-sm">Google Analytics nao conectado</p>
+                            <p className="font-medium text-sm">Google Analytics não conectado</p>
                             <p className="text-muted-foreground text-xs mt-1">
                                 Conecte sua propriedade GA4 para ver dados do website.
                             </p>
@@ -164,28 +164,28 @@ export default function AnalyticsPage() {
                     <div className="flex items-start gap-2.5 px-4 py-3 bg-muted/40 border border-border rounded-lg">
                         <Info className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                         <p className="text-xs text-muted-foreground leading-relaxed">
-                            Os dados abaixo sao fornecidos pelo Google Analytics 4. Pequenas variacoes em relacao ao painel do GA4 sao normais devido a diferenca nos momentos de processamento e amostragem de dados.
+                            Os dados abaixo são fornecidos pelo Google Analytics 4. Pequenas variações em relação ao painel do GA4 são normais devido à diferença nos momentos de processamento e amostragem de dados.
                         </p>
                     </div>
 
                     {/* GA KPI Cards */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <AnalyticsKPICard title="Sessoes" value={fmtNum(gaData.totals.sessions)} icon={Users} color="text-blue-500 bg-blue-500/10" />
-                        <AnalyticsKPICard title="Usuarios Ativos" value={fmtNum(gaData.totals.activeUsers)} icon={Eye} color="text-emerald-500 bg-emerald-500/10" />
+                        <AnalyticsKPICard title="Sessões" value={fmtNum(gaData.totals.sessions)} icon={Users} color="text-blue-500 bg-blue-500/10" />
+                        <AnalyticsKPICard title="Usuários Ativos" value={fmtNum(gaData.totals.activeUsers)} icon={Eye} color="text-emerald-500 bg-emerald-500/10" />
                         <AnalyticsKPICard title="Pageviews" value={fmtNum(gaData.totals.screenPageViews)} icon={FileText} color="text-amber-500 bg-amber-500/10" />
                         <AnalyticsKPICard
                             title="Engajamento"
                             value={fmtPercent(gaData.totals.engagementRate)}
                             icon={TrendingUp}
                             color="text-purple-500 bg-purple-500/10"
-                            tooltip="Percentual de sessoes que duraram mais de 10 segundos, tiveram um evento de conversao ou tiveram 2 ou mais visualizacoes de pagina."
+                            tooltip="Percentual de sessões que duraram mais de 10 segundos, tiveram um evento de conversão ou tiveram 2 ou mais visualizações de página."
                         />
                     </div>
 
                     {/* GA Secondary KPIs */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         <Card className="border border-border shadow-none rounded-lg p-4">
-                            <span className="text-[11px] uppercase tracking-wider font-medium text-muted-foreground">Novos Usuarios</span>
+                            <span className="text-[11px] uppercase tracking-wider font-medium text-muted-foreground">Novos Usuários</span>
                             <div className="text-lg font-bold mt-1">{fmtNum(gaData.totals.newUsers)}</div>
                         </Card>
                         <Card className="border border-border shadow-none rounded-lg p-4">
@@ -203,7 +203,7 @@ export default function AnalyticsPage() {
                                     </button>
                                     {showBounceTooltip && (
                                         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-popover text-popover-foreground text-xs rounded-lg shadow-lg border border-border w-56 z-50">
-                                            Percentual de sessoes que nao foram engajadas, ou seja, duraram menos de 10 segundos e nao tiveram conversao nem segunda visualizacao.
+                                            Percentual de sessões que não foram engajadas, ou seja, duraram menos de 10 segundos e não tiveram conversão nem segunda visualização.
                                         </div>
                                     )}
                                 </div>
@@ -211,7 +211,7 @@ export default function AnalyticsPage() {
                             <div className="text-lg font-bold mt-1">{fmtPercent(gaData.totals.bounceRate)}</div>
                         </Card>
                         <Card className="border border-border shadow-none rounded-lg p-4">
-                            <span className="text-[11px] uppercase tracking-wider font-medium text-muted-foreground">Tempo Medio</span>
+                            <span className="text-[11px] uppercase tracking-wider font-medium text-muted-foreground">Tempo Médio</span>
                             <div className="text-lg font-bold mt-1">{fmtDuration(gaData.totals.avgSessionDuration)}</div>
                         </Card>
                     </div>
@@ -219,7 +219,7 @@ export default function AnalyticsPage() {
                     {/* GA Daily Chart */}
                     <Card className="border border-border shadow-none rounded-lg">
                         <CardHeader className="border-b border-border/50 px-5 py-4">
-                            <CardTitle className="text-base font-semibold">Sessoes e Usuarios por Dia</CardTitle>
+                            <CardTitle className="text-base font-semibold">Sessões e Usuários por Dia</CardTitle>
                         </CardHeader>
                         <CardContent className="p-5 h-[350px]">
                             <ResponsiveContainer width="100%" height="100%">
@@ -231,8 +231,8 @@ export default function AnalyticsPage() {
                                     <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
                                     <Tooltip contentStyle={{ backgroundColor: "var(--card)", borderColor: "var(--border)", borderRadius: "12px" }} itemStyle={{ fontSize: "12px" }} labelStyle={{ fontSize: "12px", marginBottom: "8px", color: "var(--foreground)" }} />
                                     <Legend verticalAlign="top" height={36} iconType="circle" />
-                                    <Line type="monotone" dataKey="sessions" name="Sessoes" stroke="var(--primary)" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
-                                    <Line type="monotone" dataKey="activeUsers" name="Usuarios Ativos" stroke="#8b5cf6" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                                    <Line type="monotone" dataKey="sessions" name="Sessões" stroke="var(--primary)" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                                    <Line type="monotone" dataKey="activeUsers" name="Usuários Ativos" stroke="#8b5cf6" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
                                     <Line type="monotone" dataKey="screenPageViews" name="Pageviews" stroke="#f59e0b" strokeWidth={1.5} dot={false} strokeDasharray="5 5" />
                                 </LineChart>
                             </ResponsiveContainer>
@@ -244,7 +244,7 @@ export default function AnalyticsPage() {
                         {/* Traffic Sources - Horizontal Bars */}
                         <Card className="lg:col-span-1 border border-border shadow-none rounded-lg">
                             <CardHeader className="border-b border-border/50 px-5 py-4">
-                                <CardTitle className="text-base font-semibold">Origens de Trafego</CardTitle>
+                                <CardTitle className="text-base font-semibold">Origens de Tráfego</CardTitle>
                             </CardHeader>
                             <CardContent className="p-5">
                                 {gaData.trafficSources.length > 0 ? (
@@ -287,15 +287,15 @@ export default function AnalyticsPage() {
                         {/* Traffic Sources Table */}
                         <Card className="border border-border shadow-none rounded-lg">
                             <CardHeader className="border-b border-border/50 px-5 py-4">
-                                <CardTitle className="text-base font-semibold">Fontes de Trafego</CardTitle>
+                                <CardTitle className="text-base font-semibold">Fontes de Tráfego</CardTitle>
                             </CardHeader>
                             <CardContent className="p-0">
                                 <Table>
                                     <TableHeader>
                                         <TableRow className="hover:bg-transparent border-b border-border/50">
                                             <TableHead>Fonte / Meio</TableHead>
-                                            <TableHead className="text-right">Sessoes</TableHead>
-                                            <TableHead className="text-right">Usuarios</TableHead>
+                                            <TableHead className="text-right">Sessões</TableHead>
+                                            <TableHead className="text-right">Usuários</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -318,15 +318,15 @@ export default function AnalyticsPage() {
                         {/* Top Pages */}
                         <Card className="border border-border shadow-none rounded-lg">
                             <CardHeader className="border-b border-border/50 px-5 py-4">
-                                <CardTitle className="text-base font-semibold">Top Paginas</CardTitle>
+                                <CardTitle className="text-base font-semibold">Top Páginas</CardTitle>
                             </CardHeader>
                             <CardContent className="p-0">
                                 <Table>
                                     <TableHeader>
                                         <TableRow className="hover:bg-transparent border-b border-border/50">
-                                            <TableHead>Pagina</TableHead>
+                                            <TableHead>Página</TableHead>
                                             <TableHead className="text-right">Views</TableHead>
-                                            <TableHead className="text-right">Usuarios</TableHead>
+                                            <TableHead className="text-right">Usuários</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -353,7 +353,7 @@ export default function AnalyticsPage() {
                             <CardHeader className="border-b border-border/50 px-5 py-4">
                                 <div>
                                     <CardTitle className="text-base font-semibold">Dispositivos</CardTitle>
-                                    <p className="text-xs text-muted-foreground mt-0.5">Sessoes por tipo de dispositivo</p>
+                                    <p className="text-xs text-muted-foreground mt-0.5">Sessões por tipo de dispositivo</p>
                                 </div>
                             </CardHeader>
                             <CardContent className="p-5">
@@ -369,7 +369,7 @@ export default function AnalyticsPage() {
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center justify-between mb-1">
                                                         <span className="font-medium text-sm capitalize">{d.device}</span>
-                                                        <span className="text-sm font-semibold">{fmtNum(d.sessions)} <span className="text-xs font-normal text-muted-foreground">sessoes</span></span>
+                                                        <span className="text-sm font-semibold">{fmtNum(d.sessions)} <span className="text-xs font-normal text-muted-foreground">sessões</span></span>
                                                     </div>
                                                     <div className="w-full h-1.5 bg-secondary rounded-full overflow-hidden">
                                                         <div className="h-full bg-primary rounded-full" style={{ width: `${(d.sessions / maxSessions) * 100}%` }} />
@@ -388,8 +388,8 @@ export default function AnalyticsPage() {
                         <Card className="border border-border shadow-none rounded-lg">
                             <CardHeader className="border-b border-border/50 px-5 py-4">
                                 <div>
-                                    <CardTitle className="text-base font-semibold">Top 10 Regioes</CardTitle>
-                                    <p className="text-xs text-muted-foreground mt-0.5">Sessoes por regiao</p>
+                                    <CardTitle className="text-base font-semibold">Top 10 Regiões</CardTitle>
+                                    <p className="text-xs text-muted-foreground mt-0.5">Sessões por região</p>
                                 </div>
                             </CardHeader>
                             <CardContent className="p-5">
@@ -407,7 +407,7 @@ export default function AnalyticsPage() {
                                                     <div className="w-20 h-1.5 bg-secondary rounded-full overflow-hidden">
                                                         <div className="h-full bg-primary rounded-full" style={{ width: `${(g.sessions / maxSessions) * 100}%` }} />
                                                     </div>
-                                                    <span className="text-sm font-medium w-20 text-right">{fmtNum(g.sessions)} <span className="text-xs font-normal text-muted-foreground">sessoes</span></span>
+                                                    <span className="text-sm font-medium w-20 text-right">{fmtNum(g.sessions)} <span className="text-xs font-normal text-muted-foreground">sessões</span></span>
                                                 </div>
                                             </div>
                                         );

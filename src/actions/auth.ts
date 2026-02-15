@@ -19,7 +19,7 @@ export async function registerUser(formData: {
   });
 
   if (existingUser) {
-    return { error: "Este email ja esta em uso." };
+    return { error: "Este email já está em uso." };
   }
 
   // Hash password
@@ -38,7 +38,7 @@ export async function registerUser(formData: {
   const slug = email.split("@")[0].toLowerCase().replace(/[^a-z0-9]/g, "-");
   const organization = await prisma.organization.create({
     data: {
-      name: name ? `${name}'s Organization` : "Minha Organizacao",
+      name: name ? `${name}'s Organization` : "Minha Organização",
       slug: `${slug}-${user.id.slice(0, 6)}`,
     },
   });
@@ -120,7 +120,7 @@ export async function getProfile() {
 
 export async function updateProfile(data: { name: string; email: string }) {
   const session = await auth();
-  if (!session?.user?.id) return { error: "Nao autenticado." };
+  if (!session?.user?.id) return { error: "Não autenticado." };
 
   const nameError = validateName(data.name);
   if (nameError) return { error: nameError };
@@ -131,7 +131,7 @@ export async function updateProfile(data: { name: string; email: string }) {
     const existing = await prisma.user.findUnique({
       where: { email: data.email },
     });
-    if (existing) return { error: "Este email ja esta em uso." };
+    if (existing) return { error: "Este email já está em uso." };
   }
 
   await prisma.user.update({
@@ -147,7 +147,7 @@ export async function changePassword(data: {
   newPassword: string;
 }) {
   const session = await auth();
-  if (!session?.user?.id) return { error: "Nao autenticado." };
+  if (!session?.user?.id) return { error: "Não autenticado." };
 
   const passwordError = validatePassword(data.newPassword);
   if (passwordError) return { error: passwordError };
@@ -157,7 +157,7 @@ export async function changePassword(data: {
   });
 
   if (!user?.hashedPassword) {
-    return { error: "Conta nao possui senha configurada." };
+    return { error: "Conta não possui senha configurada." };
   }
 
   const isValid = await bcrypt.compare(data.currentPassword, user.hashedPassword);

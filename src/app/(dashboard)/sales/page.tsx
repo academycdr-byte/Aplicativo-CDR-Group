@@ -131,7 +131,7 @@ export default function SalesPage() {
         <Card className="transition-shadow hover:shadow-md">
           <CardContent className="pt-5">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-sm text-muted-foreground font-medium">Ticket Medio</p>
+              <p className="text-sm text-muted-foreground font-medium">Ticket Médio</p>
               <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
                 <Receipt className="w-4 h-4 text-primary" />
               </div>
@@ -202,7 +202,7 @@ export default function SalesPage() {
             <div className="h-64 flex items-center justify-center text-muted-foreground text-sm">
               Conecte suas plataformas em{" "}
               <Link href="/integrations" className="text-primary mx-1 hover:underline">
-                Integracoes
+                Integrações
               </Link>{" "}
               para ver os dados de vendas.
             </div>

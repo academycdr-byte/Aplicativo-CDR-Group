@@ -24,11 +24,11 @@ export async function validateCartpandaCredentials(
     );
 
     if (response.status === 401 || response.status === 403) {
-      return { valid: false, error: "Token invalido ou sem permissao. Verifique sua API Key." };
+      return { valid: false, error: "Token inválido ou sem permissão. Verifique sua API Key." };
     }
 
     if (response.status === 404) {
-      return { valid: false, error: "Loja nao encontrada. Verifique o Store ID (Nome da Loja)." };
+      return { valid: false, error: "Loja não encontrada. Verifique o Store ID (Nome da Loja)." };
     }
 
     if (!response.ok) {
@@ -39,7 +39,7 @@ export async function validateCartpandaCredentials(
   } catch (error) {
     return {
       valid: false,
-      error: `Nao foi possivel conectar a Cartpanda: ${error instanceof Error ? error.message : "Erro desconhecido"}`,
+      error: `Não foi possível conectar a Cartpanda: ${error instanceof Error ? error.message : "Erro desconhecido"}`,
     };
   }
 }

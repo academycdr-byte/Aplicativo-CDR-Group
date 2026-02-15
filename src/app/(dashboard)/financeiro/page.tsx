@@ -196,7 +196,7 @@ export default function FinancePage() {
                             subText={`${cogsPct.toFixed(2)}% da receita`}
                         />
                         <FinancialCard
-                            title="Ads (Trafego)"
+                            title="Ads (Tráfego)"
                             value={fmt(metrics.adSpend)}
                             icon={TrendingUp}
                             iconClass="bg-red-500/10 text-red-500"
@@ -272,7 +272,7 @@ export default function FinancePage() {
                             valueClass={metrics.margin >= 0 ? "text-emerald-600" : "text-red-600"}
                         />
                         <FinancialCard
-                            title="Ticket Medio"
+                            title="Ticket Médio"
                             value={fmt(metrics.ticketMedio)}
                             icon={DollarSign}
                             iconClass="bg-sky-500/10 text-sky-500"
@@ -282,7 +282,7 @@ export default function FinancePage() {
 
                     {/* Profit Breakdown Bar */}
                     <Card className="border border-border shadow-none rounded-lg p-4 sm:p-6">
-                        <h3 className="text-sm font-medium text-muted-foreground mb-3 sm:mb-4">Composicao da Receita</h3>
+                        <h3 className="text-sm font-medium text-muted-foreground mb-3 sm:mb-4">Composição da Receita</h3>
                         <div className="w-full h-7 sm:h-8 flex rounded-md overflow-hidden bg-secondary">
                             {cogsPct > 0 && (
                                 <div style={{ width: `${cogsPct}%` }} className="bg-amber-400 h-full flex items-center justify-center text-[9px] sm:text-[10px] font-bold text-white">
@@ -327,7 +327,7 @@ export default function FinancePage() {
                         </div>
                         <div className="flex flex-wrap gap-x-3 gap-y-1.5 mt-3 text-[11px] sm:text-xs text-muted-foreground justify-center">
                             <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-amber-400 rounded-sm" />Produto</div>
-                            <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-red-400 rounded-sm" />Anuncios</div>
+                            <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-red-400 rounded-sm" />Anúncios</div>
                             <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-blue-400 rounded-sm" />Gateway</div>
                             <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-indigo-400 rounded-sm" />Checkout</div>
                             <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-purple-400 rounded-sm" />Impostos</div>
@@ -346,9 +346,9 @@ export default function FinancePage() {
                             />
                         ) : config.cmvMethod === "average" ? (
                             <div className="space-y-3">
-                                <h3 className="text-base sm:text-lg font-medium">Custos (CMV) - Custo Medio</h3>
+                                <h3 className="text-base sm:text-lg font-medium">Custos (CMV) - Custo Médio</h3>
                                 <p className="text-sm text-muted-foreground">
-                                    Metodo ativo: <span className="font-medium text-foreground">Custo Medio por Pedido</span>
+                                    Método ativo: <span className="font-medium text-foreground">Custo Médio por Pedido</span>
                                 </p>
                                 <div className="grid grid-cols-3 gap-3 p-3 sm:p-4 rounded-lg border border-blue-500/20 bg-blue-500/5">
                                     <div className="text-center">
@@ -365,7 +365,7 @@ export default function FinancePage() {
                                     </div>
                                 </div>
                                 <p className="text-xs text-muted-foreground">
-                                    Para alterar o valor medio, acesse &quot;Configurar Taxas&quot; acima.
+                                    Para alterar o valor médio, acesse &quot;Configurar Taxas&quot; acima.
                                 </p>
                             </div>
                         ) : (

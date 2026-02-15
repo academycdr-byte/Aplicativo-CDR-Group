@@ -7,12 +7,12 @@ import { prisma } from "@/lib/prisma";
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
+    return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
   }
 
   const organizationId = session.user.organizationId;
   if (!organizationId) {
-    return NextResponse.json({ error: "Organizacao nao encontrada" }, { status: 403 });
+    return NextResponse.json({ error: "Organização não encontrada" }, { status: 403 });
   }
 
   const membership = await prisma.membership.findFirst({

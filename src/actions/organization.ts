@@ -16,10 +16,10 @@ export async function getOrganization() {
 
 export async function updateOrganization(data: { name: string; slug: string }) {
   const ctx = await getSessionWithOrg();
-  if (!ctx) return { error: "Nao autenticado." };
+  if (!ctx) return { error: "Não autenticado." };
 
   if (ctx.role !== "OWNER" && ctx.role !== "ADMIN") {
-    return { error: "Voce nao tem permissao para editar a organizacao." };
+    return { error: "Você não tem permissão para editar a organização." };
   }
 
   const slug = data.slug.toLowerCase().replace(/[^a-z0-9-]/g, "-");
@@ -29,7 +29,7 @@ export async function updateOrganization(data: { name: string; slug: string }) {
   });
 
   if (existingSlug) {
-    return { error: "Este slug ja esta em uso." };
+    return { error: "Este slug já está em uso." };
   }
 
   await prisma.organization.update({
@@ -66,10 +66,10 @@ export async function getMembers() {
 
 export async function inviteMember(data: { email: string; role: UserRole }) {
   const ctx = await getSessionWithOrg();
-  if (!ctx) return { error: "Nao autenticado." };
+  if (!ctx) return { error: "Não autenticado." };
 
   if (ctx.role !== "OWNER" && ctx.role !== "ADMIN") {
-    return { error: "Voce nao tem permissao para convidar membros." };
+    return { error: "Você não tem permissão para convidar membros." };
   }
 
   // Check if user exists
@@ -78,7 +78,7 @@ export async function inviteMember(data: { email: string; role: UserRole }) {
   });
 
   if (!user) {
-    return { error: "Usuario nao encontrado. O usuario precisa criar uma conta primeiro." };
+    return { error: "Usuário não encontrado. O usuário precisa criar uma conta primeiro." };
   }
 
   // Check if already a member
@@ -92,12 +92,12 @@ export async function inviteMember(data: { email: string; role: UserRole }) {
   });
 
   if (existingMembership) {
-    return { error: "Este usuario ja e membro da organizacao." };
+    return { error: "Este usuário já é membro da organização." };
   }
 
   // Prevent assigning OWNER role
   if (data.role === "OWNER") {
-    return { error: "Nao e possivel convidar como proprietario." };
+    return { error: "Não é possível convidar como proprietário." };
   }
 
   await prisma.membership.create({
@@ -113,10 +113,10 @@ export async function inviteMember(data: { email: string; role: UserRole }) {
 
 export async function updateMemberRole(data: { membershipId: string; role: UserRole }) {
   const ctx = await getSessionWithOrg();
-  if (!ctx) return { error: "Nao autenticado." };
+  if (!ctx) return { error: "Não autenticado." };
 
   if (ctx.role !== "OWNER") {
-    return { error: "Apenas o proprietario pode alterar funcoes." };
+    return { error: "Apenas o proprietário pode alterar funções." };
   }
 
   const membership = await prisma.membership.findUnique({
@@ -124,15 +124,15 @@ export async function updateMemberRole(data: { membershipId: string; role: UserR
   });
 
   if (!membership || membership.organizationId !== ctx.organization.id) {
-    return { error: "Membro nao encontrado." };
+    return { error: "Membro não encontrado." };
   }
 
   if (membership.role === "OWNER") {
-    return { error: "Nao e possivel alterar a funcao do proprietario." };
+    return { error: "Não é possível alterar a função do proprietário." };
   }
 
   if (data.role === "OWNER") {
-    return { error: "Nao e possivel promover a proprietario." };
+    return { error: "Não é possível promover a proprietário." };
   }
 
   await prisma.membership.update({
@@ -145,10 +145,10 @@ export async function updateMemberRole(data: { membershipId: string; role: UserR
 
 export async function removeMember(membershipId: string) {
   const ctx = await getSessionWithOrg();
-  if (!ctx) return { error: "Nao autenticado." };
+  if (!ctx) return { error: "Não autenticado." };
 
   if (ctx.role !== "OWNER" && ctx.role !== "ADMIN") {
-    return { error: "Voce nao tem permissao para remover membros." };
+    return { error: "Você não tem permissão para remover membros." };
   }
 
   const membership = await prisma.membership.findUnique({
@@ -156,11 +156,11 @@ export async function removeMember(membershipId: string) {
   });
 
   if (!membership || membership.organizationId !== ctx.organization.id) {
-    return { error: "Membro nao encontrado." };
+    return { error: "Membro não encontrado." };
   }
 
   if (membership.role === "OWNER") {
-    return { error: "Nao e possivel remover o proprietario." };
+    return { error: "Não é possível remover o proprietário." };
   }
 
   await prisma.membership.delete({

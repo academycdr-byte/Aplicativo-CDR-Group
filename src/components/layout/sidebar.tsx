@@ -74,7 +74,7 @@ export function Sidebar() {
 
     const platformNavItems: NavItem[] = [
       { name: "Mais Vendidos", href: "/best-sellers", icon: ShoppingBag },
-      { name: "Anuncios", href: "/ads", icon: Megaphone },
+      { name: "Anúncios", href: "/ads", icon: Megaphone },
       { name: "Financeiro", href: "/financeiro", icon: Wallet },
       { name: "Analytics", href: "/analytics", icon: BarChart3 },
       { name: "Relatórios", href: "/reports", icon: FileText },

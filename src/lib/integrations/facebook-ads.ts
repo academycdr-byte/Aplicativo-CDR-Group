@@ -44,7 +44,7 @@ async function refreshFacebookToken(integrationId: string): Promise<string> {
 }
 
 /**
- * Busca thumbnails dos criativos dos anuncios.
+ * Busca thumbnails dos criativos dos anúncios.
  */
 async function fetchAdThumbnails(
   adIds: string[],
@@ -83,7 +83,7 @@ async function fetchAdThumbnails(
 }
 
 /**
- * Busca URLs de videos dos criativos dos anuncios.
+ * Busca URLs de vídeos dos criativos dos anúncios.
  * Retorna um mapa de adId -> videoUrl
  */
 async function fetchAdVideoUrls(
@@ -696,7 +696,7 @@ export async function syncFacebookAdsMetrics(
 
 export function getFacebookAuthUrl(state: string) {
   const clientId = process.env.FACEBOOK_APP_ID?.trim();
-  if (!clientId) throw new Error("FACEBOOK_APP_ID nao configurado");
+  if (!clientId) throw new Error("FACEBOOK_APP_ID não configurado");
 
   const scopes = "ads_read,ads_management,business_management";
 
@@ -708,7 +708,7 @@ export async function exchangeFacebookToken(code: string) {
   const clientSecret = process.env.FACEBOOK_APP_SECRET?.trim();
 
   if (!clientId || !clientSecret) {
-    throw new Error("FACEBOOK_APP_ID ou FACEBOOK_APP_SECRET nao configurado");
+    throw new Error("FACEBOOK_APP_ID ou FACEBOOK_APP_SECRET não configurado");
   }
 
   const response = await fetch(

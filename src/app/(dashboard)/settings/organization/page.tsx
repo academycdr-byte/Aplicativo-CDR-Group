@@ -42,7 +42,7 @@ type Member = {
 };
 
 const roleLabels: Record<string, string> = {
-  OWNER: "Proprietario",
+  OWNER: "Proprietário",
   ADMIN: "Administrador",
   MEMBER: "Membro",
   CLIENT: "Cliente",
@@ -91,7 +91,7 @@ export default function OrganizationPage() {
     if (result.error) {
       setOrgMsg(result.error);
     } else {
-      setOrgMsg("Organizacao atualizada com sucesso!");
+      setOrgMsg("Organização atualizada com sucesso!");
     }
     setLoading(false);
   }
@@ -122,7 +122,7 @@ export default function OrganizationPage() {
     if (result.error) {
       toast.error(result.error);
     } else {
-      toast.success("Funcao atualizada!");
+      toast.success("Função atualizada!");
       loadData();
     }
   }
@@ -143,17 +143,17 @@ export default function OrganizationPage() {
   return (
     <div className="space-y-6 max-w-3xl animate-in fade-in duration-500">
       <div>
-        <h2 className="text-2xl font-bold tracking-tight">Organizacao</h2>
+        <h2 className="text-2xl font-bold tracking-tight">Organização</h2>
         <p className="text-muted-foreground text-sm mt-1">
-          Gerencie sua organizacao e equipe.
+          Gerencie sua organização e equipe.
         </p>
       </div>
 
       {/* Organization Info */}
       <Card>
         <CardHeader>
-          <CardTitle>Dados da organizacao</CardTitle>
-          <CardDescription>Nome e identificador da sua organizacao.</CardDescription>
+          <CardTitle>Dados da organização</CardTitle>
+          <CardDescription>Nome e identificador da sua organização.</CardDescription>
         </CardHeader>
         <CardContent>
           {orgMsg && (
@@ -163,7 +163,7 @@ export default function OrganizationPage() {
           )}
           <form onSubmit={handleOrgSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="orgName">Nome da organizacao</Label>
+              <Label htmlFor="orgName">Nome da organização</Label>
               <Input
                 id="orgName"
                 value={orgName}
@@ -172,7 +172,7 @@ export default function OrganizationPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="orgSlug">Slug (identificador unico)</Label>
+              <Label htmlFor="orgSlug">Slug (identificador único)</Label>
               <Input
                 id="orgSlug"
                 value={orgSlug}
@@ -180,7 +180,7 @@ export default function OrganizationPage() {
                 disabled={!isOwnerOrAdmin}
               />
               <p className="text-xs text-muted-foreground">
-                Usado na URL. Apenas letras minusculas, numeros e hifens.
+                Usado na URL. Apenas letras minúsculas, números e hifens.
               </p>
             </div>
             {isOwnerOrAdmin && (
@@ -197,7 +197,7 @@ export default function OrganizationPage() {
         <CardHeader>
           <CardTitle>Membros da equipe</CardTitle>
           <CardDescription>
-            Gerencie quem tem acesso a esta organizacao.
+            Gerencie quem tem acesso a esta organização.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -211,7 +211,7 @@ export default function OrganizationPage() {
               )}
               <form onSubmit={handleInvite} className="flex gap-3 items-end flex-wrap">
                 <div className="flex-1 min-w-[200px] space-y-2">
-                  <Label htmlFor="inviteEmail">Email do usuario</Label>
+                  <Label htmlFor="inviteEmail">Email do usuário</Label>
                   <Input
                     id="inviteEmail"
                     type="email"
@@ -222,7 +222,7 @@ export default function OrganizationPage() {
                   />
                 </div>
                 <div className="w-40 space-y-2">
-                  <Label>Funcao</Label>
+                  <Label>Função</Label>
                   <Select value={inviteRole} onValueChange={setInviteRole}>
                     <SelectTrigger>
                       <SelectValue />
@@ -248,8 +248,8 @@ export default function OrganizationPage() {
               <TableRow>
                 <TableHead scope="col">Nome</TableHead>
                 <TableHead scope="col">Email</TableHead>
-                <TableHead scope="col">Funcao</TableHead>
-                {isOwnerOrAdmin && <TableHead scope="col" className="w-[80px]">Acoes</TableHead>}
+                <TableHead scope="col">Função</TableHead>
+                {isOwnerOrAdmin && <TableHead scope="col" className="w-[80px]">Ações</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>

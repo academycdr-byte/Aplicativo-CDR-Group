@@ -123,7 +123,7 @@ export function FinancialEntryTable({
             return;
         }
 
-        toast.success("Lancamento registrado com sucesso!");
+        toast.success("Lançamento registrado com sucesso!");
         setIsDialogOpen(false);
         setNewEntry({
             type: "cost",
@@ -145,24 +145,24 @@ export function FinancialEntryTable({
             return;
         }
 
-        toast.success("Lancamento removido");
+        toast.success("Lançamento removido");
         onUpdate?.();
     };
 
     return (
         <div className="space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <h3 className="text-base sm:text-lg font-medium">Lancamentos Manuais</h3>
+                <h3 className="text-base sm:text-lg font-medium">Lançamentos Manuais</h3>
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                     <DialogTrigger asChild>
                         <Button size="sm">
                             <Plus className="w-4 h-4 mr-2" />
-                            Novo Lancamento
+                            Novo Lançamento
                         </Button>
                     </DialogTrigger>
                     <DialogContent>
                         <DialogHeader>
-                            <DialogTitle>Novo Lancamento</DialogTitle>
+                            <DialogTitle>Novo Lançamento</DialogTitle>
                             <DialogDescription>
                                 Registre um custo avulso ou uma receita extra.
                             </DialogDescription>
@@ -249,7 +249,7 @@ export function FinancialEntryTable({
 
                             {/* Description */}
                             <div className="space-y-2">
-                                <Label htmlFor="entryDesc">Descricao (opcional)</Label>
+                                <Label htmlFor="entryDesc">Descrição (opcional)</Label>
                                 <Input
                                     id="entryDesc"
                                     value={newEntry.description}
@@ -310,7 +310,7 @@ export function FinancialEntryTable({
             <div className="space-y-2 sm:hidden">
                 {filteredEntries.length === 0 ? (
                     <div className="text-center py-8 text-sm text-muted-foreground border border-dashed rounded-lg">
-                        Nenhum lancamento registrado no periodo.
+                        Nenhum lançamento registrado no período.
                     </div>
                 ) : (
                     filteredEntries.map((entry) => (
@@ -364,7 +364,7 @@ export function FinancialEntryTable({
                             <TableHead scope="col">Data</TableHead>
                             <TableHead scope="col">Tipo</TableHead>
                             <TableHead scope="col">Categoria</TableHead>
-                            <TableHead scope="col">Descricao</TableHead>
+                            <TableHead scope="col">Descrição</TableHead>
                             <TableHead scope="col" className="text-right">Valor</TableHead>
                             <TableHead scope="col" className="w-[60px]"><span className="sr-only">Ações</span></TableHead>
                         </TableRow>
@@ -409,7 +409,7 @@ export function FinancialEntryTable({
                         {filteredEntries.length === 0 && (
                             <TableRow>
                                 <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                                    Nenhum lancamento registrado no periodo. Clique em &quot;Novo Lancamento&quot; para adicionar.
+                                    Nenhum lançamento registrado no período. Clique em &quot;Novo Lançamento&quot; para adicionar.
                                 </TableCell>
                             </TableRow>
                         )}

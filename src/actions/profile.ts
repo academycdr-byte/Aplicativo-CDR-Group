@@ -9,14 +9,14 @@ export async function updateProfile(data: {
   email: string;
 }) {
   const session = await getSession();
-  if (!session) return { error: "Nao autenticado." };
+  if (!session) return { error: "Não autenticado." };
 
   const existing = await prisma.user.findFirst({
     where: { email: data.email, NOT: { id: session.user.id } },
   });
 
   if (existing) {
-    return { error: "Este email ja esta em uso por outro usuario." };
+    return { error: "Este email já está em uso por outro usuário." };
   }
 
   await prisma.user.update({
@@ -32,14 +32,14 @@ export async function updatePassword(data: {
   newPassword: string;
 }) {
   const session = await getSession();
-  if (!session) return { error: "Nao autenticado." };
+  if (!session) return { error: "Não autenticado." };
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
   });
 
   if (!user || !user.hashedPassword) {
-    return { error: "Usuario nao encontrado." };
+    return { error: "Usuário não encontrado." };
   }
 
   const passwordMatch = await bcrypt.compare(data.currentPassword, user.hashedPassword);

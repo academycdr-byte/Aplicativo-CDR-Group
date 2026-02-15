@@ -129,7 +129,7 @@ export default function ProfilePage() {
     setPasswordMsg("");
 
     if (newPassword !== confirmPassword) {
-      setPasswordMsg("As senhas nao coincidem.");
+      setPasswordMsg("As senhas não coincidem.");
       return;
     }
 
@@ -161,7 +161,7 @@ export default function ProfilePage() {
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Meu Perfil</h2>
         <p className="text-muted-foreground text-sm mt-1">
-          Gerencie suas informacoes pessoais e senha.
+          Gerencie suas informações pessoais e senha.
         </p>
       </div>
 
@@ -232,7 +232,7 @@ export default function ProfilePage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Informacoes pessoais</CardTitle>
+          <CardTitle>Informações pessoais</CardTitle>
           <CardDescription>Atualize seu nome e email.</CardDescription>
         </CardHeader>
         <CardContent>
@@ -277,7 +277,7 @@ export default function ProfilePage() {
         <CardHeader>
           <CardTitle>Alterar senha</CardTitle>
           <CardDescription>
-            Para sua seguranca, informe a senha atual antes de definir uma nova.
+            Para sua segurança, informe a senha atual antes de definir uma nova.
           </CardDescription>
         </CardHeader>
         <CardContent>

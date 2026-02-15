@@ -67,11 +67,11 @@ export function AdsFilter({ onSearchChange, onExcludeChange, className }: AdsFil
                 <div className="relative flex-1">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
-                        placeholder="Buscar por titulo do anuncio..."
+                        placeholder="Buscar por título do anúncio..."
                         value={searchValue}
                         onChange={(e) => setSearchValue(e.target.value)}
                         className="pl-9 bg-card/50"
-                        aria-label="Buscar por titulo do anuncio"
+                        aria-label="Buscar por título do anúncio"
                     />
                 </div>
 
@@ -80,7 +80,7 @@ export function AdsFilter({ onSearchChange, onExcludeChange, className }: AdsFil
                     <div className="relative">
                         <FilterX className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
-                            placeholder="Excluir por titulo (ex: Catalog)..."
+                            placeholder="Excluir por título (ex: Catalog)..."
                             value={excludeInputValue}
                             onChange={(e) => setExcludeInputValue(e.target.value)}
                             onKeyDown={handleKeyDown}
@@ -89,7 +89,7 @@ export function AdsFilter({ onSearchChange, onExcludeChange, className }: AdsFil
                                 // Better to require Enter or explicit action to avoid accidental filters
                             }}
                             className="pl-9 bg-card/50 pr-12"
-                            aria-label="Excluir anuncios por titulo"
+                            aria-label="Excluir anúncios por título"
                         />
                         <Button
                             size="icon"
@@ -97,7 +97,7 @@ export function AdsFilter({ onSearchChange, onExcludeChange, className }: AdsFil
                             className="absolute right-1 top-1 h-7 w-7"
                             onClick={handleAddExclude}
                             disabled={!excludeInputValue.trim()}
-                            aria-label="Adicionar termo de exclusao"
+                            aria-label="Adicionar termo de exclusão"
                         >
                             <Plus className="h-4 w-4" />
                         </Button>
@@ -115,7 +115,7 @@ export function AdsFilter({ onSearchChange, onExcludeChange, className }: AdsFil
                             <button
                                 onClick={() => handleRemoveExclude(term)}
                                 className="ml-1 hover:bg-background/20 rounded-full p-0.5"
-                                aria-label={`Remover exclusao: ${term}`}
+                                aria-label={`Remover exclusão: ${term}`}
                             >
                                 <X className="h-3 w-3 text-[#aaff00]" />
                             </button>
