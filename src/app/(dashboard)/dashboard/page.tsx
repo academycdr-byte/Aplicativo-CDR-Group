@@ -177,8 +177,10 @@ export default function DashboardPage() {
 
   // Auto-sync + refresh for ALL periods (adaptive interval)
   useEffect(() => {
+    let cancelled = false;
+
     const isYesterday = period.type === "preset" && period.days === -1;
-    if (isYesterday) return; // Yesterday data doesn't change
+    if (isYesterday) return () => { cancelled = true; };
 
     // Adaptive interval based on period
     let intervalMs: number;
@@ -194,19 +196,24 @@ export default function DashboardPage() {
 
     // Initial sync when mounting or changing period
     syncRecent().then(() => {
+      if (cancelled) return;
       loadData(true);
-      getLastSyncTime().then((r) => setLastSyncAt(r.lastSyncAt));
+      getLastSyncTime().then((r) => { if (!cancelled) setLastSyncAt(r.lastSyncAt); });
     });
 
     // Auto-refresh at adaptive interval
     const intervalId = setInterval(() => {
       syncRecent().then(() => {
+        if (cancelled) return;
         loadData(true);
-        getLastSyncTime().then((r) => setLastSyncAt(r.lastSyncAt));
+        getLastSyncTime().then((r) => { if (!cancelled) setLastSyncAt(r.lastSyncAt); });
       });
     }, intervalMs);
 
-    return () => clearInterval(intervalId);
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+    };
   }, [period, loadData]);
 
   async function handleSync() {
