@@ -13,6 +13,7 @@ import {
   BarChart3,
   Settings,
   Wallet,
+  Calculator,
   ChevronRight,
   type LucideIcon
 } from "lucide-react";
@@ -56,6 +57,7 @@ export function MobileSidebar() {
     { name: "Mais Vendidos", href: "/best-sellers", icon: ShoppingBag },
     { name: "Anúncios", href: "/ads", icon: Megaphone },
     { name: "Financeiro", href: "/financeiro", icon: Wallet },
+    { name: "Simulador", href: "/dre-performance", icon: Calculator },
     { name: "Analytics", href: "/analytics", icon: BarChart3 },
   ];
 
