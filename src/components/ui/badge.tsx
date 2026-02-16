@@ -5,7 +5,7 @@ import { Slot } from "radix-ui"
 import { cn } from "@/lib/utils"
 
 const badgeVariants = cva(
-  "inline-flex items-center justify-center rounded-full border px-2.5 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1 [&>svg]:pointer-events-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive transition-all duration-200 ease-out overflow-hidden",
+  "inline-flex items-center justify-center rounded-full border px-2.5 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1 [&>svg]:pointer-events-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive transition-all duration-300 ease-apple overflow-hidden",
   {
     variants: {
       variant: {
@@ -18,9 +18,11 @@ const badgeVariants = cva(
           "border-border/50 text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
         ghost: "border-transparent [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
         link: "text-primary underline-offset-4 [a&]:hover:underline",
-        // Apple HIG variants
-        glass: "border-white/20 bg-white/10 text-white backdrop-blur-md shadow-sm [a&]:hover:bg-white/20",
+        // Academia Lendaria variants
+        glass: "border-border bg-surface-glass text-foreground dark:text-white backdrop-blur-md shadow-sm [a&]:hover:bg-surface-active",
         soft: "border-primary/20 bg-primary/10 text-primary [a&]:hover:bg-primary/20",
+        success: "border-transparent bg-success/10 text-success [a&]:hover:bg-success/20",
+        warning: "border-transparent bg-warning/10 text-warning [a&]:hover:bg-warning/20",
       },
     },
     defaultVariants: {

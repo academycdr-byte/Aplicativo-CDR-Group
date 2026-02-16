@@ -5,25 +5,25 @@ import { Slot } from "@radix-ui/react-slot"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive active:scale-[0.98] duration-200 ease-out",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive active:scale-[0.98] duration-300 ease-apple",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-md hover:shadow-lg border border-transparent",
+        default: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-[var(--shadow-sm)] hover:shadow-[var(--shadow-md)] border border-transparent",
         destructive:
           "bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/80 shadow-sm",
         outline:
-          "border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-zinc-900/50 dark:border-white/10 dark:hover:bg-white/10 backdrop-blur-sm",
+          "border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-surface-glass dark:border-border dark:hover:bg-surface-active backdrop-blur-sm",
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-transparent",
         ghost:
-          "hover:bg-accent hover:text-accent-foreground dark:hover:bg-white/10",
+          "hover:bg-accent hover:text-accent-foreground dark:hover:bg-surface-hover",
         link: "text-primary underline-offset-4 hover:underline",
-        // Apple specific variants
-        glass: "bg-white/10 backdrop-blur-md border border-white/20 text-white hover:bg-white/20 shadow-sm",
+        // Academia Lendaria glass variant
+        glass: "bg-surface-glass backdrop-blur-xl border border-border text-foreground dark:text-white hover:bg-surface-active shadow-[var(--shadow-glass)]",
       },
       size: {
-        default: "h-[44px] px-5 py-2 has-[>svg]:px-4 text-[15px]", // Apple minimum touch target 44px
+        default: "h-[44px] px-5 py-2 has-[>svg]:px-4 text-[15px]",
         xs: "h-7 gap-1 rounded-md px-2 text-xs has-[>svg]:px-1.5 [&_svg:not([class*='size-'])]:size-3",
         sm: "h-9 rounded-lg gap-1.5 px-3 has-[>svg]:px-2.5 text-xs",
         lg: "h-12 rounded-xl px-8 has-[>svg]:px-6 text-base",
@@ -35,7 +35,9 @@ const buttonVariants = cva(
       radius: {
         default: "rounded-2xl",
         full: "rounded-full",
+        pill: "rounded-[200px]",
         sm: "rounded-lg",
+        md: "rounded-xl",
       }
     },
     defaultVariants: {

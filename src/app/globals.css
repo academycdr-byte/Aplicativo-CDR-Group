@@ -4,26 +4,43 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ============================================================================
+   ACADEMIA LENDARIA DESIGN SYSTEM
+   Glassmorphism + Premium Dark + Apple HIG
+   Paleta: CDR Green (mantida)
+   ============================================================================ */
+
 :root {
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 
-  /* Apple HIG Radius - 16px default for cards */
+  /* === BORDER RADIUS (Academia Lendaria Scale) === */
   --radius: 1rem;
+  --radius-pill: 200px;
+  --radius-circle: 50%;
 
-  /* Apple HIG Typography Scale */
-  --text-large-title: 2.125rem;
-  --text-title-1: 1.75rem;
-  --text-title-2: 1.375rem;
-  --text-title-3: 1.25rem;
-  --text-headline: 1.0625rem;
-  --text-body: 1.0625rem;
-  --text-callout: 1rem;
-  --text-subheadline: 0.9375rem;
-  --text-footnote: 0.8125rem;
-  --text-caption-1: 0.75rem;
-  --text-caption-2: 0.6875rem;
+  /* === TIPOGRAFIA (Academia Lendaria Scale) ===
+     Extraido pixel-perfect de academialendaria.ai */
+  --text-hero: 4rem;          /* 64px - hero display */
+  --text-hero-sub: 3rem;      /* 48px - hero headline */
+  --text-large-title: 3.5rem; /* 56px - titulos de secao h2 */
+  --text-title-1: 2rem;       /* 32px - h3, cards, features */
+  --text-title-2: 1.5rem;     /* 24px - sub-headings */
+  --text-title-3: 1.25rem;    /* 20px */
+  --text-headline: 1.125rem;  /* 18px - body large */
+  --text-body: 1rem;          /* 16px - body text */
+  --text-subheadline: 0.875rem; /* 14px - captions, sidebar */
+  --text-footnote: 0.8125rem; /* 13px */
+  --text-caption-1: 0.75rem;  /* 12px - nav links, small */
+  --text-caption-2: 0.6875rem; /* 11px - section labels */
 
-  /* Apple Semantic Colors */
+  /* === LETTER SPACING (Academia Precision) === */
+  --tracking-tight: -0.02em;  /* headings */
+  --tracking-tighter: -0.03em; /* large titles */
+  --tracking-wide: 0.05em;    /* section labels */
+  --tracking-widest: 0.1em;   /* uppercase labels */
+
+  /* === APPLE SEMANTIC COLORS (mantidos) === */
   --system-blue: oklch(0.59 0.2 260);
   --system-green: oklch(0.62 0.19 145);
   --system-orange: oklch(0.75 0.17 55);
@@ -37,7 +54,7 @@
   --system-gray5: oklch(0.92 0 0);
   --system-gray6: oklch(0.97 0 0);
 
-  /* Light Mode - Clean, Neutral, Apple-like */
+  /* === LIGHT MODE - Clean, Neutral, Apple-like === */
   --background: oklch(0.985 0.001 0);
   --foreground: oklch(0.14 0.005 0);
 
@@ -90,29 +107,44 @@
   --sidebar-accent: oklch(0.96 0.005 0);
   --sidebar-accent-foreground: oklch(0.2 0.005 0);
   --sidebar-ring: oklch(0.53 0.2 142);
+
+  /* === SURFACES (Light Mode) === */
+  --surface-hover: rgba(0, 0, 0, 0.03);
+  --surface-elevated: rgba(0, 0, 0, 0.02);
+  --surface-glass: rgba(255, 255, 255, 0.8);
+  --surface-active: rgba(0, 0, 0, 0.05);
+
+  /* === SHADOWS (Light Mode) === */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  --shadow-floating: 0 12px 32px rgba(0, 0, 0, 0.12);
+  --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.06);
 }
 
 .dark {
-  /* Dark Mode - Refined Green, less neon */
-  --background: oklch(0.145 0.015 150);
+  /* === DARK MODE - Academia Lendaria Premium Dark === */
+  --background: oklch(0.06 0.01 150);
   --foreground: oklch(0.95 0 0);
 
-  --card: oklch(0.185 0.02 150);
+  --card: oklch(0.15 0.015 150);
   --card-foreground: oklch(0.95 0 0);
 
-  --popover: oklch(0.185 0.02 150);
+  --popover: oklch(0.15 0.015 150);
   --popover-foreground: oklch(0.95 0 0);
 
   --primary: oklch(0.72 0.17 148);
-  --primary-foreground: oklch(0.13 0.015 150);
+  --primary-foreground: oklch(0.08 0.01 150);
 
-  --secondary: oklch(0.23 0.02 150);
+  --secondary: oklch(0.16 0.015 150);
   --secondary-foreground: oklch(0.95 0 0);
 
-  --muted: oklch(0.23 0.02 150);
+  --muted: oklch(0.16 0.015 150);
   --muted-foreground: oklch(0.65 0.01 0);
 
-  --accent: oklch(0.23 0.02 150);
+  --accent: oklch(0.16 0.015 150);
   --accent-foreground: oklch(0.95 0 0);
 
   --destructive: oklch(0.63 0.22 25);
@@ -132,20 +164,43 @@
   --chart-4: oklch(0.75 0.15 110);
   --chart-5: oklch(0.48 0.1 160);
 
-  /* Sidebar Dark */
-  --sidebar-bg: oklch(0.12 0.02 150);
-  --sidebar-text: oklch(0.85 0.01 0);
-  --sidebar-hover: oklch(0.22 0.02 150);
-  --sidebar-active: oklch(0.22 0.02 150);
+  /* Sidebar Dark - Deeper than background (Academia) */
+  --sidebar-bg: oklch(0.04 0.01 150);
+  --sidebar-text: oklch(0.72 0.01 0);
+  --sidebar-hover: oklch(1 0 0 / 0.04);
+  --sidebar-active: oklch(1 0 0 / 0.06);
   --sidebar-border: oklch(1 0 0 / 0.06);
 
-  --sidebar: oklch(0.16 0.02 150);
+  --sidebar: oklch(0.06 0.01 150);
   --sidebar-foreground: oklch(0.95 0 0);
   --sidebar-primary: oklch(0.72 0.17 148);
-  --sidebar-primary-foreground: oklch(0.13 0.015 150);
-  --sidebar-accent: oklch(0.23 0.02 150);
+  --sidebar-primary-foreground: oklch(0.06 0.01 150);
+  --sidebar-accent: oklch(0.16 0.015 150);
   --sidebar-accent-foreground: oklch(0.95 0 0);
   --sidebar-ring: oklch(0.72 0.17 148);
+
+  /* === SURFACES (Academia Lendaria - rgba sobre escuro) === */
+  --surface-hover: rgba(255, 255, 255, 0.04);
+  --surface-elevated: rgba(255, 255, 255, 0.05);
+  --surface-glass: rgba(255, 255, 255, 0.08);
+  --surface-active: rgba(255, 255, 255, 0.1);
+  --surface-button: rgba(255, 255, 255, 0.12);
+
+  /* === BORDERS (Academia Lendaria) === */
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-glass: rgba(255, 255, 255, 0.08);
+  --border-default: rgba(255, 255, 255, 0.1);
+  --border-visible: rgba(255, 255, 255, 0.16);
+
+  /* === SHADOWS (Dark Mode - deeper) === */
+  --shadow-xs: none;
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6);
+  --shadow-xl: 0 20px 48px rgba(0, 0, 0, 0.7);
+  --shadow-floating: 0 16px 48px rgba(0, 0, 0, 0.5);
+  --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.3);
+  --shadow-glow: 0 0 24px oklch(0.72 0.17 148 / 0.15);
 }
 
 @theme inline {
@@ -205,34 +260,70 @@
   --color-system-yellow: var(--system-yellow);
   --color-system-purple: var(--system-purple);
 
-  /* Apple Easing */
+  /* Surface Colors */
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-surface-glass: var(--surface-glass);
+  --color-surface-active: var(--surface-active);
+
+  /* Easing (Academia Lendaria Motion) */
   --ease-apple: cubic-bezier(0.25, 0.1, 0.25, 1);
   --ease-apple-fast: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-smooth: cubic-bezier(0, 0, 0.2, 1);
   --spring-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
 
   --animate-accordion-down: accordion-down 0.2s ease-out;
   --animate-accordion-up: accordion-up 0.2s ease-out;
+  --animate-fade-in: fade-in 0.5s var(--ease-smooth);
+  --animate-slide-up: slide-up 0.6s var(--ease-smooth);
+  --animate-slide-down: slide-down 0.4s var(--ease-smooth);
+  --animate-scale-in: scale-in 0.3s var(--spring-bounce);
+  --animate-glow-pulse: glow-pulse 3s ease-in-out infinite;
 
   @keyframes accordion-down {
-    from {
-      height: 0;
-    }
-
-    to {
-      height: var(--radix-accordion-content-height);
-    }
+    from { height: 0; }
+    to { height: var(--radix-accordion-content-height); }
   }
 
   @keyframes accordion-up {
-    from {
-      height: var(--radix-accordion-content-height);
-    }
+    from { height: var(--radix-accordion-content-height); }
+    to { height: 0; }
+  }
 
-    to {
-      height: 0;
-    }
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slide-up {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes slide-down {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes scale-in {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  @keyframes glow-pulse {
+    0%, 100% { box-shadow: 0 0 20px oklch(0.72 0.17 148 / 0.1); }
+    50% { box-shadow: 0 0 30px oklch(0.72 0.17 148 / 0.2); }
+  }
+
+  @keyframes scroll-infinite {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
   }
 }
+
+/* ============================================================================
+   BASE LAYER
+   ============================================================================ */
 
 @layer base {
   * {
@@ -242,35 +333,313 @@
   body {
     @apply bg-background text-foreground antialiased selection:bg-primary/20 selection:text-foreground;
     font-feature-settings: "ss01", "ss02", "cv01", "cv02";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* === TIPOGRAFIA HEADINGS (Academia Lendaria Scale) === */
+  h1 {
+    font-size: var(--text-title-1);
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: var(--tracking-tight);
+  }
+
+  h2 {
+    font-size: var(--text-title-2);
+    font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: var(--tracking-tight);
+  }
+
+  h3 {
+    font-size: var(--text-title-3);
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  h4 {
+    font-size: var(--text-headline);
+    font-weight: 600;
+    line-height: 1.4;
   }
 }
 
-/* Utilities */
+/* ============================================================================
+   COMPONENT LAYER - Academia Lendaria Design System
+   ============================================================================ */
+
 @layer components {
 
-  /* Apple Glassmorphism */
+  /* === GLASSMORPHISM (Core Academy Effect) === */
   .glass {
-    @apply bg-card/70 backdrop-blur-xl border border-white/10 shadow-lg;
+    background: var(--surface-glass);
+    backdrop-filter: blur(12px) saturate(1.8);
+    -webkit-backdrop-filter: blur(12px) saturate(1.8);
+    border: 1px solid var(--border);
   }
 
-  .glass-dark {
-    @apply bg-zinc-900/70 backdrop-blur-xl border border-white/5 shadow-lg;
+  .glass-heavy {
+    background: var(--surface-glass);
+    backdrop-filter: blur(24px) saturate(2.2);
+    -webkit-backdrop-filter: blur(24px) saturate(2.2);
+    border: 1px solid var(--border);
   }
 
-  /* Smooth transitions */
+  .glass-card {
+    background: var(--surface-glass);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+  }
+
+  .glass-subtle {
+    background: var(--surface-elevated);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid var(--border);
+  }
+
+  /* === SURFACE SYSTEM === */
+  .surface-elevated {
+    background: var(--surface-elevated);
+  }
+
+  .surface-hover {
+    @apply transition-all duration-300;
+  }
+  .surface-hover:hover {
+    background: var(--surface-hover);
+  }
+
+  .surface-active {
+    background: var(--surface-active);
+  }
+
+  /* === CARD VARIANTS (Academia Premium) === */
+  .card-premium {
+    @apply bg-card border border-border/20 shadow-sm;
+    border-radius: 16px;
+    transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+  }
+  .card-premium:hover {
+    border-color: var(--primary);
+    box-shadow: var(--shadow-md);
+  }
+
+  .card-glass {
+    background: var(--surface-glass);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    transition: all 0.44s cubic-bezier(0.25, 0.1, 0.25, 1);
+  }
+  .card-glass:hover {
+    background: var(--surface-active);
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+
+  /* === BUTTON VARIANTS (Academia Style) === */
+  .btn-glass {
+    background: var(--surface-glass);
+    backdrop-filter: blur(24px) saturate(2.2);
+    -webkit-backdrop-filter: blur(24px) saturate(2.2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 24px;
+    font-weight: 600;
+    transition: transform 0.44s cubic-bezier(0.25, 0.1, 0.25, 1),
+                border-color 0.8s cubic-bezier(0.25, 0.1, 0.25, 1),
+                background 0.4s cubic-bezier(0.25, 0.1, 0.25, 1);
+  }
+  .btn-glass:hover {
+    background: var(--surface-active);
+    transform: translateY(-1px);
+  }
+
+  .btn-pill {
+    border-radius: 200px;
+    padding: 8px 8px 8px 12px;
+    border: 1px solid var(--border);
+    background: transparent;
+    transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+  }
+  .btn-pill:hover {
+    background: var(--surface-hover);
+  }
+
+  /* === METRIC CARD === */
+  .metric-card {
+    @apply bg-card border border-border/20 shadow-sm p-6;
+    border-radius: 16px;
+    transition: all 0.3s ease;
+  }
+  .metric-card:hover {
+    box-shadow: var(--shadow-md);
+  }
+  .metric-value {
+    font-size: 30px;
+    font-weight: 700;
+    line-height: 36px;
+    letter-spacing: -0.75px;
+  }
+  .metric-change-positive {
+    @apply text-success;
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .metric-change-negative {
+    @apply text-destructive;
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .metric-label {
+    @apply text-muted-foreground;
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  /* === SECTION LABELS (Academia Style) === */
+  .section-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    @apply text-muted-foreground;
+  }
+  .section-label-accent {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    @apply text-primary/70;
+  }
+
+  /* === TRANSITIONS (Academia Motion System) === */
   .transition-default {
-    @apply transition-all duration-300 ease-apple;
+    transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
   }
 
-  /* Card Hover - Apple style (subtle, no lift) */
-  .hover-card {
-    @apply transition-colors duration-200 ease-apple hover:border-primary/20;
+  .transition-fast {
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .transition-slow {
+    transition: all 0.44s cubic-bezier(0.25, 0.1, 0.25, 1);
+  }
+
+  .transition-color {
+    transition: color 0.8s cubic-bezier(0.25, 0.1, 0.25, 1);
+  }
+
+  /* === HOVER EFFECTS (Academy Premium) === */
+  .hover-lift {
+    transition: transform 0.3s cubic-bezier(0.25, 0.1, 0.25, 1),
+                box-shadow 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+  }
+  .hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .hover-glow {
+    transition: box-shadow 0.4s ease;
+  }
+  .hover-glow:hover {
+    box-shadow: 0 0 20px oklch(0.72 0.17 148 / 0.15);
+  }
+
+  .hover-scale {
+    transition: transform 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+  }
+  .hover-scale:hover {
+    transform: scale(1.02);
+  }
+  .hover-scale:active {
+    transform: scale(0.98);
+  }
+
+  /* === GRADIENT ACCENTS === */
+  .gradient-primary {
+    background: linear-gradient(135deg, oklch(0.53 0.2 142), oklch(0.62 0.19 145));
+  }
+
+  .gradient-glow {
+    background: linear-gradient(135deg, oklch(0.72 0.17 148 / 0.1), oklch(0.72 0.17 148 / 0.05));
+  }
+
+  .text-gradient {
+    background: linear-gradient(135deg, oklch(0.72 0.17 148), oklch(0.62 0.19 145));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* === DIVIDERS === */
+  .divider-subtle {
+    height: 1px;
+    background: var(--border);
+  }
+
+  .divider-glow {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, oklch(0.72 0.17 148 / 0.3), transparent);
+  }
+
+  /* === SCROLL REVEAL ANIMATION (Academia) === */
+  .reveal {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.6s cubic-bezier(0, 0, 0.2, 1),
+                transform 0.6s cubic-bezier(0, 0, 0.2, 1);
+  }
+  .reveal.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* === DATE FILTER PILLS === */
+  .date-pill {
+    font-size: 12px;
+    font-weight: 500;
+    padding: 0 12px;
+    height: 28px;
+    border-radius: 9999px;
+    @apply text-foreground;
+    background: transparent;
+    border: none;
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+  }
+  .date-pill:hover {
+    background: var(--surface-hover);
+  }
+  .date-pill-active {
+    font-weight: 600;
+    @apply bg-primary text-primary-foreground;
+  }
+
+  /* === LOGO CAROUSEL (Academia Infinite Scroll) === */
+  .carousel-scroll {
+    animation: scroll-infinite 30s linear infinite;
+  }
+  .carousel-scroll:hover {
+    animation-play-state: paused;
+  }
+
+  /* === FOCUS RING (Apple HIG) === */
+  .focus-ring {
+    @apply outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
   }
 }
 
-/* Reduced Motion Support */
-@media (prefers-reduced-motion: reduce) {
+/* ============================================================================
+   REDUCED MOTION
+   ============================================================================ */
 
+@media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
@@ -281,7 +650,10 @@
   }
 }
 
-/* Hide scrollbar utility */
+/* ============================================================================
+   SCROLLBAR
+   ============================================================================ */
+
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
@@ -291,9 +663,34 @@
   scrollbar-width: none;
 }
 
-/* Recharts Overrides - Apple Style */
+/* Custom scrollbar (Academia premium) */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+}
+
+/* ============================================================================
+   RECHARTS OVERRIDES (Academia Premium)
+   ============================================================================ */
+
 .recharts-default-tooltip {
-  @apply !bg-card/95 !backdrop-blur-xl !border-border/30 !rounded-xl !shadow-md !px-4 !py-3;
+  background: var(--surface-glass) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 12px !important;
+  box-shadow: var(--shadow-lg) !important;
+  padding: 12px 16px !important;
 }
 
 .recharts-tooltip-label {
@@ -306,7 +703,8 @@
 
 .recharts-cartesian-grid-horizontal line,
 .recharts-cartesian-grid-vertical line {
-  @apply !stroke-border/10;
+  stroke: var(--border) !important;
+  opacity: 0.5;
 }
 
 .recharts-legend-item-text {
