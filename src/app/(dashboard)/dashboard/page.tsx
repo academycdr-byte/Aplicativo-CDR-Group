@@ -346,10 +346,12 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 relative">
-      {/* Non-blocking loading bar — replaces the old full-screen overlay */}
       {refreshing && (
-        <div className="absolute top-0 left-0 right-0 z-50 h-0.5 overflow-hidden rounded-t-xl">
-          <div className="h-full bg-primary w-full animate-[shimmer_1.2s_ease-in-out_infinite] origin-left" />
+        <div className="absolute inset-0 bg-background/50 z-50 flex items-start justify-center pt-32 rounded-xl backdrop-blur-[1px]">
+          <div className="flex items-center gap-2 bg-card border border-border/50 rounded-full px-4 py-2 shadow-lg">
+            <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <span className="text-sm text-muted-foreground font-medium">Atualizando...</span>
+          </div>
         </div>
       )}
       {/* Page Header */}
