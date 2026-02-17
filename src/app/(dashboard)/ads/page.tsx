@@ -229,12 +229,14 @@ export default function AdsPage() {
   // Creative Filtering
   const [uniqueCreatives, setUniqueCreatives] = useState(false);
 
-  // Loading
+  // Loading & Error
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Load Data
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (retries = 2) => {
     setLoading(true);
+    setLoadError(null);
     const { days, from, to } = periodToParams(period);
     const platform = platformFilter === "all" ? undefined : platformFilter;
 
@@ -248,24 +250,39 @@ export default function AdsPage() {
       accountId: accountFilter !== "all" ? accountFilter : undefined,
     };
 
-    try {
-      const data = await loadAllAdsData(params, searchQuery || undefined, excludedTerms);
-      if (!data) return;
+    let lastError: unknown;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const data = await loadAllAdsData(params, searchQuery || undefined, excludedTerms);
+        if (!data) {
+          setLoading(false);
+          return;
+        }
 
-      setTotals(data.metrics.totals);
-      setPrevTotals(data.metrics.previousTotals);
-      setMetrics(data.metrics.metrics);
-      setDayData(data.dailyData);
-      setCreatives(data.creatives);
-      setAdSets(data.adSets);
-    } catch (error) {
-      console.error("Failed to load ads data", error);
-    } finally {
-      setLoading(false);
+        setTotals(data.metrics.totals);
+        setPrevTotals(data.metrics.previousTotals);
+        setMetrics(data.metrics.metrics);
+        setDayData(data.dailyData);
+        setCreatives(data.creatives);
+        setAdSets(data.adSets);
+        setLoading(false);
+        setMetricsPage(1);
+        setCreativesPage(1);
+        setAdSetsPage(1);
+        return; // Success
+      } catch (error) {
+        lastError = error;
+        console.error(`[Ads] loadData attempt ${attempt + 1}/${retries + 1} failed:`, error);
+        if (attempt < retries) {
+          await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+        }
+      }
     }
-    setMetricsPage(1);
-    setCreativesPage(1);
-    setAdSetsPage(1);
+
+    // All retries exhausted
+    console.error("[Ads] All retries exhausted:", lastError);
+    setLoadError("Erro ao carregar dados dos anúncios. Tente novamente.");
+    setLoading(false);
   }, [period, platformFilter, accountFilter, searchQuery, excludedTerms]);
 
   useEffect(() => {
@@ -522,6 +539,16 @@ export default function AdsPage() {
         onSearchChange={setSearchQuery}
         onExcludeChange={setExcludedTerms}
       />
+
+      {/* Error Banner */}
+      {loadError && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 flex items-center justify-between gap-3">
+          <p className="text-sm text-red-500 font-medium">{loadError}</p>
+          <Button variant="outline" size="sm" onClick={() => loadData()} className="shrink-0 text-xs">
+            Tentar novamente
+          </Button>
+        </div>
+      )}
 
       {loading ? (
         <div className="space-y-6">

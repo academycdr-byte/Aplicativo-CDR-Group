@@ -132,31 +132,47 @@ export default function DashboardPage() {
     getLastSyncTime().then((r) => setLastSyncAt(r.lastSyncAt));
   }, []);
 
-  const loadData = useCallback(async (silent = false) => {
+  const loadData = useCallback(async (silent = false, retries = 2) => {
     if (!silent) setLoading(true);
     const { days, from, to } = periodToParams(period);
 
-    try {
-      const data = await loadAllDashboardData(days, from, to);
-      if (!data) {
+    let lastError: unknown;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const data = await loadAllDashboardData(days, from, to);
+        if (!data) {
+          if (!silent) setLoading(false);
+          return;
+        }
+
+        if (data.dashboard) setStats(data.dashboard);
+        setMetricsData(data.metrics);
+        setRecentOrders(data.orders);
+        setFunnel(data.funnel);
+        setRates(data.rates);
+        if (data.profitData) setProfitData(data.profitData);
+
+        if (!silent && data.failedCount > 0) {
+          toast.error(`Erro ao carregar ${data.failedCount} seção(ões) do dashboard`);
+        }
+
         if (!silent) setLoading(false);
-        return;
+        return; // Success - exit
+      } catch (error) {
+        lastError = error;
+        console.error(`[Dashboard] loadData attempt ${attempt + 1}/${retries + 1} failed:`, error);
+        if (attempt < retries) {
+          // Wait before retry with exponential backoff
+          await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+        }
       }
-
-      if (data.dashboard) setStats(data.dashboard);
-      setMetricsData(data.metrics);
-      setRecentOrders(data.orders);
-      setFunnel(data.funnel);
-      setRates(data.rates);
-      if (data.profitData) setProfitData(data.profitData);
-
-      if (!silent && data.failedCount > 0) {
-        toast.error(`Erro ao carregar ${data.failedCount} seção(ões) do dashboard`);
-      }
-    } catch {
-      if (!silent) toast.error("Erro ao carregar dados do dashboard");
     }
 
+    // All retries exhausted
+    if (!silent) {
+      toast.error("Erro ao carregar dados do dashboard. Tente atualizar a página.");
+      console.error("[Dashboard] All retries exhausted:", lastError);
+    }
     if (!silent) setLoading(false);
   }, [period]);
 

@@ -597,7 +597,13 @@ export async function getDailyProfit(days: number = 30, from?: string, to?: stri
  * React cache() on getSessionWithOrg ensures auth is checked only once.
  */
 export async function loadAllDashboardData(days: number = 30, from?: string, to?: string) {
-  const ctx = await getSessionWithOrg();
+  let ctx;
+  try {
+    ctx = await getSessionWithOrg();
+  } catch (error) {
+    console.error("[loadAllDashboardData] Session error:", error);
+    return null;
+  }
   if (!ctx) return null;
 
   const results = await Promise.allSettled([
@@ -610,6 +616,14 @@ export async function loadAllDashboardData(days: number = 30, from?: string, to?
     getCustomerTrends(days, from, to),
     getDailyProfit(days, from, to),
   ]);
+
+  // Log rejected queries for debugging
+  results.forEach((r, i) => {
+    if (r.status === "rejected") {
+      const names = ["dashboard", "metrics", "platforms", "orders", "funnel", "rates", "trends", "profit"];
+      console.error(`[loadAllDashboardData] ${names[i]} failed:`, r.reason);
+    }
+  });
 
   return {
     dashboard: results[0].status === "fulfilled" ? results[0].value : null,

@@ -380,7 +380,13 @@ export async function loadAllAdsData(
   searchQuery?: string,
   excludedTerms?: string[],
 ) {
-  const ctx = await getSessionWithOrg();
+  let ctx;
+  try {
+    ctx = await getSessionWithOrg();
+  } catch (error) {
+    console.error("[loadAllAdsData] Session error:", error);
+    return null;
+  }
   if (!ctx) return null;
 
   const { days, from, to } = params;
@@ -390,6 +396,14 @@ export async function loadAllAdsData(
     getCreativePerformance(params),
     getAdSetPerformance(params),
   ]);
+
+  // Log rejected queries for debugging
+  results.forEach((r, i) => {
+    if (r.status === "rejected") {
+      const names = ["adMetrics", "dailyData", "creatives", "adSets"];
+      console.error(`[loadAllAdsData] ${names[i]} failed:`, r.reason);
+    }
+  });
 
   return {
     metrics: results[0].status === "fulfilled" ? results[0].value : { metrics: [], totals: null, previousTotals: null },
@@ -404,7 +418,13 @@ export async function loadAllAdsData(
  * Consolidated analytics page data loader (1 HTTP round-trip instead of 4).
  */
 export async function loadAllAnalyticsData(days: number, from?: string, to?: string) {
-  const ctx = await getSessionWithOrg();
+  let ctx;
+  try {
+    ctx = await getSessionWithOrg();
+  } catch (error) {
+    console.error("[loadAllAnalyticsData] Session error:", error);
+    return null;
+  }
   if (!ctx) return null;
 
   const adParams = { days, from, to };
