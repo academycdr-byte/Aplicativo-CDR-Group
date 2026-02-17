@@ -4,11 +4,13 @@ import { prisma } from "@/lib/prisma";
 import { getSessionWithOrg } from "@/lib/session";
 import { getDateRange, getPreviousDateRange, buildDateFilter, buildDateOnlyFilter, toDateKeyBrasilia, toDateKeyDateOnly } from "@/lib/date-utils";
 
-export async function getDashboardData(days: number = 30, from?: string, to?: string) {
-  const ctx = await getSessionWithOrg();
-  if (!ctx) return null;
+export async function getDashboardData(days: number = 30, from?: string, to?: string, orgId?: string) {
+  if (!orgId) {
+    const ctx = await getSessionWithOrg();
+    if (!ctx) return null;
+    orgId = ctx.organization.id;
+  }
 
-  const orgId = ctx.organization.id;
   const range = getDateRange(days, from, to);
   const dateFilter = buildDateFilter(range);
   const dateOnlyFilter = buildDateOnlyFilter(range);
@@ -24,7 +26,7 @@ export async function getDashboardData(days: number = 30, from?: string, to?: st
     adSpend,
     prevAdSpend,
     adRevenue,
-  ] = await Promise.all([
+  ] = await prisma.$transaction([
     prisma.order.count({
       where: { organizationId: orgId, orderDate: dateFilter, status: "paid" },
     }),
@@ -132,24 +134,27 @@ export async function getOrdersByPlatform() {
 /**
  * Analise de Metricas: combined daily order + ad data for multi-metric chart
  */
-export async function getMetricsAnalysis(days: number = 30, from?: string, to?: string) {
-  const ctx = await getSessionWithOrg();
-  if (!ctx) return [];
+export async function getMetricsAnalysis(days: number = 30, from?: string, to?: string, orgId?: string) {
+  if (!orgId) {
+    const ctx = await getSessionWithOrg();
+    if (!ctx) return [];
+    orgId = ctx.organization.id;
+  }
 
-  const orgId = ctx.organization.id;
   const range = getDateRange(days, from, to);
   const dateFilter = buildDateFilter(range);
   const dateOnlyFilter = buildDateOnlyFilter(range);
 
-  const [orders, adMetrics] = await Promise.all([
+  const [orders, adMetrics] = await prisma.$transaction([
     prisma.order.findMany({
       where: { organizationId: orgId, orderDate: dateFilter },
       select: { orderDate: true, totalAmount: true, status: true },
       orderBy: { orderDate: "asc" },
     }),
-    prisma.adMetric.findMany({
+    prisma.adMetric.groupBy({
+      by: ["date"],
       where: { organizationId: orgId, date: dateOnlyFilter },
-      select: { date: true, spend: true, conversions: true, revenue: true },
+      _sum: { spend: true, conversions: true, revenue: true },
       orderBy: { date: "asc" },
     }),
   ]);
@@ -179,9 +184,9 @@ export async function getMetricsAnalysis(days: number = 30, from?: string, to?: 
   for (const m of adMetrics) {
     const key = toDateKeyDateOnly(m.date);
     if (!grouped[key]) grouped[key] = { date: key, faturamento: 0, investimento: 0, compras: 0, ticketMedio: 0, cpa: 0, roas: 0, fbConversions: 0, fbRevenue: 0 };
-    grouped[key].investimento += Number(m.spend);
-    grouped[key].fbConversions += m.conversions;
-    grouped[key].fbRevenue += Number(m.revenue);
+    grouped[key].investimento += Number(m._sum?.spend || 0);
+    grouped[key].fbConversions += Number(m._sum?.conversions || 0);
+    grouped[key].fbRevenue += Number(m._sum?.revenue || 0);
   }
 
   // Compute derived metrics
@@ -204,11 +209,12 @@ export async function getMetricsAnalysis(days: number = 30, from?: string, to?: 
  * All funnel data comes exclusively from Facebook Ads metrics,
  * regardless of the connected e-commerce platform (Shopify, Nuvemshop, etc.).
  */
-export async function getFunnelData(days: number = 30, from?: string, to?: string) {
-  const ctx = await getSessionWithOrg();
-  if (!ctx) return null;
-
-  const orgId = ctx.organization.id;
+export async function getFunnelData(days: number = 30, from?: string, to?: string, orgId?: string) {
+  if (!orgId) {
+    const ctx = await getSessionWithOrg();
+    if (!ctx) return null;
+    orgId = ctx.organization.id;
+  }
   const range = getDateRange(days, from, to);
   const dateOnlyFilter = buildDateOnlyFilter(range);
 
@@ -242,17 +248,19 @@ export async function getFunnelData(days: number = 30, from?: string, to?: strin
  * Tries StoreFunnel data first (populated from ShopifyQL), falls back to local orders.
  * Fully resilient: never throws, always returns valid data.
  */
-export async function getPaidAndRepurchaseRates(days: number = 30, from?: string, to?: string) {
-  const ctx = await getSessionWithOrg();
-  if (!ctx) return null;
+export async function getPaidAndRepurchaseRates(days: number = 30, from?: string, to?: string, orgId?: string) {
+  if (!orgId) {
+    const ctx = await getSessionWithOrg();
+    if (!ctx) return null;
+    orgId = ctx.organization.id;
+  }
 
-  const orgId = ctx.organization.id;
   const range = getDateRange(days, from, to);
   const dateFilter = buildDateFilter(range);
   const dateOnlyFilter = buildDateOnlyFilter(range);
 
-  // Core paid rate queries (always work - these tables haven't changed)
-  const [totalOrders, paidOrders, ordersInPeriod] = await Promise.all([
+  // Core paid rate queries - batched in single transaction for Neon performance
+  const [totalOrders, paidOrders, ordersInPeriod] = await prisma.$transaction([
     prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter } }),
     prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter, status: "paid" } }),
     prisma.order.findMany({
@@ -426,11 +434,12 @@ export async function getRecentOrders(limit: number = 5) {
  * Uses the same financial config (gateway, checkout, tax, fixed costs, chargebacks, CMV).
  * Returns daily profit data for the calendar and a total profit for the period.
  */
-export async function getDailyProfit(days: number = 30, from?: string, to?: string) {
-  const ctx = await getSessionWithOrg();
-  if (!ctx) return { dailyProfits: [], totalProfit: 0 };
-
-  const orgId = ctx.organization.id;
+export async function getDailyProfit(days: number = 30, from?: string, to?: string, orgId?: string) {
+  if (!orgId) {
+    const ctx = await getSessionWithOrg();
+    if (!ctx) return { dailyProfits: [], totalProfit: 0 };
+    orgId = ctx.organization.id;
+  }
   const range = getDateRange(days, from, to);
   const dateFilter = buildDateFilter(range);
   const dateOnlyFilter = buildDateOnlyFilter(range);
@@ -593,8 +602,9 @@ export async function getDailyProfit(days: number = 30, from?: string, to?: stri
 
 /**
  * Consolidated dashboard data loader.
- * Makes a SINGLE server action call (1 HTTP round-trip) instead of 7 separate calls.
- * React cache() on getSessionWithOrg ensures auth is checked only once.
+ * Makes a SINGLE server action call (1 HTTP round-trip) instead of multiple.
+ * Auth is checked once, orgId is passed directly to avoid redundant session lookups.
+ * Only fetches data that the dashboard page actually renders (5 queries, not 8).
  */
 export async function loadAllDashboardData(days: number = 30, from?: string, to?: string) {
   let ctx;
@@ -606,21 +616,20 @@ export async function loadAllDashboardData(days: number = 30, from?: string, to?
   }
   if (!ctx) return null;
 
+  const orgId = ctx.organization.id;
+
   const results = await Promise.allSettled([
-    getDashboardData(days, from, to),
-    getMetricsAnalysis(days, from, to),
-    getOrdersByPlatform(),
-    getRecentOrders(5),
-    getFunnelData(days, from, to),
-    getPaidAndRepurchaseRates(days, from, to),
-    getCustomerTrends(days, from, to),
-    getDailyProfit(days, from, to),
+    getDashboardData(days, from, to, orgId),
+    getMetricsAnalysis(days, from, to, orgId),
+    getFunnelData(days, from, to, orgId),
+    getPaidAndRepurchaseRates(days, from, to, orgId),
+    getDailyProfit(days, from, to, orgId),
   ]);
 
   // Log rejected queries for debugging
   results.forEach((r, i) => {
     if (r.status === "rejected") {
-      const names = ["dashboard", "metrics", "platforms", "orders", "funnel", "rates", "trends", "profit"];
+      const names = ["dashboard", "metrics", "funnel", "rates", "profit"];
       console.error(`[loadAllDashboardData] ${names[i]} failed:`, r.reason);
     }
   });
@@ -628,12 +637,9 @@ export async function loadAllDashboardData(days: number = 30, from?: string, to?
   return {
     dashboard: results[0].status === "fulfilled" ? results[0].value : null,
     metrics: results[1].status === "fulfilled" ? results[1].value : [],
-    platforms: results[2].status === "fulfilled" ? results[2].value : [],
-    orders: results[3].status === "fulfilled" ? results[3].value : [],
-    funnel: results[4].status === "fulfilled" ? results[4].value : null,
-    rates: results[5].status === "fulfilled" ? results[5].value : null,
-    trends: results[6].status === "fulfilled" ? results[6].value : [],
-    profitData: results[7].status === "fulfilled" ? results[7].value : { dailyProfits: [], totalProfit: 0 },
+    funnel: results[2].status === "fulfilled" ? results[2].value : null,
+    rates: results[3].status === "fulfilled" ? results[3].value : null,
+    profitData: results[4].status === "fulfilled" ? results[4].value : { dailyProfits: [], totalProfit: 0 },
     failedCount: results.filter((r) => r.status === "rejected").length,
   };
 }

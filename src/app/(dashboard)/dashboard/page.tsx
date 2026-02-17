@@ -81,17 +81,6 @@ type RatesData = {
   uniqueCustomers: number;
 };
 
-type RecentOrder = {
-  id: string;
-  externalOrderId: string;
-  platform: string;
-  status: string;
-  customerName: string | null;
-  totalAmount: number;
-  currency: string;
-  orderDate: Date;
-};
-
 const metricToggles = [
   { key: "faturamento", label: "Faturamento", color: "#10b981", type: "area" },
   { key: "investimento", label: "Investimento", color: "#f43f5e", type: "area" },
@@ -113,7 +102,6 @@ const CURRENCIES: Record<Currency, { locale: string; symbol: string; label: stri
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [metricsData, setMetricsData] = useState<MetricPoint[]>([]);
-  const [_recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [funnel, setFunnel] = useState<FunnelData | null>(null);
   const [rates, setRates] = useState<RatesData | null>(null);
   const [period, setPeriod] = useState<PeriodValue>({ type: "preset", days: 30 });
@@ -123,17 +111,30 @@ export default function DashboardPage() {
   const [profitData, setProfitData] = useState<{ dailyProfits: { date: string; profit: number; revenue: number; costs: number }[]; totalProfit: number }>({ dailyProfits: [], totalProfit: 0 });
 
   const [lastSyncAt, setLastSyncAt] = useState<Date | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const [currency, setCurrency] = useState<Currency>("BRL");
   const [exchangeRates, setExchangeRates] = useState<Record<string, number> | null>(null);
+
+  // Track if we've loaded data at least once (to distinguish skeleton vs overlay)
+  const hasDataRef = React.useRef(false);
 
   useEffect(() => {
     getExchangeRates().then((r) => setExchangeRates(r));
     getLastSyncTime().then((r) => setLastSyncAt(r.lastSyncAt));
   }, []);
 
-  const loadData = useCallback(async (silent = false, retries = 2) => {
-    if (!silent) setLoading(true);
+  const loadData = useCallback(async (silent = false, retries = 1) => {
+    const isFirstLoad = !hasDataRef.current;
+
+    if (!silent) {
+      if (isFirstLoad) {
+        setLoading(true);
+      } else {
+        setRefreshing(true);
+      }
+    }
+
     const { days, from, to } = periodToParams(period);
 
     let lastError: unknown;
@@ -141,42 +142,40 @@ export default function DashboardPage() {
       try {
         const data = await loadAllDashboardData(days, from, to);
         if (!data) {
-          if (!silent) setLoading(false);
+          if (!silent) { setLoading(false); setRefreshing(false); }
           return;
         }
 
         if (data.dashboard) setStats(data.dashboard);
         setMetricsData(data.metrics);
-        setRecentOrders(data.orders);
         setFunnel(data.funnel);
         setRates(data.rates);
         if (data.profitData) setProfitData(data.profitData);
+        hasDataRef.current = true;
 
         if (!silent && data.failedCount > 0) {
           toast.error(`Erro ao carregar ${data.failedCount} seção(ões) do dashboard`);
         }
 
-        if (!silent) setLoading(false);
-        return; // Success - exit
+        if (!silent) { setLoading(false); setRefreshing(false); }
+        return; // Success
       } catch (error) {
         lastError = error;
         console.error(`[Dashboard] loadData attempt ${attempt + 1}/${retries + 1} failed:`, error);
         if (attempt < retries) {
-          // Wait before retry with exponential backoff
           await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
         }
       }
     }
 
-    // All retries exhausted
     if (!silent) {
       toast.error("Erro ao carregar dados do dashboard. Tente atualizar a página.");
       console.error("[Dashboard] All retries exhausted:", lastError);
     }
-    if (!silent) setLoading(false);
+    if (!silent) { setLoading(false); setRefreshing(false); }
   }, [period]);
 
-  // Load data on period change
+  // Load data on period change (fast - no sync, just DB queries)
   useEffect(() => {
     loadData();
   }, [loadData]);
@@ -191,7 +190,7 @@ export default function DashboardPage() {
     return () => window.removeEventListener("sync-complete", handleSyncComplete);
   }, [loadData]);
 
-  // Auto-sync + refresh for ALL periods (adaptive interval)
+  // Auto-sync: only on MOUNT + interval (NOT on period change)
   useEffect(() => {
     let cancelled = false;
 
@@ -210,7 +209,7 @@ export default function DashboardPage() {
       intervalMs = 15 * 60 * 1000; // 90d / Custom: 15 min
     }
 
-    // Initial sync when mounting or changing period
+    // Initial sync on mount only (background, doesn't block data display)
     syncRecent().then(() => {
       if (cancelled) return;
       loadData(true);
@@ -230,7 +229,8 @@ export default function DashboardPage() {
       cancelled = true;
       clearInterval(intervalId);
     };
-  }, [period, loadData]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleSync() {
     setSyncing(true);
@@ -325,7 +325,15 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className={cn("space-y-8 animate-in fade-in duration-500 relative", refreshing && "pointer-events-none")}>
+      {refreshing && (
+        <div className="absolute inset-0 bg-background/50 z-50 flex items-start justify-center pt-32 rounded-xl backdrop-blur-[1px]">
+          <div className="flex items-center gap-2 bg-card border border-border/50 rounded-full px-4 py-2 shadow-lg">
+            <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <span className="text-sm text-muted-foreground font-medium">Atualizando...</span>
+          </div>
+        </div>
+      )}
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
