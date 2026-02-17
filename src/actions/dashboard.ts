@@ -437,33 +437,26 @@ export async function getDailyProfit(days: number = 30, from?: string, to?: stri
   const dateFilter = buildDateFilter(range);
   const dateOnlyFilter = buildDateOnlyFilter(range);
 
-  // ALL queries in a SINGLE $transaction (1 Neon round-trip for everything)
-  // Always fetch productCosts and supplierPayments - the extra data is tiny
-  // compared to the latency of separate round-trips
-  const [configResult, orders, adMetrics, financialEntries, productCosts, supplierPayments] = await prisma.$transaction([
-    prisma.financialConfig.findUnique({
-      where: { organizationId: orgId },
-    }),
-    prisma.order.findMany({
-      where: { organizationId: orgId, orderDate: dateFilter, status: { in: ["paid", "partially_refunded"] } },
-      select: { orderDate: true, totalAmount: true, rawData: true },
-      orderBy: { orderDate: "asc" },
-    }),
-    prisma.adMetric.groupBy({
-      by: ["date"],
-      where: { organizationId: orgId, date: dateOnlyFilter },
-      _sum: { spend: true },
-      orderBy: { date: "asc" },
-    }),
-    prisma.financialEntry.findMany({
-      where: { organizationId: orgId, entryDate: dateFilter },
-      select: { entryDate: true, type: true, amount: true },
-    }),
-    prisma.productCost.findMany({ where: { organizationId: orgId } }),
-    prisma.supplierPayment.findMany({
-      where: { organizationId: orgId, paymentDate: dateFilter },
-      select: { paymentDate: true, amount: true },
-    }),
+  // Run config + core data in PARALLEL (2 concurrent queries, not sequential)
+  const [configResult, [orders, adMetrics, financialEntries]] = await Promise.all([
+    prisma.financialConfig.findUnique({ where: { organizationId: orgId } }),
+    prisma.$transaction([
+      prisma.order.findMany({
+        where: { organizationId: orgId, orderDate: dateFilter, status: { in: ["paid", "partially_refunded"] } },
+        select: { orderDate: true, totalAmount: true, rawData: true },
+        orderBy: { orderDate: "asc" },
+      }),
+      prisma.adMetric.groupBy({
+        by: ["date"],
+        where: { organizationId: orgId, date: dateOnlyFilter },
+        _sum: { spend: true },
+        orderBy: { date: "asc" },
+      }),
+      prisma.financialEntry.findMany({
+        where: { organizationId: orgId, entryDate: dateFilter },
+        select: { entryDate: true, type: true, amount: true },
+      }),
+    ]),
   ]);
 
   const config = configResult || {
@@ -481,16 +474,21 @@ export async function getDailyProfit(days: number = 30, from?: string, to?: stri
   const cbRate = Number(config.chargebackRate) / 100;
   const cmvMethod = String(config.cmvMethod || "sku");
 
-  // Build cost map for SKU method
+  // Build cost map for SKU method (conditional - only 1 extra query if needed)
   let costMap = new Map<string, number>();
   if (cmvMethod === "sku") {
+    const productCosts = await prisma.productCost.findMany({ where: { organizationId: orgId } });
     productCosts.forEach(pc => costMap.set(pc.sku.toLowerCase().trim(), Number(pc.costPrice)));
   }
 
   // Build supplier payments map for supplier_payments method
   let supplierPaymentsByDay = new Map<string, number>();
   if (cmvMethod === "supplier_payments") {
-    for (const p of supplierPayments) {
+    const payments = await prisma.supplierPayment.findMany({
+      where: { organizationId: orgId, paymentDate: dateFilter },
+      select: { paymentDate: true, amount: true },
+    });
+    for (const p of payments) {
       const key = toDateKeyBrasilia(p.paymentDate);
       supplierPaymentsByDay.set(key, (supplierPaymentsByDay.get(key) || 0) + Number(p.amount));
     }
