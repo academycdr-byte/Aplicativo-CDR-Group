@@ -294,25 +294,25 @@ export async function getPaidAndRepurchaseRates(days: number = 30, from?: string
   // Fallback: calculate from order data (Nuvemshop and any platform without ShopifyQL)
   // A recurring customer = has placed more than 1 order in all history
   if (!usedFunnelData) {
-    const allHistoricalOrders = await prisma.order.findMany({
-      where: { organizationId: orgId, customerEmail: { not: null } },
-      select: { customerEmail: true },
-    });
-
-    // Count total orders per customer across entire history
-    const orderCountByEmail = new Map<string, number>();
-    for (const o of allHistoricalOrders) {
-      const email = o.customerEmail!.toLowerCase();
-      orderCountByEmail.set(email, (orderCountByEmail.get(email) || 0) + 1);
-    }
-
-    // Unique customers who ordered in the selected period
+    // Get unique emails in the current period
     const uniqueEmailsInPeriod = new Set(ordersInPeriod.map((o) => o.customerEmail!.toLowerCase()));
-
     totalCustomersSum = uniqueEmailsInPeriod.size;
-    for (const email of uniqueEmailsInPeriod) {
-      if ((orderCountByEmail.get(email) || 0) > 1) {
-        returningCustomersSum++;
+
+    // Use groupBy to count orders per email efficiently (avoids fetching ALL rows)
+    if (uniqueEmailsInPeriod.size > 0) {
+      const emailCounts = await prisma.order.groupBy({
+        by: ["customerEmail"],
+        where: {
+          organizationId: orgId,
+          customerEmail: { in: Array.from(uniqueEmailsInPeriod) },
+        },
+        _count: { id: true },
+      });
+
+      for (const ec of emailCounts) {
+        if (ec._count.id > 1) {
+          returningCustomersSum++;
+        }
       }
     }
   }
@@ -462,21 +462,26 @@ export async function getDailyProfit(days: number = 30, from?: string, to?: stri
   const cbRate = Number(config.chargebackRate) / 100;
   const cmvMethod = String(config.cmvMethod || "sku");
 
-  // Fetch paid orders in period
-  const orders = await prisma.order.findMany({
-    where: { organizationId: orgId, orderDate: dateFilter, status: { in: ["paid", "partially_refunded"] } },
-    select: { orderDate: true, totalAmount: true, rawData: true },
-    orderBy: { orderDate: "asc" },
-  });
+  // Batch core queries in a single transaction (1 Neon round-trip instead of 3+)
+  const [orders, adMetrics, financialEntries] = await prisma.$transaction([
+    prisma.order.findMany({
+      where: { organizationId: orgId, orderDate: dateFilter, status: { in: ["paid", "partially_refunded"] } },
+      select: { orderDate: true, totalAmount: true, rawData: true },
+      orderBy: { orderDate: "asc" },
+    }),
+    prisma.adMetric.groupBy({
+      by: ["date"],
+      where: { organizationId: orgId, date: dateOnlyFilter },
+      _sum: { spend: true },
+      orderBy: { date: "asc" },
+    }),
+    prisma.financialEntry.findMany({
+      where: { organizationId: orgId, entryDate: dateFilter },
+      select: { entryDate: true, type: true, amount: true },
+    }),
+  ]);
 
-  // Fetch ad spend
-  const adMetrics = await prisma.adMetric.findMany({
-    where: { organizationId: orgId, date: dateOnlyFilter },
-    select: { date: true, spend: true },
-    orderBy: { date: "asc" },
-  });
-
-  // Build cost map for SKU method
+  // Build cost map for SKU method (conditional - only 1 extra query if needed)
   let costMap = new Map<string, number>();
   if (cmvMethod === "sku") {
     const productCosts = await prisma.productCost.findMany({ where: { organizationId: orgId } });
@@ -495,12 +500,6 @@ export async function getDailyProfit(days: number = 30, from?: string, to?: stri
       supplierPaymentsByDay.set(key, (supplierPaymentsByDay.get(key) || 0) + Number(p.amount));
     }
   }
-
-  // Fetch manual financial entries in period
-  const financialEntries = await prisma.financialEntry.findMany({
-    where: { organizationId: orgId, entryDate: dateFilter },
-    select: { entryDate: true, type: true, amount: true },
-  });
 
   // Group manual entries by day
   const manualCostsByDay = new Map<string, number>();
@@ -542,11 +541,11 @@ export async function getDailyProfit(days: number = 30, from?: string, to?: stri
     }
   }
 
-  // Add ad spend by day
+  // Add ad spend by day (from groupBy results)
   for (const m of adMetrics) {
     const key = toDateKeyDateOnly(m.date);
     if (!dailyData[key]) dailyData[key] = { revenue: 0, orderCount: 0, cogs: 0, adSpend: 0 };
-    dailyData[key].adSpend += Number(m.spend);
+    dailyData[key].adSpend += Number(m._sum?.spend || 0);
   }
 
   // Ensure days with only manual entries also appear in dailyData
