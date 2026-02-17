@@ -259,46 +259,39 @@ export async function getPaidAndRepurchaseRates(days: number = 30, from?: string
   const dateFilter = buildDateFilter(range);
   const dateOnlyFilter = buildDateOnlyFilter(range);
 
-  // Core paid rate queries - batched in single transaction for Neon performance
-  const [totalOrders, paidOrders, ordersInPeriod] = await prisma.$transaction([
-    prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter } }),
-    prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter, status: "paid" } }),
-    prisma.order.findMany({
-      where: { organizationId: orgId, orderDate: dateFilter, customerEmail: { not: null } },
-      select: { customerEmail: true, orderDate: true },
-    }),
-  ]);
-
-  // Try StoreFunnel customer metrics from Shopify only (accurate ShopifyQL data)
-  let totalCustomersSum = 0;
-  let returningCustomersSum = 0;
-  let usedFunnelData = false;
-
-  try {
-    const funnelData = await prisma.storeFunnel.findMany({
+  // Run core queries + storeFunnel in PARALLEL (2 concurrent Neon round-trips max)
+  const [txResult, funnelData] = await Promise.all([
+    prisma.$transaction([
+      prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter } }),
+      prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter, status: "paid" } }),
+      prisma.order.findMany({
+        where: { organizationId: orgId, orderDate: dateFilter, customerEmail: { not: null } },
+        select: { customerEmail: true },
+      }),
+    ]),
+    prisma.storeFunnel.findMany({
       where: { organizationId: orgId, platform: "SHOPIFY", date: dateOnlyFilter },
       select: { totalCustomers: true, returningCustomers: true },
-    });
-    const hasFunnelCustomerData = funnelData.some((f) => f.totalCustomers > 0);
-    if (hasFunnelCustomerData) {
-      for (const f of funnelData) {
-        totalCustomersSum += f.totalCustomers;
-        returningCustomersSum += f.returningCustomers;
-      }
-      usedFunnelData = true;
-    }
-  } catch {
-    // StoreFunnel columns don't exist yet - fall through to local calculation
-  }
+    }).catch(() => [] as { totalCustomers: number; returningCustomers: number }[]),
+  ]);
 
-  // Fallback: calculate from order data (Nuvemshop and any platform without ShopifyQL)
-  // A recurring customer = has placed more than 1 order in all history
-  if (!usedFunnelData) {
-    // Get unique emails in the current period
-    const uniqueEmailsInPeriod = new Set(ordersInPeriod.map((o) => o.customerEmail!.toLowerCase()));
+  const [totalOrders, paidOrders, ordersInPeriod] = txResult;
+
+  let totalCustomersSum = 0;
+  let returningCustomersSum = 0;
+
+  // Try StoreFunnel data first (accurate ShopifyQL data)
+  const hasFunnelCustomerData = funnelData.length > 0 && funnelData.some((f: { totalCustomers: number }) => f.totalCustomers > 0);
+  if (hasFunnelCustomerData) {
+    for (const f of funnelData) {
+      totalCustomersSum += f.totalCustomers;
+      returningCustomersSum += f.returningCustomers;
+    }
+  } else {
+    // Fallback: calculate from order data
+    const uniqueEmailsInPeriod = new Set<string>(ordersInPeriod.map((o) => o.customerEmail!.toLowerCase()));
     totalCustomersSum = uniqueEmailsInPeriod.size;
 
-    // Use groupBy to count orders per email efficiently (avoids fetching ALL rows)
     if (uniqueEmailsInPeriod.size > 0) {
       const emailCounts = await prisma.order.groupBy({
         by: ["customerEmail"],
@@ -306,18 +299,18 @@ export async function getPaidAndRepurchaseRates(days: number = 30, from?: string
           organizationId: orgId,
           customerEmail: { in: Array.from(uniqueEmailsInPeriod) },
         },
-        _count: { id: true },
+        _count: { _all: true },
       });
 
       for (const ec of emailCounts) {
-        if (ec._count.id > 1) {
+        if (ec._count._all > 1) {
           returningCustomersSum++;
         }
       }
     }
   }
 
-  const uniqueEmails = new Set(ordersInPeriod.map((o) => o.customerEmail!.toLowerCase()));
+  const uniqueEmails = new Set<string>(ordersInPeriod.map((o) => o.customerEmail!.toLowerCase()));
 
   return {
     paidRate: totalOrders > 0 ? (paidOrders / totalOrders) * 100 : 0,
@@ -444,26 +437,13 @@ export async function getDailyProfit(days: number = 30, from?: string, to?: stri
   const dateFilter = buildDateFilter(range);
   const dateOnlyFilter = buildDateOnlyFilter(range);
 
-  // Load financial config
-  const config = await prisma.financialConfig.findUnique({
-    where: { organizationId: orgId },
-  }) || {
-    defaultTaxRate: 0, fixedTransactionFee: 0, gatewayRate: 0,
-    checkoutRate: 0, taxBase: "revenue", fixedCosts: 0,
-    chargebackRate: 0, cmvMethod: "sku", averageCostPerOrder: 0,
-  };
-
-  const taxRate = Number(config.defaultTaxRate) / 100;
-  const fixedFeePerTx = Number(config.fixedTransactionFee);
-  const gwRate = Number(config.gatewayRate) / 100;
-  const ckRate = Number(config.checkoutRate) / 100;
-  const taxBase = String(config.taxBase || "revenue");
-  const monthlyFixedCosts = Number(config.fixedCosts);
-  const cbRate = Number(config.chargebackRate) / 100;
-  const cmvMethod = String(config.cmvMethod || "sku");
-
-  // Batch core queries in a single transaction (1 Neon round-trip instead of 3+)
-  const [orders, adMetrics, financialEntries] = await prisma.$transaction([
+  // ALL queries in a SINGLE $transaction (1 Neon round-trip for everything)
+  // Always fetch productCosts and supplierPayments - the extra data is tiny
+  // compared to the latency of separate round-trips
+  const [configResult, orders, adMetrics, financialEntries, productCosts, supplierPayments] = await prisma.$transaction([
+    prisma.financialConfig.findUnique({
+      where: { organizationId: orgId },
+    }),
     prisma.order.findMany({
       where: { organizationId: orgId, orderDate: dateFilter, status: { in: ["paid", "partially_refunded"] } },
       select: { orderDate: true, totalAmount: true, rawData: true },
@@ -479,23 +459,38 @@ export async function getDailyProfit(days: number = 30, from?: string, to?: stri
       where: { organizationId: orgId, entryDate: dateFilter },
       select: { entryDate: true, type: true, amount: true },
     }),
+    prisma.productCost.findMany({ where: { organizationId: orgId } }),
+    prisma.supplierPayment.findMany({
+      where: { organizationId: orgId, paymentDate: dateFilter },
+      select: { paymentDate: true, amount: true },
+    }),
   ]);
 
-  // Build cost map for SKU method (conditional - only 1 extra query if needed)
+  const config = configResult || {
+    defaultTaxRate: 0, fixedTransactionFee: 0, gatewayRate: 0,
+    checkoutRate: 0, taxBase: "revenue", fixedCosts: 0,
+    chargebackRate: 0, cmvMethod: "sku", averageCostPerOrder: 0,
+  };
+
+  const taxRate = Number(config.defaultTaxRate) / 100;
+  const fixedFeePerTx = Number(config.fixedTransactionFee);
+  const gwRate = Number(config.gatewayRate) / 100;
+  const ckRate = Number(config.checkoutRate) / 100;
+  const taxBase = String(config.taxBase || "revenue");
+  const monthlyFixedCosts = Number(config.fixedCosts);
+  const cbRate = Number(config.chargebackRate) / 100;
+  const cmvMethod = String(config.cmvMethod || "sku");
+
+  // Build cost map for SKU method
   let costMap = new Map<string, number>();
   if (cmvMethod === "sku") {
-    const productCosts = await prisma.productCost.findMany({ where: { organizationId: orgId } });
     productCosts.forEach(pc => costMap.set(pc.sku.toLowerCase().trim(), Number(pc.costPrice)));
   }
 
   // Build supplier payments map for supplier_payments method
   let supplierPaymentsByDay = new Map<string, number>();
   if (cmvMethod === "supplier_payments") {
-    const payments = await prisma.supplierPayment.findMany({
-      where: { organizationId: orgId, paymentDate: dateFilter },
-      select: { paymentDate: true, amount: true },
-    });
-    for (const p of payments) {
+    for (const p of supplierPayments) {
       const key = toDateKeyBrasilia(p.paymentDate);
       supplierPaymentsByDay.set(key, (supplierPaymentsByDay.get(key) || 0) + Number(p.amount));
     }
