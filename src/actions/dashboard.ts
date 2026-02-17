@@ -437,8 +437,10 @@ export async function getDailyProfit(days: number = 30, from?: string, to?: stri
   const dateFilter = buildDateFilter(range);
   const dateOnlyFilter = buildDateOnlyFilter(range);
 
-  // Run config + core data in PARALLEL (2 concurrent queries, not sequential)
-  const [configResult, [orders, adMetrics, financialEntries]] = await Promise.all([
+  // Run ALL queries in parallel (config + core data + cost data)
+  // Previously costMap/supplierPayments ran sequentially AFTER config loaded.
+  // Now they run in parallel — unused results are discarded based on cmvMethod.
+  const [configResult, txResult, allProductCosts, allSupplierPayments] = await Promise.all([
     prisma.financialConfig.findUnique({ where: { organizationId: orgId } }),
     prisma.$transaction([
       prisma.order.findMany({
@@ -457,7 +459,14 @@ export async function getDailyProfit(days: number = 30, from?: string, to?: stri
         select: { entryDate: true, type: true, amount: true },
       }),
     ]),
+    prisma.productCost.findMany({ where: { organizationId: orgId } }),
+    prisma.supplierPayment.findMany({
+      where: { organizationId: orgId, paymentDate: dateFilter },
+      select: { paymentDate: true, amount: true },
+    }),
   ]);
+
+  const [orders, adMetrics, financialEntries] = txResult;
 
   const config = configResult || {
     defaultTaxRate: 0, fixedTransactionFee: 0, gatewayRate: 0,
@@ -474,21 +483,16 @@ export async function getDailyProfit(days: number = 30, from?: string, to?: stri
   const cbRate = Number(config.chargebackRate) / 100;
   const cmvMethod = String(config.cmvMethod || "sku");
 
-  // Build cost map for SKU method (conditional - only 1 extra query if needed)
-  let costMap = new Map<string, number>();
+  // Build cost map from pre-fetched data (no extra round-trip)
+  const costMap = new Map<string, number>();
   if (cmvMethod === "sku") {
-    const productCosts = await prisma.productCost.findMany({ where: { organizationId: orgId } });
-    productCosts.forEach(pc => costMap.set(pc.sku.toLowerCase().trim(), Number(pc.costPrice)));
+    allProductCosts.forEach(pc => costMap.set(pc.sku.toLowerCase().trim(), Number(pc.costPrice)));
   }
 
-  // Build supplier payments map for supplier_payments method
-  let supplierPaymentsByDay = new Map<string, number>();
+  // Build supplier payments map from pre-fetched data (no extra round-trip)
+  const supplierPaymentsByDay = new Map<string, number>();
   if (cmvMethod === "supplier_payments") {
-    const payments = await prisma.supplierPayment.findMany({
-      where: { organizationId: orgId, paymentDate: dateFilter },
-      select: { paymentDate: true, amount: true },
-    });
-    for (const p of payments) {
+    for (const p of allSupplierPayments) {
       const key = toDateKeyBrasilia(p.paymentDate);
       supplierPaymentsByDay.set(key, (supplierPaymentsByDay.get(key) || 0) + Number(p.amount));
     }

@@ -119,13 +119,40 @@ export default function DashboardPage() {
   // Track if we've loaded data at least once (to distinguish skeleton vs overlay)
   const hasDataRef = React.useRef(false);
 
+  // Client-side cache: period key → dashboard data (show instantly on period switch-back)
+  const cacheRef = React.useRef(new Map<string, NonNullable<Awaited<ReturnType<typeof loadAllDashboardData>>>>());
+
   useEffect(() => {
     getExchangeRates().then((r) => setExchangeRates(r));
     getLastSyncTime().then((r) => setLastSyncAt(r.lastSyncAt));
   }, []);
 
-  const loadData = useCallback(async (silent = false, retries = 1) => {
+  // Apply data from server or cache to all state slices
+  const applyData = useCallback((data: NonNullable<Awaited<ReturnType<typeof loadAllDashboardData>>>) => {
+    if (data.dashboard) setStats(data.dashboard);
+    setMetricsData(data.metrics);
+    setFunnel(data.funnel);
+    setRates(data.rates);
+    if (data.profitData) setProfitData(data.profitData);
+  }, []);
+
+  // Generate cache key from period
+  const getCacheKey = useCallback((p: PeriodValue): string => {
+    if (p.type === "preset") return `p-${p.days}`;
+    return `c-${p.from.getTime()}-${p.to.getTime()}`;
+  }, []);
+
+  const loadData = useCallback(async (silent = false) => {
     const isFirstLoad = !hasDataRef.current;
+    const cacheKey = getCacheKey(period);
+
+    // Check cache: if we have data for this period, show it INSTANTLY
+    const cached = cacheRef.current.get(cacheKey);
+    if (cached && !isFirstLoad) {
+      applyData(cached);
+      // Still refresh in background but don't show any loading state
+      silent = true;
+    }
 
     if (!silent) {
       if (isFirstLoad) {
@@ -137,43 +164,36 @@ export default function DashboardPage() {
 
     const { days, from, to } = periodToParams(period);
 
-    let lastError: unknown;
-    for (let attempt = 0; attempt <= retries; attempt++) {
-      try {
-        const data = await loadAllDashboardData(days, from, to);
-        if (!data) {
-          if (!silent) { setLoading(false); setRefreshing(false); }
-          return;
-        }
-
-        if (data.dashboard) setStats(data.dashboard);
-        setMetricsData(data.metrics);
-        setFunnel(data.funnel);
-        setRates(data.rates);
-        if (data.profitData) setProfitData(data.profitData);
-        hasDataRef.current = true;
-
-        if (!silent && data.failedCount > 0) {
-          toast.error(`Erro ao carregar ${data.failedCount} seção(ões) do dashboard`);
-        }
-
+    try {
+      const data = await loadAllDashboardData(days, from, to);
+      if (!data) {
         if (!silent) { setLoading(false); setRefreshing(false); }
-        return; // Success
-      } catch (error) {
-        lastError = error;
-        console.error(`[Dashboard] loadData attempt ${attempt + 1}/${retries + 1} failed:`, error);
-        if (attempt < retries) {
-          await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
-        }
+        return;
+      }
+
+      // Cache the fresh result
+      cacheRef.current.set(cacheKey, data);
+      // Limit cache to 10 entries to avoid memory bloat
+      if (cacheRef.current.size > 10) {
+        const firstKey = cacheRef.current.keys().next().value;
+        if (firstKey) cacheRef.current.delete(firstKey);
+      }
+
+      applyData(data);
+      hasDataRef.current = true;
+
+      if (!silent && data.failedCount > 0) {
+        toast.error(`Erro ao carregar ${data.failedCount} seção(ões) do dashboard`);
+      }
+    } catch (error) {
+      console.error("[Dashboard] loadData failed:", error);
+      if (!silent) {
+        toast.error("Erro ao carregar dados do dashboard. Tente atualizar a página.");
       }
     }
 
-    if (!silent) {
-      toast.error("Erro ao carregar dados do dashboard. Tente atualizar a página.");
-      console.error("[Dashboard] All retries exhausted:", lastError);
-    }
     if (!silent) { setLoading(false); setRefreshing(false); }
-  }, [period]);
+  }, [period, applyData, getCacheKey]);
 
   // Load data on period change (fast - no sync, just DB queries)
   useEffect(() => {
@@ -325,13 +345,11 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className={cn("space-y-8 animate-in fade-in duration-500 relative", refreshing && "pointer-events-none")}>
+    <div className="space-y-8 animate-in fade-in duration-500 relative">
+      {/* Non-blocking loading bar — replaces the old full-screen overlay */}
       {refreshing && (
-        <div className="absolute inset-0 bg-background/50 z-50 flex items-start justify-center pt-32 rounded-xl backdrop-blur-[1px]">
-          <div className="flex items-center gap-2 bg-card border border-border/50 rounded-full px-4 py-2 shadow-lg">
-            <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-            <span className="text-sm text-muted-foreground font-medium">Atualizando...</span>
-          </div>
+        <div className="absolute top-0 left-0 right-0 z-50 h-0.5 overflow-hidden rounded-t-xl">
+          <div className="h-full bg-primary w-full animate-[shimmer_1.2s_ease-in-out_infinite] origin-left" />
         </div>
       )}
       {/* Page Header */}
