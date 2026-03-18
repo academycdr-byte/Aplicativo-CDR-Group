@@ -54,6 +54,7 @@ async function fetchAdThumbnails(
   if (adIds.length === 0) return thumbnails;
 
   // Batch fetch (max 50 per request)
+  // Fetch image_url (full res for image ads) + thumbnail_url as fallback
   const batches = [];
   for (let i = 0; i < adIds.length; i += 50) {
     batches.push(adIds.slice(i, i + 50));
@@ -63,14 +64,16 @@ async function fetchAdThumbnails(
     const ids = batch.join(",");
     try {
       const response = await fetch(
-        `https://graph.facebook.com/${FB_GRAPH_VERSION}/?ids=${ids}&fields=creative{thumbnail_url}&access_token=${accessToken}`
+        `https://graph.facebook.com/${FB_GRAPH_VERSION}/?ids=${ids}&fields=creative{thumbnail_url,image_url}&access_token=${accessToken}`
       );
       if (response.ok) {
         const data = await response.json();
         for (const [adId, adData] of Object.entries(data)) {
-          const creative = (adData as { creative?: { thumbnail_url?: string } })?.creative;
-          if (creative?.thumbnail_url) {
-            thumbnails[adId] = creative.thumbnail_url;
+          const creative = (adData as { creative?: { thumbnail_url?: string; image_url?: string } })?.creative;
+          // Prefer image_url (full res) over thumbnail_url (64x64)
+          const url = creative?.image_url || creative?.thumbnail_url;
+          if (url) {
+            thumbnails[adId] = url;
           }
         }
       }
