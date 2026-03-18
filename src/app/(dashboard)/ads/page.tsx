@@ -487,7 +487,7 @@ export default function AdsPage() {
       : value;
 
     return (
-      <Card className="border border-border shadow-none rounded-xl p-4 sm:p-5 hover:border-primary/30 transition-colors overflow-hidden">
+      <Card className="border border-border/40 shadow-none rounded-xl p-4 sm:p-5 hover:border-primary/30 transition-colors overflow-hidden">
         <div className="flex items-center justify-between mb-3">
           <span className="text-[10px] sm:text-[11px] uppercase tracking-wider font-medium text-muted-foreground truncate mr-2">{title}</span>
           <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center shrink-0 ${iconClass}`}>
@@ -606,7 +606,7 @@ export default function AdsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
         {/* Funnel - Left Side (or Top on mobile) */}
         <div className="lg:col-span-5 xl:col-span-4">
-          <Card className="h-full border border-border shadow-none rounded-xl">
+          <Card className="h-full border border-border/40 shadow-none rounded-xl">
             <CardHeader className="border-b border-border/50 px-4 sm:px-5 py-3 sm:py-4">
               <CardTitle className="text-base font-semibold">Funil de Vendas</CardTitle>
             </CardHeader>
@@ -627,7 +627,7 @@ export default function AdsPage() {
 
         {/* Main Chart - Right Side */}
         <div className="lg:col-span-7 xl:col-span-8">
-          <Card className="h-full flex flex-col border border-border shadow-none rounded-xl">
+          <Card className="h-full flex flex-col border border-border/40 shadow-none rounded-xl">
             <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/50 px-4 sm:px-5 py-3 sm:py-4">
               <CardTitle className="text-base font-semibold">Evolução Temporal</CardTitle>
               <Select value={chartMetric} onValueChange={(v) => setChartMetric(v as typeof chartMetric)}>
@@ -783,7 +783,7 @@ export default function AdsPage() {
             .map((c) => (
               <Card
                 key={c.adId}
-                className={`group overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-md border border-border shadow-none rounded-xl border-l-4 ${c.roas >= 3 ? "border-l-emerald-500" : c.roas >= 1 ? "border-l-amber-500" : "border-l-red-500"
+                className={`group overflow-hidden cursor-pointer transition-colors duration-300 border border-border/40 hover:border-border/60 shadow-none rounded-xl border-l-4 ${c.roas >= 3 ? "border-l-emerald-500" : c.roas >= 1 ? "border-l-amber-500" : "border-l-red-500"
                   }`}
                 onClick={() => {
                   setSelectedCreative(c);
@@ -880,7 +880,7 @@ export default function AdsPage() {
 
       {/* AdSet Performance Section */}
       {sortedAdSets.length > 0 && (
-      <Card className="border border-border shadow-none rounded-xl">
+      <Card className="border border-border/40 shadow-none rounded-xl">
         <CardHeader className="flex flex-row items-center justify-between border-b border-border/50 px-5 py-4">
           <div className="flex items-center gap-2">
             <Users className="w-4 h-4 text-muted-foreground" />
@@ -955,7 +955,7 @@ export default function AdsPage() {
       )}
 
       {/* Top Performers Section */}
-      <Card className="border border-border shadow-none rounded-xl">
+      <Card className="border border-border/40 shadow-none rounded-xl">
         <CardHeader className="flex flex-row items-center justify-between border-b border-border/50 px-5 py-4">
           <CardTitle className="text-base font-semibold">Top 5 Anúncios (ROAS)</CardTitle>
           <div className="flex items-center space-x-2">
@@ -999,7 +999,7 @@ export default function AdsPage() {
       </Card>
 
       {/* Detailed Table */}
-      <Card className="border border-border shadow-none rounded-xl">
+      <Card className="border border-border/40 shadow-none rounded-xl">
         <CardHeader className="flex flex-row items-center justify-between border-b border-border/50 px-5 py-4">
           <CardTitle className="text-base font-semibold">Detalhamento Completo</CardTitle>
           <div className="flex items-center gap-2">

@@ -138,7 +138,7 @@ export default function OrdersPage() {
       </div>
 
       {/* Filters */}
-      <Card className="border border-border shadow-none rounded-lg">
+      <Card className="border border-border/40 hover:border-border/60 transition-colors duration-300 shadow-none rounded-lg">
         <CardContent className="p-4">
           <div className="flex flex-col lg:flex-row gap-4 items-end">
             <form onSubmit={handleSearch} className="flex gap-2 w-full lg:w-auto flex-1">
@@ -216,7 +216,7 @@ export default function OrdersPage() {
         </CardContent>
       </Card>
 
-      <Card className="border border-border shadow-none rounded-lg overflow-hidden">
+      <Card className="border border-border/40 hover:border-border/60 transition-colors duration-300 shadow-none rounded-lg overflow-hidden">
         {loading ? (
           <div className="p-6 space-y-4">
             {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (

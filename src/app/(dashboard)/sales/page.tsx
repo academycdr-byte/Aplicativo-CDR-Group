@@ -86,63 +86,48 @@ export default function SalesPage() {
 
       {loading ? (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {[1, 2, 3].map((i) => (
-              <Card key={i} className="h-28">
-                <CardContent className="pt-5">
+              <Card key={i} className="border-border/30">
+                <CardContent className="p-3 sm:p-5">
                   <div className="animate-pulse space-y-3">
-                    <div className="h-4 w-24 bg-muted/40 rounded" />
-                    <div className="h-8 w-32 bg-muted/40 rounded" />
+                    <div className="h-3 w-20 bg-muted/30 rounded" />
+                    <div className="h-7 w-28 bg-muted/30 rounded" />
                   </div>
                 </CardContent>
               </Card>
             ))}
           </div>
-          <Card className="h-80">
+          <Card className="h-80 border-border/30">
             <div className="animate-pulse h-full w-full bg-muted/10 rounded-lg" />
           </Card>
         </div>
       ) : (
       <>
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <Card className="transition-shadow hover:shadow-md">
-          <CardContent className="pt-5">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm text-muted-foreground font-medium">Receita Total</p>
-              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                <DollarSign className="w-4 h-4 text-primary" />
-              </div>
-            </div>
-            <p className="text-2xl font-bold tracking-tight">{fmt(stats?.totalRevenue || 0)}</p>
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+        <Card className="border-border/40 hover:border-border/60 transition-colors duration-300">
+          <CardContent className="p-3 sm:p-5">
+            <p className="text-[10px] sm:text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-2 sm:mb-3">Receita Total</p>
+            <p className="text-lg sm:text-2xl font-bold tracking-tight">{fmt(stats?.totalRevenue || 0)}</p>
           </CardContent>
         </Card>
-        <Card className="transition-shadow hover:shadow-md">
-          <CardContent className="pt-5">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm text-muted-foreground font-medium">Total de Pedidos</p>
-              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                <ShoppingBag className="w-4 h-4 text-primary" />
-              </div>
-            </div>
-            <p className="text-2xl font-bold tracking-tight">{stats?.totalOrders || 0}</p>
+        <Card className="border-border/40 hover:border-border/60 transition-colors duration-300">
+          <CardContent className="p-3 sm:p-5">
+            <p className="text-[10px] sm:text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-2 sm:mb-3">Total de Pedidos</p>
+            <p className="text-lg sm:text-2xl font-bold tracking-tight">{stats?.totalOrders || 0}</p>
           </CardContent>
         </Card>
-        <Card className="transition-shadow hover:shadow-md">
-          <CardContent className="pt-5">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm text-muted-foreground font-medium">Ticket Médio</p>
-              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Receipt className="w-4 h-4 text-primary" />
-              </div>
-            </div>
-            <p className="text-2xl font-bold tracking-tight">{fmt(stats?.avgTicket || 0)}</p>
+        <Card className="border-border/40 hover:border-border/60 transition-colors duration-300">
+          <CardContent className="p-3 sm:p-5">
+            <p className="text-[10px] sm:text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-2 sm:mb-3">Ticket Médio</p>
+            <p className="text-lg sm:text-2xl font-bold tracking-tight">{fmt(stats?.avgTicket || 0)}</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Revenue Over Time */}
-      <Card>
+      <Card className="border-border/40">
         <CardHeader>
           <CardTitle className="text-base">Receita ao longo do tempo</CardTitle>
         </CardHeader>

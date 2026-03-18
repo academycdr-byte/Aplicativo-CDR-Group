@@ -12,17 +12,12 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import {
-    TrendingUp,
-    Eye,
-    Users,
     Smartphone,
     Globe,
     Monitor,
     Tablet,
-    FileText,
     Link2,
     Info,
-    type LucideIcon,
 } from "lucide-react";
 import {
     ResponsiveContainer,
@@ -36,7 +31,7 @@ import {
 } from "recharts";
 import { loadAllAnalyticsData } from "@/actions/ads";
 import { PeriodSelector, periodToParams, type PeriodValue } from "@/components/period-selector";
-import { cn } from "@/lib/utils";
+
 
 type GAData = {
     totals: {
@@ -170,25 +165,23 @@ export default function AnalyticsPage() {
 
                     {/* GA KPI Cards */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <AnalyticsKPICard title="Sessões" value={fmtNum(gaData.totals.sessions)} icon={Users} color="text-blue-500 bg-blue-500/10" />
-                        <AnalyticsKPICard title="Usuários Ativos" value={fmtNum(gaData.totals.activeUsers)} icon={Eye} color="text-emerald-500 bg-emerald-500/10" />
-                        <AnalyticsKPICard title="Pageviews" value={fmtNum(gaData.totals.screenPageViews)} icon={FileText} color="text-amber-500 bg-amber-500/10" />
+                        <AnalyticsKPICard title="Sessões" value={fmtNum(gaData.totals.sessions)} />
+                        <AnalyticsKPICard title="Usuários Ativos" value={fmtNum(gaData.totals.activeUsers)} />
+                        <AnalyticsKPICard title="Pageviews" value={fmtNum(gaData.totals.screenPageViews)} />
                         <AnalyticsKPICard
                             title="Engajamento"
                             value={fmtPercent(gaData.totals.engagementRate)}
-                            icon={TrendingUp}
-                            color="text-purple-500 bg-purple-500/10"
                             tooltip="Percentual de sessões que duraram mais de 10 segundos, tiveram um evento de conversão ou tiveram 2 ou mais visualizações de página."
                         />
                     </div>
 
                     {/* GA Secondary KPIs */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <Card className="border border-border shadow-none rounded-lg p-4">
+                        <Card className="border border-border/40 hover:border-border/60 transition-colors duration-300 shadow-none rounded-lg p-4">
                             <span className="text-[11px] uppercase tracking-wider font-medium text-muted-foreground">Novos Usuários</span>
                             <div className="text-lg font-bold mt-1">{fmtNum(gaData.totals.newUsers)}</div>
                         </Card>
-                        <Card className="border border-border shadow-none rounded-lg p-4">
+                        <Card className="border border-border/40 hover:border-border/60 transition-colors duration-300 shadow-none rounded-lg p-4">
                             <div className="flex items-center gap-1.5">
                                 <span className="text-[11px] uppercase tracking-wider font-medium text-muted-foreground">Bounce Rate</span>
                                 <div className="relative">
@@ -210,14 +203,14 @@ export default function AnalyticsPage() {
                             </div>
                             <div className="text-lg font-bold mt-1">{fmtPercent(gaData.totals.bounceRate)}</div>
                         </Card>
-                        <Card className="border border-border shadow-none rounded-lg p-4">
+                        <Card className="border border-border/40 hover:border-border/60 transition-colors duration-300 shadow-none rounded-lg p-4">
                             <span className="text-[11px] uppercase tracking-wider font-medium text-muted-foreground">Tempo Médio</span>
                             <div className="text-lg font-bold mt-1">{fmtDuration(gaData.totals.avgSessionDuration)}</div>
                         </Card>
                     </div>
 
                     {/* GA Daily Chart */}
-                    <Card className="border border-border shadow-none rounded-lg">
+                    <Card className="border border-border/40 hover:border-border/60 transition-colors duration-300 shadow-none rounded-lg">
                         <CardHeader className="border-b border-border/50 px-5 py-4">
                             <CardTitle className="text-base font-semibold">Sessões e Usuários por Dia</CardTitle>
                         </CardHeader>
@@ -242,7 +235,7 @@ export default function AnalyticsPage() {
                     {/* Traffic Sources (redesigned) + Traffic Table + Top Pages */}
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         {/* Traffic Sources - Horizontal Bars */}
-                        <Card className="lg:col-span-1 border border-border shadow-none rounded-lg">
+                        <Card className="lg:col-span-1 border border-border/40 hover:border-border/60 transition-colors duration-300 shadow-none rounded-lg">
                             <CardHeader className="border-b border-border/50 px-5 py-4">
                                 <CardTitle className="text-base font-semibold">Origens de Tráfego</CardTitle>
                             </CardHeader>
@@ -285,7 +278,7 @@ export default function AnalyticsPage() {
                         </Card>
 
                         {/* Traffic Sources Table */}
-                        <Card className="border border-border shadow-none rounded-lg">
+                        <Card className="border border-border/40 hover:border-border/60 transition-colors duration-300 shadow-none rounded-lg">
                             <CardHeader className="border-b border-border/50 px-5 py-4">
                                 <CardTitle className="text-base font-semibold">Fontes de Tráfego</CardTitle>
                             </CardHeader>
@@ -316,7 +309,7 @@ export default function AnalyticsPage() {
                         </Card>
 
                         {/* Top Pages */}
-                        <Card className="border border-border shadow-none rounded-lg">
+                        <Card className="border border-border/40 hover:border-border/60 transition-colors duration-300 shadow-none rounded-lg">
                             <CardHeader className="border-b border-border/50 px-5 py-4">
                                 <CardTitle className="text-base font-semibold">Top Páginas</CardTitle>
                             </CardHeader>
@@ -349,7 +342,7 @@ export default function AnalyticsPage() {
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* Devices */}
-                        <Card className="border border-border shadow-none rounded-lg">
+                        <Card className="border border-border/40 hover:border-border/60 transition-colors duration-300 shadow-none rounded-lg">
                             <CardHeader className="border-b border-border/50 px-5 py-4">
                                 <div>
                                     <CardTitle className="text-base font-semibold">Dispositivos</CardTitle>
@@ -385,7 +378,7 @@ export default function AnalyticsPage() {
                         </Card>
 
                         {/* Geography - Top 10 */}
-                        <Card className="border border-border shadow-none rounded-lg">
+                        <Card className="border border-border/40 hover:border-border/60 transition-colors duration-300 shadow-none rounded-lg">
                             <CardHeader className="border-b border-border/50 px-5 py-4">
                                 <div>
                                     <CardTitle className="text-base font-semibold">Top 10 Regiões</CardTitle>
@@ -424,36 +417,31 @@ export default function AnalyticsPage() {
     );
 }
 
-function AnalyticsKPICard({ title, value, icon: Icon, color, tooltip }: { title: string; value: string; icon: LucideIcon; color: string; tooltip?: string }) {
+function AnalyticsKPICard({ title, value, tooltip }: { title: string; value: string; tooltip?: string }) {
     const [showTooltip, setShowTooltip] = useState(false);
 
     return (
-        <Card className="border border-border shadow-none rounded-lg p-5">
-            <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-1.5">
-                    <span className="text-[11px] uppercase tracking-wider font-medium text-muted-foreground">{title}</span>
-                    {tooltip && (
-                        <div className="relative">
-                            <button
-                                type="button"
-                                onClick={() => setShowTooltip(!showTooltip)}
-                                onMouseEnter={() => setShowTooltip(true)}
-                                onMouseLeave={() => setShowTooltip(false)}
-                                className="focus:outline-none"
-                            >
-                                <Info className="w-3.5 h-3.5 text-muted-foreground/50 cursor-help" />
-                            </button>
-                            {showTooltip && (
-                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-popover text-popover-foreground text-xs rounded-lg shadow-lg border border-border w-56 z-50">
-                                    {tooltip}
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
-                <div className={cn("w-8 h-8 rounded-full flex items-center justify-center", color)}>
-                    <Icon className="w-4 h-4" />
-                </div>
+        <Card className="border border-border/40 hover:border-border/60 transition-colors duration-300 shadow-none rounded-lg p-5">
+            <div className="flex items-center gap-1.5 mb-2">
+                <span className="text-[11px] uppercase tracking-wider font-medium text-muted-foreground">{title}</span>
+                {tooltip && (
+                    <div className="relative">
+                        <button
+                            type="button"
+                            onClick={() => setShowTooltip(!showTooltip)}
+                            onMouseEnter={() => setShowTooltip(true)}
+                            onMouseLeave={() => setShowTooltip(false)}
+                            className="focus:outline-none"
+                        >
+                            <Info className="w-3.5 h-3.5 text-muted-foreground/50 cursor-help" />
+                        </button>
+                        {showTooltip && (
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-popover text-popover-foreground text-xs rounded-lg shadow-lg border border-border w-56 z-50">
+                                {tooltip}
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
             <div className="text-2xl font-bold tracking-tight">{value}</div>
         </Card>

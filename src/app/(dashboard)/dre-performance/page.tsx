@@ -38,15 +38,13 @@ const RECOMPRA_KEY = "cdr-dre-recompra";
 function KPICard({
   title,
   value,
-  icon: Icon,
-  iconClass,
   valueClass,
   subText,
   className,
 }: {
   title: string;
   value: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon?: React.ComponentType<{ className?: string }>;
   iconClass?: string;
   valueClass?: string;
   subText?: string;
@@ -55,31 +53,19 @@ function KPICard({
   return (
     <Card
       className={cn(
-        "border border-border shadow-none rounded-lg p-3 sm:p-5 transition-colors duration-200 ease-[cubic-bezier(0.25,0.1,0.25,1)] hover:border-primary/20",
+        "border border-border/40 hover:border-border/60 shadow-none rounded-lg p-3 sm:p-5 transition-colors duration-300",
         className
       )}
     >
-      <div className="flex items-center justify-between mb-1.5 sm:mb-2">
-        <span className="text-[10px] sm:text-[11px] uppercase tracking-wider font-medium opacity-70 leading-tight">
-          {title}
-        </span>
-        <div
-          className={cn(
-            "w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center shrink-0",
-            iconClass
-          )}
-        >
-          <Icon className="w-3 h-3 sm:w-4 sm:h-4" />
-        </div>
+      <span className="text-[10px] sm:text-[11px] uppercase tracking-wider font-medium text-muted-foreground leading-tight">
+        {title}
+      </span>
+      <div className={cn("text-lg sm:text-2xl font-bold tracking-tight mt-1", valueClass)}>
+        {value}
       </div>
-      <div>
-        <div className={cn("text-lg sm:text-2xl font-bold tracking-tight", valueClass)}>
-          {value}
-        </div>
-        {subText && (
-          <p className="text-[10px] sm:text-xs opacity-70 mt-0.5 sm:mt-1">{subText}</p>
-        )}
-      </div>
+      {subText && (
+        <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">{subText}</p>
+      )}
     </Card>
   );
 }
@@ -169,7 +155,7 @@ export default function DREPerformancePage() {
 
       {/* Hero Insight Banner - Apple HIG Alert Style */}
       <Card className={cn(
-        "border shadow-sm rounded-lg p-4 sm:p-5 backdrop-blur-sm transition-colors duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)]",
+        "border border-border/40 hover:border-border/60 shadow-none rounded-lg p-4 sm:p-5 backdrop-blur-sm transition-colors duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)]",
         isHealthy
           ? "border-emerald-500/20 bg-emerald-500/[0.04]"
           : isWarning

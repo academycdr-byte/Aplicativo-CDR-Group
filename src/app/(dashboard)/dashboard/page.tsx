@@ -374,7 +374,7 @@ export default function DashboardPage() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <KPICard
           label="FATURAMENTO"
           value={fmtRevenue(stats?.revenue || 0)}
@@ -730,12 +730,12 @@ function KPICard({ label, value, change, icon: Icon, trend, action, tag }: {
 
   return (
     <Card className="border-border/40 hover:border-border/60 transition-colors duration-300" role="status" aria-label={`${label}${tag ? ` (${tag})` : ''}: ${value}`}>
-      <CardContent className="p-4 sm:p-5">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
+      <CardContent className="p-3 sm:p-5">
+        <div className="flex items-center justify-between mb-2 sm:mb-3">
+          <div className="flex items-center gap-1.5">
+            <p className="text-[10px] sm:text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
             {tag && (
-              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500">
+              <span className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500">
                 <CheckCircle className="w-2.5 h-2.5" aria-hidden="true" />
                 <span className="text-[9px] font-semibold uppercase tracking-wide leading-none">{tag}</span>
               </span>
@@ -743,11 +743,11 @@ function KPICard({ label, value, change, icon: Icon, trend, action, tag }: {
           </div>
           {action}
         </div>
-        <h3 className="text-2xl sm:text-[28px] font-bold tracking-tight text-foreground leading-none">{value}</h3>
-        <div className="flex items-center gap-2 mt-2">
+        <h3 className="text-lg sm:text-[28px] font-bold tracking-tight text-foreground leading-none">{value}</h3>
+        <div className="flex items-center gap-1.5 mt-1.5 sm:mt-2">
           {change && change !== "0%" && (
             <span className={cn(
-              "text-xs font-medium",
+              "text-[10px] sm:text-xs font-medium",
               isPositive && "text-emerald-500",
               isNegative && "text-red-400",
               !isPositive && !isNegative && "text-muted-foreground"
@@ -755,7 +755,7 @@ function KPICard({ label, value, change, icon: Icon, trend, action, tag }: {
               {change}
             </span>
           )}
-          <span className="text-xs text-muted-foreground/60">vs período anterior</span>
+          <span className="text-[10px] sm:text-xs text-muted-foreground/60 hidden sm:inline">vs período anterior</span>
         </div>
       </CardContent>
     </Card>
