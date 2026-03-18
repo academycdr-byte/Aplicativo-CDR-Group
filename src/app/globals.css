@@ -125,27 +125,31 @@
 }
 
 .dark {
-  /* === DARK MODE - Academia Lendaria Premium Dark === */
-  --background: oklch(0.06 0.01 150);
+  /* === DARK MODE — Premium Neutral (Linear / Vercel / Stripe reference)
+     Backgrounds are pure neutral (chroma 0). Brand green shows only
+     in primary, charts, and interactive accents — never in surfaces.
+     This creates a professional, grown-up look where DATA is the hero. === */
+  --background: oklch(0.085 0 0);
   --foreground: oklch(0.95 0 0);
 
-  --card: oklch(0.15 0.015 150);
+  --card: oklch(0.115 0 0);
   --card-foreground: oklch(0.95 0 0);
 
-  --popover: oklch(0.15 0.015 150);
+  --popover: oklch(0.12 0 0);
   --popover-foreground: oklch(0.95 0 0);
 
+  /* Primary — CDR brand green (the ONLY color accent) */
   --primary: oklch(0.72 0.17 148);
-  --primary-foreground: oklch(0.08 0.01 150);
+  --primary-foreground: oklch(0.08 0 0);
 
-  --secondary: oklch(0.16 0.015 150);
-  --secondary-foreground: oklch(0.95 0 0);
+  --secondary: oklch(0.14 0 0);
+  --secondary-foreground: oklch(0.93 0 0);
 
-  --muted: oklch(0.16 0.015 150);
-  --muted-foreground: oklch(0.65 0.01 0);
+  --muted: oklch(0.14 0 0);
+  --muted-foreground: oklch(0.55 0 0);
 
-  --accent: oklch(0.16 0.015 150);
-  --accent-foreground: oklch(0.95 0 0);
+  --accent: oklch(0.15 0 0);
+  --accent-foreground: oklch(0.93 0 0);
 
   --destructive: oklch(0.63 0.22 25);
   --destructive-foreground: oklch(0.95 0 0);
@@ -153,54 +157,54 @@
   --success: oklch(0.72 0.17 148);
   --warning: oklch(0.85 0.16 80);
 
-  --border: oklch(1 0 0 / 0.08);
+  --border: oklch(1 0 0 / 0.06);
   --input: oklch(1 0 0 / 0.08);
   --ring: oklch(0.72 0.17 148);
 
-  /* Charts - Dark Mode */
+  /* Charts — carefully curated palette, balanced saturation */
   --chart-1: oklch(0.72 0.17 148);
-  --chart-2: oklch(0.6 0.15 155);
-  --chart-3: oklch(0.55 0.12 170);
-  --chart-4: oklch(0.75 0.15 110);
-  --chart-5: oklch(0.48 0.1 160);
+  --chart-2: oklch(0.65 0.14 230);
+  --chart-3: oklch(0.60 0.15 300);
+  --chart-4: oklch(0.75 0.14 80);
+  --chart-5: oklch(0.55 0.12 170);
 
-  /* Sidebar Dark - Deeper than background (Academia) */
-  --sidebar-bg: oklch(0.04 0.01 150);
-  --sidebar-text: oklch(0.72 0.01 0);
+  /* Sidebar — deeper than page background for visual anchoring */
+  --sidebar-bg: oklch(0.055 0 0);
+  --sidebar-text: oklch(0.65 0 0);
   --sidebar-hover: oklch(1 0 0 / 0.04);
   --sidebar-active: oklch(1 0 0 / 0.06);
-  --sidebar-border: oklch(1 0 0 / 0.06);
+  --sidebar-border: oklch(1 0 0 / 0.05);
 
-  --sidebar: oklch(0.06 0.01 150);
-  --sidebar-foreground: oklch(0.95 0 0);
+  --sidebar: oklch(0.065 0 0);
+  --sidebar-foreground: oklch(0.93 0 0);
   --sidebar-primary: oklch(0.72 0.17 148);
-  --sidebar-primary-foreground: oklch(0.06 0.01 150);
-  --sidebar-accent: oklch(0.16 0.015 150);
-  --sidebar-accent-foreground: oklch(0.95 0 0);
+  --sidebar-primary-foreground: oklch(0.065 0 0);
+  --sidebar-accent: oklch(0.14 0 0);
+  --sidebar-accent-foreground: oklch(0.93 0 0);
   --sidebar-ring: oklch(0.72 0.17 148);
 
-  /* === SURFACES (Academia Lendaria - rgba sobre escuro) === */
-  --surface-hover: rgba(255, 255, 255, 0.04);
-  --surface-elevated: rgba(255, 255, 255, 0.05);
-  --surface-glass: rgba(255, 255, 255, 0.08);
-  --surface-active: rgba(255, 255, 255, 0.1);
-  --surface-button: rgba(255, 255, 255, 0.12);
+  /* === SURFACES (neutral rgba overlays) === */
+  --surface-hover: rgba(255, 255, 255, 0.035);
+  --surface-elevated: rgba(255, 255, 255, 0.04);
+  --surface-glass: rgba(255, 255, 255, 0.06);
+  --surface-active: rgba(255, 255, 255, 0.08);
+  --surface-button: rgba(255, 255, 255, 0.10);
 
-  /* === BORDERS (Academia Lendaria) === */
-  --border-subtle: rgba(255, 255, 255, 0.06);
-  --border-glass: rgba(255, 255, 255, 0.08);
-  --border-default: rgba(255, 255, 255, 0.1);
-  --border-visible: rgba(255, 255, 255, 0.16);
+  /* === BORDERS === */
+  --border-subtle: rgba(255, 255, 255, 0.04);
+  --border-glass: rgba(255, 255, 255, 0.06);
+  --border-default: rgba(255, 255, 255, 0.08);
+  --border-visible: rgba(255, 255, 255, 0.14);
 
-  /* === SHADOWS (Dark Mode - deeper) === */
+  /* === SHADOWS (deeper for true dark mode) === */
   --shadow-xs: none;
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6);
-  --shadow-xl: 0 20px 48px rgba(0, 0, 0, 0.7);
-  --shadow-floating: 0 16px 48px rgba(0, 0, 0, 0.5);
-  --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.3);
-  --shadow-glow: 0 0 24px oklch(0.72 0.17 148 / 0.15);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.7);
+  --shadow-xl: 0 24px 56px rgba(0, 0, 0, 0.8);
+  --shadow-floating: 0 16px 48px rgba(0, 0, 0, 0.6);
+  --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.4);
+  --shadow-glow: 0 0 24px oklch(0.72 0.17 148 / 0.12);
 }
 
 @theme inline {

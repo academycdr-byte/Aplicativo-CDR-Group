@@ -351,11 +351,9 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8 animate-in fade-in duration-500 relative">
       {refreshing && (
-        <div className="absolute inset-0 bg-background/50 z-50 flex items-start justify-center pt-32 rounded-xl backdrop-blur-[1px]">
-          <div className="flex items-center gap-2 bg-card border border-border/50 rounded-full px-4 py-2 shadow-lg">
-            <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-            <span className="text-sm text-muted-foreground font-medium">Atualizando...</span>
-          </div>
+        <div className="fixed top-4 right-4 z-50 flex items-center gap-2 bg-card/90 backdrop-blur-md border border-border/50 rounded-full px-3.5 py-1.5 shadow-lg animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <span className="text-xs text-muted-foreground font-medium">Atualizando...</span>
         </div>
       )}
       {/* Page Header */}
@@ -429,7 +427,7 @@ export default function DashboardPage() {
       {/* Main Chart + Calendar Section */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Performance Chart */}
-        <Card className="xl:col-span-2 shadow-sm">
+        <Card className="xl:col-span-2 border-border/40">
           <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between space-y-0 pb-4">
             <div className="space-y-1">
               <CardTitle>Performance</CardTitle>
@@ -624,7 +622,7 @@ export default function DashboardPage() {
         </Card>
 
         {/* Profit Calendar */}
-        <Card className="shadow-sm">
+        <Card className="border-border/40">
           <CardHeader>
             <CardTitle>Lucro Estimado</CardTitle>
             <CardDescription>{getMonthLabel()}</CardDescription>
@@ -645,7 +643,7 @@ export default function DashboardPage() {
       {/* Row: Funnel + Rates */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         {/* Funnel Visual */}
-        <Card className="shadow-sm overflow-hidden">
+        <Card className="border-border/40 overflow-hidden">
           <CardHeader className="border-b border-border/40 bg-muted/20">
             <div className="flex items-center justify-between">
               <div className="space-y-1">
@@ -727,43 +725,37 @@ function buildFunnelRates(f: FunnelData): FunnelRate[] {
 function KPICard({ label, value, change, icon: Icon, trend, action, tag }: {
   label: string; value: string; change: string; icon: LucideIcon; trend: "up" | "down" | "neutral"; action?: React.ReactNode; tag?: string;
 }) {
-  const isPositive = change && change.startsWith("+") || trend === "up";
-  const isNegative = change && change.startsWith("-") || trend === "down";
+  const isPositive = change && (change.startsWith("+") || trend === "up");
+  const isNegative = change && (change.startsWith("-") || trend === "down");
 
   return (
-    <Card className="shadow-sm group relative overflow-hidden" role="status" aria-label={`${label}${tag ? ` (${tag})` : ''}: ${value}`}>
-      <div className="absolute right-0 top-0 p-3 opacity-5 group-hover:opacity-10 transition-opacity" aria-hidden="true">
-        <Icon className="w-12 h-12 sm:w-16 sm:h-16" />
-      </div>
-      <CardContent className="p-4 sm:p-6 relative z-10">
-        <div className="flex items-start justify-between mb-3 sm:mb-4">
-          <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
-            <Icon className="w-5 h-5" />
-          </div>
+    <Card className="border-border/40 hover:border-border/60 transition-colors duration-300" role="status" aria-label={`${label}${tag ? ` (${tag})` : ''}: ${value}`}>
+      <CardContent className="p-4 sm:p-5">
+        <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            {change && (
-              <Badge variant="outline" className={cn(
-                "font-mono text-[10px] px-1.5 py-0 h-5 border-transparent bg-secondary/50",
-                isPositive && "text-emerald-500 bg-emerald-500/10",
-                isNegative && "text-red-500 bg-red-500/10"
-              )}>
-                {change}
-              </Badge>
-            )}
-            {action}
-          </div>
-        </div>
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
+            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
             {tag && (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-500">
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500">
                 <CheckCircle className="w-2.5 h-2.5" aria-hidden="true" />
-                <span className="text-[9px] font-semibold uppercase tracking-wider leading-none">{tag}</span>
+                <span className="text-[9px] font-semibold uppercase tracking-wide leading-none">{tag}</span>
               </span>
             )}
           </div>
-          <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">{value}</h3>
+          {action}
+        </div>
+        <h3 className="text-2xl sm:text-[28px] font-bold tracking-tight text-foreground leading-none">{value}</h3>
+        <div className="flex items-center gap-2 mt-2">
+          {change && change !== "0%" && (
+            <span className={cn(
+              "text-xs font-medium",
+              isPositive && "text-emerald-500",
+              isNegative && "text-red-400",
+              !isPositive && !isNegative && "text-muted-foreground"
+            )}>
+              {change}
+            </span>
+          )}
+          <span className="text-xs text-muted-foreground/60">vs período anterior</span>
         </div>
       </CardContent>
     </Card>
@@ -779,21 +771,19 @@ function RateCard({ title, value, subtext, progress, colorClass, icon: Icon }: {
   icon: React.ComponentType<{ className?: string }>;
 }) {
   return (
-    <Card className="shadow-sm flex flex-col justify-between p-6" role="status" aria-label={`${title}: ${value}`}>
+    <Card className="border-border/40 flex flex-col justify-between p-5 sm:p-6" role="status" aria-label={`${title}: ${value}`}>
       <div className="flex items-center justify-between mb-4">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{title}</span>
-        <Icon className="w-4 h-4 text-muted-foreground/50" aria-hidden="true" />
+        <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{title}</span>
+        <Icon className="w-4 h-4 text-muted-foreground/40" aria-hidden="true" />
       </div>
 
       <div className="space-y-3">
-        <div className="flex items-baseline justify-between">
-          <div className="text-2xl font-bold tracking-tight">{value}</div>
-        </div>
+        <div className="text-2xl sm:text-[28px] font-bold tracking-tight leading-none">{value}</div>
 
-        <div className="h-2 w-full bg-secondary rounded-full overflow-hidden" role="progressbar" aria-valuenow={Math.min(progress, 100)} aria-valuemin={0} aria-valuemax={100} aria-label={`${title} progresso`}>
-          <div className={`h-full rounded-full transition-all duration-500 ${colorClass}`} style={{ width: `${Math.min(progress, 100)}%` }} />
+        <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden" role="progressbar" aria-valuenow={Math.min(progress, 100)} aria-valuemin={0} aria-valuemax={100} aria-label={`${title} progresso`}>
+          <div className={`h-full rounded-full transition-all duration-700 ease-out ${colorClass}`} style={{ width: `${Math.min(progress, 100)}%` }} />
         </div>
-        <p className="text-xs text-muted-foreground font-medium">{subtext}</p>
+        <p className="text-xs text-muted-foreground">{subtext}</p>
       </div>
     </Card>
   );
@@ -801,17 +791,27 @@ function RateCard({ title, value, subtext, progress, colorClass, icon: Icon }: {
 
 function DashboardSkeleton() {
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div className="h-8 w-32 bg-muted/40 rounded-lg animate-pulse" />
-        <div className="h-10 w-48 bg-muted/40 rounded-lg animate-pulse" />
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="flex justify-between items-end">
+        <div className="space-y-2">
+          <div className="h-7 w-36 bg-muted/30 rounded-lg animate-pulse" />
+          <div className="h-4 w-56 bg-muted/20 rounded-md animate-pulse" />
+        </div>
+        <div className="h-9 w-44 bg-muted/20 rounded-lg animate-pulse" />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[...Array(4)].map((_, i) => (
-          <div key={i} className="h-32 bg-muted/40 rounded-2xl animate-pulse" />
+          <div key={i} className="h-[120px] bg-card border border-border/30 rounded-xl animate-pulse p-5">
+            <div className="h-3 w-20 bg-muted/30 rounded mb-4" />
+            <div className="h-7 w-32 bg-muted/30 rounded mb-2" />
+            <div className="h-3 w-24 bg-muted/20 rounded" />
+          </div>
         ))}
       </div>
-      <div className="h-96 bg-muted/40 rounded-2xl animate-pulse" />
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div className="xl:col-span-2 h-[420px] bg-card border border-border/30 rounded-xl animate-pulse" />
+        <div className="h-[420px] bg-card border border-border/30 rounded-xl animate-pulse" />
+      </div>
     </div>
-  )
+  );
 }

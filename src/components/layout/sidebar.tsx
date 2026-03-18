@@ -97,19 +97,19 @@ export function Sidebar() {
         <Image
           src="/logo-cdr.png"
           alt="CDR Group"
-          width={44}
-          height={44}
-          className="rounded-xl shadow-sm"
+          width={40}
+          height={40}
+          className="rounded-xl"
           priority
         />
         <div>
-          <p className="font-semibold text-base leading-tight text-white tracking-wide">CDR Group</p>
-          <p className="text-[11px] text-sidebar-text/40 leading-tight font-medium tracking-wider uppercase">Performance</p>
+          <p className="font-semibold text-[15px] leading-tight text-sidebar-foreground tracking-tight">CDR Group</p>
+          <p className="text-[10px] text-sidebar-text/40 leading-tight font-medium tracking-widest uppercase mt-0.5">Performance</p>
         </div>
       </div>
 
-      {/* Divider glow */}
-      <div className="mx-6 mb-4 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
+      {/* Divider */}
+      <div className="mx-6 mb-4 h-px bg-sidebar-border" />
 
       {/* Navigation */}
       <nav className="flex-1 px-4 space-y-8 overflow-y-auto no-scrollbar py-2" aria-label="Navegacao principal">
