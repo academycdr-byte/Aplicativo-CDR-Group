@@ -102,10 +102,37 @@ export async function GET(
             const storyId = creative.effective_object_story_id;
 
             // 3a: Try fetching the post directly — video posts have 'source' at top level
+            // Also try 'object_id' which for video posts is the video object ID
             const storyData = await fbGet(
-                `${storyId}?fields=source,type,full_picture,attachments{media{source,image{src,width,height}},type,subattachments{media{source,image{src}},type}}`,
+                `${storyId}?fields=source,type,full_picture,object_id,attachments{media{source,image{src,width,height}},type,subattachments{media{source,image{src}},type}}`,
                 accessToken
             );
+
+            // 3a-extra: If story has object_id, it might be the video ID
+            if (storyData?.object_id && !storyData?.source) {
+                const objVideo = await fbGet(
+                    `${storyData.object_id}?fields=source,picture`,
+                    accessToken
+                );
+                if (objVideo?.source) {
+                    await prisma.adMetric.updateMany({
+                        where: { adId },
+                        data: { videoUrl: objVideo.source },
+                    });
+                    const poster = objVideo.picture || storyData.full_picture;
+                    if (poster) {
+                        await prisma.adMetric.updateMany({
+                            where: { adId },
+                            data: { thumbnailUrl: poster },
+                        });
+                    }
+                    return NextResponse.json({
+                        videoUrl: objVideo.source,
+                        imageUrl: poster || null,
+                        type: "video",
+                    });
+                }
+            }
 
             if (storyData) {
                 // 3b: Video source directly on the post (most reliable for video posts)
@@ -207,8 +234,49 @@ export async function GET(
                     }
                 }
 
-                // 3e: Fallback to full_picture (high-res image, better than thumbnail_url)
-                if (storyData.full_picture) {
+                // 3e: Try Instagram Media API (for Instagram-placed ads)
+                // Instagram media can be fetched via /{ig_media_id}?fields=media_url,media_type
+                const igMediaId = storyId.split("_").pop();
+                if (igMediaId) {
+                    const igMedia = await fbGet(
+                        `${igMediaId}?fields=media_url,media_type,thumbnail_url`,
+                        accessToken
+                    );
+                    if (igMedia?.media_url) {
+                        if (igMedia.media_type === "VIDEO") {
+                            await prisma.adMetric.updateMany({
+                                where: { adId },
+                                data: { videoUrl: igMedia.media_url },
+                            });
+                            const poster = igMedia.thumbnail_url || storyData?.full_picture;
+                            if (poster) {
+                                await prisma.adMetric.updateMany({
+                                    where: { adId },
+                                    data: { thumbnailUrl: poster },
+                                });
+                            }
+                            return NextResponse.json({
+                                videoUrl: igMedia.media_url,
+                                imageUrl: poster || null,
+                                type: "video",
+                            });
+                        } else {
+                            // It's an image — use the media_url (full res)
+                            await prisma.adMetric.updateMany({
+                                where: { adId },
+                                data: { thumbnailUrl: igMedia.media_url },
+                            });
+                            return NextResponse.json({
+                                videoUrl: null,
+                                imageUrl: igMedia.media_url,
+                                type: "image",
+                            });
+                        }
+                    }
+                }
+
+                // 3f: Fallback to full_picture (high-res image, better than thumbnail_url)
+                if (storyData?.full_picture) {
                     await prisma.adMetric.updateMany({
                         where: { adId },
                         data: { thumbnailUrl: storyData.full_picture },
