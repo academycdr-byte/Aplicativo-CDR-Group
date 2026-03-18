@@ -107,13 +107,10 @@ export default function LoginPage() {
   }
 
   return (
-    <Card className="w-full border-white/10 bg-white/5 backdrop-blur-2xl shadow-2xl">
+    <Card className="w-full border-border/40 backdrop-blur-xl shadow-xl">
       <CardHeader className="text-center space-y-2 pb-6">
-        <div className="mx-auto w-12 h-12 rounded-2xl bg-primary/20 flex items-center justify-center mb-2 ring-1 ring-primary/30 shadow-glow">
-          <ShieldCheck className="w-6 h-6 text-primary" />
-        </div>
-        <CardTitle className="text-2xl font-bold tracking-tight">Bem-vindo de volta</CardTitle>
-        <CardDescription className="text-base">
+        <CardTitle className="text-xl font-bold tracking-tight">Bem-vindo de volta</CardTitle>
+        <CardDescription>
           Acesse sua conta para continuar
         </CardDescription>
       </CardHeader>

@@ -4,12 +4,6 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import {
-  TrendingUp,
-  PieChart,
-  Target,
-  DollarSign,
-  BarChart3,
-  Hash,
   AlertTriangle,
   CheckCircle2,
 } from "lucide-react";
@@ -44,8 +38,6 @@ function KPICard({
 }: {
   title: string;
   value: string;
-  icon?: React.ComponentType<{ className?: string }>;
-  iconClass?: string;
   valueClass?: string;
   subText?: string;
   className?: string;
@@ -223,39 +215,27 @@ export default function DREPerformancePage() {
           <KPICard
             title="Margem Bruta"
             value={formatPct(metrics.margemBrutaPct)}
-            icon={TrendingUp}
-            iconClass="bg-emerald-500/10 text-emerald-500"
             valueClass={metrics.margemBrutaPct >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600"}
             subText={`${formatBRL(metrics.margemBrutaUnit)} por venda (antes do custo de aquisição)`}
           />
           <KPICard
             title="Margem de Contribuição"
             value={formatPct(metrics.mcPct)}
-            icon={PieChart}
-            iconClass="bg-blue-500/10 text-blue-500"
             valueClass={metrics.mcPct >= 0 ? "text-blue-600 dark:text-blue-400" : "text-red-600"}
             subText={`${formatBRL(metrics.margemContribUnit)} por venda (já descontando aquisição)`}
           />
           <KPICard
             title="ROAS Mínimo"
             value={`${metrics.breakevenRoas.toFixed(2)}x`}
-            icon={Target}
-            iconClass="bg-amber-500/10 text-amber-500"
             subText="Abaixo desse ROAS, a operação dá prejuízo"
           />
           <KPICard
             title="Lucro Bruto Mensal"
             value={formatBRL(metrics.lucroBruto, true)}
-            icon={DollarSign}
             className={
               metrics.lucroBruto >= 0
                 ? "border-emerald-500/20 bg-emerald-500/5"
                 : "border-red-500/20 bg-red-500/5"
-            }
-            iconClass={
-              metrics.lucroBruto >= 0
-                ? "bg-emerald-500/20 text-emerald-500"
-                : "bg-red-500/20 text-red-500"
             }
             valueClass={
               metrics.lucroBruto >= 0
@@ -276,8 +256,6 @@ export default function DREPerformancePage() {
           <KPICard
             title="ROAS Realizado"
             value={`${metrics.roasRealizado.toFixed(2)}x`}
-            icon={BarChart3}
-            iconClass="bg-indigo-500/10 text-indigo-500"
             subText={inputs.impostoMetaAds > 0 || inputs.percentualAprovados < 100
               ? `Ajustado: ${formatBRL(metrics.receitaEfetiva, true)} receita ÷ ${formatBRL(metrics.budgetEfetivo, true)} custo real`
               : "Receita total dividida pelo investimento em anúncios"}
@@ -285,15 +263,11 @@ export default function DREPerformancePage() {
           <KPICard
             title="Markup"
             value={`${metrics.markup.toFixed(2)}x`}
-            icon={Hash}
-            iconClass="bg-violet-500/10 text-violet-500"
             subText="Quantas vezes o preço de venda é maior que o custo do produto"
           />
           <KPICard
             title="Ticket Médio"
             value={formatBRL(metrics.ticketMedio)}
-            icon={DollarSign}
-            iconClass="bg-sky-500/10 text-sky-500"
             subText={`${metrics.pedidosAprovadosCount} aprovados, ${metrics.numeroDevolucoes} devoluções`}
             className="col-span-2 sm:col-span-1"
           />

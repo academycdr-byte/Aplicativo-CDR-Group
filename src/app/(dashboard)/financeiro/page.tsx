@@ -142,7 +142,7 @@ export default function FinancePage() {
                 <div>
                     <h2 className="text-2xl font-bold tracking-tight">Financeiro</h2>
                     <p className="text-muted-foreground text-sm mt-0.5">
-                        Gestao de lucro liquido e unit economics.
+                        Gestão de lucro líquido e unit economics.
                     </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 sm:gap-3">
@@ -253,7 +253,7 @@ export default function FinancePage() {
                     {/* Bottom row: Net Profit + Margin */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                         <FinancialCard
-                            title="Lucro Liquido"
+                            title="Lucro Líquido"
                             value={fmt(metrics.netProfit)}
                             icon={PieChart}
                             className={metrics.netProfit >= 0 ? "border-emerald-500/20 bg-emerald-500/5" : "border-red-500/20 bg-red-500/5"}
@@ -261,7 +261,7 @@ export default function FinancePage() {
                             valueClass={metrics.netProfit >= 0 ? "text-emerald-600" : "text-red-600"}
                         />
                         <FinancialCard
-                            title="Margem Liquida"
+                            title="Margem Líquida"
                             value={`${metrics.margin.toFixed(2)}%`}
                             icon={Percent}
                             className={metrics.margin >= 0 ? "" : ""}

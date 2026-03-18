@@ -146,7 +146,7 @@ export function EstimatedProfitCalendar({ data, totalProfit, currentMonthLabel, 
                 </div>
                 <div className="flex items-center gap-2">
                     <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
-                    <span>Prejuizo</span>
+                    <span>Prejuízo</span>
                 </div>
             </div>
         </div>

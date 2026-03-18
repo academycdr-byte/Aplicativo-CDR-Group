@@ -112,7 +112,7 @@ export function Sidebar() {
       <div className="mx-6 mb-4 h-px bg-sidebar-border" />
 
       {/* Navigation */}
-      <nav className="flex-1 px-4 space-y-8 overflow-y-auto no-scrollbar py-2" aria-label="Navegacao principal">
+      <nav className="flex-1 px-4 space-y-8 overflow-y-auto no-scrollbar py-2" aria-label="Navegação principal">
         {filteredAiNav.length > 0 && (
           <div className="space-y-1">
             <p className="section-label-accent px-3 mb-3">
@@ -138,7 +138,7 @@ export function Sidebar() {
         {filteredManagementNav.length > 0 && (
           <div className="space-y-1">
             <p className="section-label px-3 mb-3 text-sidebar-text/40">
-              Gestao
+              Gestão
             </p>
             {filteredManagementNav.map((item) => (
               <NavLink key={item.href} item={item} pathname={pathname} />
