@@ -105,19 +105,33 @@ export async function GET(
         // Step 3: If no direct video_id, try effective_object_story_id (post-based creatives)
         if (!videoId && creative.effective_object_story_id) {
             const storyId = creative.effective_object_story_id;
+            // Extract page ID from story ID format: {page_id}_{post_id}
+            const pageId = storyId.split("_")[0];
 
-            // 3a: Try fetching the post directly — video posts have 'source' at top level
-            // Also try 'object_id' which for video posts is the video object ID
+            // 3-KEY: Get Page Token — required for reading post content (video source)
+            // User Token can manage ads but Page Token is needed for pages_read_engagement
+            let pageToken = accessToken; // fallback to user token
+            if (pageId) {
+                const pageData = await fbGet(
+                    `${pageId}?fields=access_token`,
+                    accessToken
+                );
+                if (pageData?.access_token) {
+                    pageToken = pageData.access_token;
+                }
+            }
+
+            // 3a: Fetch the post with Page Token — video posts have 'source' at top level
             const storyData = await fbGet(
                 `${storyId}?fields=source,type,full_picture,object_id,attachments{media{source,image{src,width,height}},type,subattachments{media{source,image{src}},type}}`,
-                accessToken
+                pageToken
             );
 
             // 3a-extra: If story has object_id, it might be the video ID
             if (storyData?.object_id && !storyData?.source) {
                 const objVideo = await fbGet(
                     `${storyData.object_id}?fields=source,picture`,
-                    accessToken
+                    pageToken
                 );
                 if (objVideo?.source) {
                     await prisma.adMetric.updateMany({
@@ -218,7 +232,7 @@ export async function GET(
                     const possibleVideoId = parts[parts.length - 1];
                     const videoCheck = await fbGet(
                         `${possibleVideoId}?fields=source,picture`,
-                        accessToken
+                        pageToken
                     );
                     if (videoCheck?.source) {
                         await prisma.adMetric.updateMany({
@@ -245,7 +259,7 @@ export async function GET(
                 if (igMediaId) {
                     const igMedia = await fbGet(
                         `${igMediaId}?fields=media_url,media_type,thumbnail_url`,
-                        accessToken
+                        pageToken
                     );
                     if (igMedia?.media_url) {
                         if (igMedia.media_type === "VIDEO") {
