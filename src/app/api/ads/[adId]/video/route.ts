@@ -359,6 +359,37 @@ export async function GET(
             });
         }
 
+        // Step 5b: Try fetching ad with adcreatives edge for video_id (different permission path)
+        if (!videoId) {
+            const adVideoDirect = await fbGet(
+                `${adId}?fields=creative.fields(video_id)`,
+                accessToken
+            );
+            if (adVideoDirect?.creative?.video_id) {
+                const vData = await fbGet(
+                    `${adVideoDirect.creative.video_id}?fields=source,picture`,
+                    accessToken
+                );
+                if (vData?.source) {
+                    await prisma.adMetric.updateMany({
+                        where: { adId },
+                        data: { videoUrl: vData.source },
+                    });
+                    if (vData.picture) {
+                        await prisma.adMetric.updateMany({
+                            where: { adId },
+                            data: { thumbnailUrl: vData.picture },
+                        });
+                    }
+                    return NextResponse.json({
+                        videoUrl: vData.source,
+                        imageUrl: vData.picture || null,
+                        type: "video",
+                    });
+                }
+            }
+        }
+
         // Last resort: thumbnail_url with enhanced resolution
         if (creative.thumbnail_url) {
             const hiRes = getHiResUrl(creative.thumbnail_url);
@@ -366,11 +397,22 @@ export async function GET(
                 where: { adId },
                 data: { thumbnailUrl: hiRes },
             });
+
+            // Build debug info to help diagnose video detection failures
+            let storyDebug = null;
+            if (isDebug && creative.effective_object_story_id) {
+                const sd = await fbGet(
+                    `${creative.effective_object_story_id}?fields=source,type,object_id,message,attachments{media{source,image{src}},type}`,
+                    accessToken
+                );
+                storyDebug = sd ? { source: sd.source || null, type: sd.type || null, object_id: sd.object_id || null, has_attachments: !!sd.attachments, attachment_types: sd.attachments?.data?.map((a: { type?: string; media?: { source?: string } }) => ({ type: a.type, has_source: !!a.media?.source })) || null } : "fetch_failed";
+            }
+
             return NextResponse.json({
                 videoUrl: null,
                 imageUrl: hiRes,
                 type: "image",
-                ...(isDebug ? { debug: { creative: { id: creativeId, video_id: creative.video_id, effective_object_story_id: creative.effective_object_story_id, object_story_id: creative.object_story_id, has_image_url: !!creative.image_url, has_thumbnail: !!creative.thumbnail_url, object_story_spec_keys: creative.object_story_spec ? Object.keys(creative.object_story_spec) : null } } } : {}),
+                ...(isDebug ? { debug: { creative: { id: creativeId, video_id: creative.video_id || null, effective_object_story_id: creative.effective_object_story_id || null, object_story_id: creative.object_story_id || null, has_image_url: !!creative.image_url, has_thumbnail: !!creative.thumbnail_url, object_story_spec_keys: creative.object_story_spec ? Object.keys(creative.object_story_spec) : null }, story: storyDebug } } : {}),
             });
         }
 
