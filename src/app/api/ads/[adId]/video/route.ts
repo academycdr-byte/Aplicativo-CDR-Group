@@ -124,13 +124,39 @@ export async function GET(
             }
 
             // 3a: Fetch the post with Page Token — video posts have 'source' at top level
-            const storyData = await fbGet(
-                `${storyId}?fields=source,type,full_picture,object_id,attachments{media{source,image{src,width,height}},type,subattachments{media{source,image{src}},type}}`,
-                pageToken
-            );
+            // Use raw fetch to capture error details
+            let storyData = null;
+            let storyError = null;
+            const storyUrl = `https://graph.facebook.com/${FB_GRAPH_VERSION}/${storyId}?fields=source,type,full_picture,object_id,attachments{media{source,image{src,width,height}},type,subattachments{media{source,image{src}},type}}&access_token=${pageToken}`;
+            try {
+                const storyRes = await fetch(storyUrl);
+                if (storyRes.ok) {
+                    storyData = await storyRes.json();
+                } else {
+                    storyError = await storyRes.text();
+                }
+            } catch (e) {
+                storyError = e instanceof Error ? e.message : "fetch exception";
+            }
+
+            // 3a-alt: If story fetch failed, try just the post_id without page prefix
+            if (!storyData) {
+                const postId = storyId.split("_").slice(1).join("_");
+                if (postId) {
+                    const altData = await fbGet(
+                        `${postId}?fields=source,type,full_picture,object_id`,
+                        pageToken
+                    );
+                    if (altData) storyData = altData;
+                }
+            }
 
             // DEBUG: Return diagnostic info if debug mode
             if (isDebug && !storyData?.source && !videoId) {
+                // Also try IG media API directly for debug
+                const igPostId = storyId.split("_").pop();
+                const igRes = igPostId ? await fbGet(`${igPostId}?fields=media_url,media_type,thumbnail_url`, pageToken) : null;
+
                 return NextResponse.json({
                     videoUrl: null,
                     imageUrl: creative.thumbnail_url || null,
@@ -140,12 +166,11 @@ export async function GET(
                         pageTokenObtained,
                         storyId,
                         storyFetched: !!storyData,
+                        storyError: storyError ? storyError.substring(0, 300) : null,
                         storySource: storyData?.source || null,
                         storyType: storyData?.type || null,
                         storyObjectId: storyData?.object_id || null,
-                        storyFullPicture: storyData?.full_picture ? "yes" : "no",
-                        storyAttachments: storyData?.attachments?.data?.length || 0,
-                        storyAttachmentTypes: storyData?.attachments?.data?.map((a: { type?: string; media?: { source?: string } }) => ({ type: a.type, hasSource: !!a.media?.source })) || null,
+                        igMediaTest: igRes ? { media_type: igRes.media_type, has_media_url: !!igRes.media_url } : "ig_fetch_failed",
                     }
                 });
             }
