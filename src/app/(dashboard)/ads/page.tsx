@@ -806,11 +806,24 @@ export default function AdsPage() {
                     <AdThumbnail src={c.thumbnailUrl} alt="" fill className="object-cover transition-transform group-hover:scale-105" sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw" />
                   ) : <ImageIcon className="w-8 h-8 opacity-20" />}
 
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex flex-col items-center justify-center gap-2">
                     <div className="w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm">
-                      <Play className="w-5 h-5 ml-0.5 fill-current" />
+                      {c.videoUrl ? <Play className="w-5 h-5 ml-0.5 fill-current" /> : <ImageIcon className="w-5 h-5" />}
                     </div>
+                    <span className="text-white text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg">
+                      {c.videoUrl ? "Clique para assistir" : "Clique para visualizar"}
+                    </span>
                   </div>
+
+                  {/* Video indicator badge */}
+                  {c.videoUrl && (
+                    <div className="absolute top-2 left-2">
+                      <Badge variant="secondary" className="backdrop-blur-md bg-black/40 text-white border-none text-[10px] h-5 gap-1">
+                        <Play className="w-3 h-3 fill-current" />
+                        Vídeo
+                      </Badge>
+                    </div>
+                  )}
 
                   <div className="absolute top-2 right-2">
                     <Badge variant="secondary" className="backdrop-blur-md bg-black/40 text-white border-none text-[10px] h-5">

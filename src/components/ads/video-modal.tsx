@@ -4,11 +4,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import Image from "next/image";
-import { Play, ExternalLink, Loader2 } from "lucide-react";
+import { Play, Loader2, ImageIcon, RefreshCw, Volume2, VolumeX, Maximize2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 
-// Re-using the Creative type structure roughly, or defining a props interface
 interface Creative {
     adId: string;
     adName: string | null;
@@ -33,18 +32,103 @@ interface VideoModalProps {
     creative: Creative | null;
 }
 
+type MediaType = "video" | "image" | "none" | "loading";
+
 export function VideoModal({ isOpen, onClose, creative }: VideoModalProps) {
+    const [mediaType, setMediaType] = useState<MediaType>("loading");
+    const [videoUrl, setVideoUrl] = useState<string | null>(null);
+    const [imageUrl, setImageUrl] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [videoError, setVideoError] = useState(false);
+    const [isMuted, setIsMuted] = useState(true);
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const mediaContainerRef = useRef<HTMLDivElement>(null);
+
+    const fetchCreativeMedia = useCallback(async (adId: string, refresh = false) => {
+        setIsLoading(true);
+        setVideoError(false);
+        try {
+            const url = `/api/ads/${adId}/video${refresh ? "?refresh=1" : ""}`;
+            const res = await fetch(url);
+            const data = await res.json();
+
+            if (data.type === "video" && data.videoUrl) {
+                setVideoUrl(data.videoUrl);
+                setImageUrl(null);
+                setMediaType("video");
+            } else if (data.type === "image" && data.imageUrl) {
+                setVideoUrl(null);
+                setImageUrl(data.imageUrl);
+                setMediaType("image");
+            } else {
+                setMediaType("none");
+            }
+        } catch (err) {
+            console.error("Failed to fetch creative media:", err);
+            setMediaType("none");
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
+
+    // Reset and fetch when creative changes
+    useEffect(() => {
+        if (!isOpen || !creative) return;
+
+        setVideoUrl(null);
+        setImageUrl(null);
+        setVideoError(false);
+        setIsMuted(true);
+        setIsFullscreen(false);
+
+        // If we already have a videoUrl cached, use it directly
+        if (creative.videoUrl) {
+            setVideoUrl(creative.videoUrl);
+            setMediaType("video");
+            setIsLoading(false);
+        } else {
+            // Fetch from API (will try video first, then image)
+            setMediaType("loading");
+            fetchCreativeMedia(creative.adId);
+        }
+    }, [isOpen, creative, fetchCreativeMedia]);
+
+    const handleVideoError = useCallback(() => {
+        if (!creative || videoError) return;
+        // Video URL likely expired — force re-fetch
+        setVideoError(true);
+        fetchCreativeMedia(creative.adId, true);
+    }, [creative, videoError, fetchCreativeMedia]);
+
+    const toggleMute = useCallback(() => {
+        if (videoRef.current) {
+            videoRef.current.muted = !videoRef.current.muted;
+            setIsMuted(!isMuted);
+        }
+    }, [isMuted]);
+
+    const toggleFullscreen = useCallback(() => {
+        if (!mediaContainerRef.current) return;
+        if (!document.fullscreenElement) {
+            mediaContainerRef.current.requestFullscreen().catch(() => {});
+            setIsFullscreen(true);
+        } else {
+            document.exitFullscreen().catch(() => {});
+            setIsFullscreen(false);
+        }
+    }, []);
+
+    // Listen for fullscreen change (user presses Esc)
+    useEffect(() => {
+        const handler = () => {
+            if (!document.fullscreenElement) setIsFullscreen(false);
+        };
+        document.addEventListener("fullscreenchange", handler);
+        return () => document.removeEventListener("fullscreenchange", handler);
+    }, []);
+
     if (!creative) return null;
-
-    // Since we don't have the actual video URL in the API response yet (usually requires a separate field or Graph API call), 
-    // we will simulate the behavior or use the thumbnailUrl if it happens to be a video (rare).
-    // FOR NOW: We will assume specific logic or fallback to an external link if we can't play it directly.
-    // Real implementation often requires fetching the `video_id` -> `source` from Meta Graph API.
-    // Given current data structure, we might only have thumbnail.
-    // We will display the thumbnail large with a "Play" button that might link out OR just show the image if it's an image.
-
-    // Checking if likely video from context is hard without specific field, but user requested "Play" icon overlay logic in parent.
-    // Here we display the content.
 
     function fmt(amount: number) {
         return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(amount);
@@ -54,34 +138,9 @@ export function VideoModal({ isOpen, onClose, creative }: VideoModalProps) {
         return new Intl.NumberFormat("pt-BR").format(n);
     }
 
-    const [fetchedVideoUrl, setFetchedVideoUrl] = useState<string | null>(null);
-    const [isLoadingVideo, setIsLoadingVideo] = useState(false);
-
-    // Reset state when creative changes
-    useEffect(() => {
-        setFetchedVideoUrl(null);
-        setIsLoadingVideo(false);
-
-        // If open, has adId, has thumbnail but no videoUrl, try to fetch it
-        if (isOpen && creative && !creative.videoUrl && creative.adId) {
-            setIsLoadingVideo(true);
-            fetch(`/api/ads/${creative.adId}/video`)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.videoUrl) {
-                        setFetchedVideoUrl(data.videoUrl);
-                    }
-                })
-                .catch(err => console.error("Failed to lazy fetch video:", err))
-                .finally(() => setIsLoadingVideo(false));
-        }
-    }, [isOpen, creative]);
-
-    const finalVideoUrl = creative?.videoUrl || fetchedVideoUrl;
-
-    // Helper to determine if we should show video player or image
-    // Show video player if we have a URL OR if we are loading (to show spinner)
-    const showVideoPlayer = !!finalVideoUrl || isLoadingVideo;
+    const showVideo = mediaType === "video" && videoUrl && !videoError;
+    const showImage = mediaType === "image" || (!showVideo && !isLoading && (imageUrl || creative.thumbnailUrl));
+    const displayImageUrl = imageUrl || creative.thumbnailUrl;
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
@@ -89,60 +148,134 @@ export function VideoModal({ isOpen, onClose, creative }: VideoModalProps) {
                 <DialogHeader>
                     <DialogTitle className="truncate pr-8">{creative.adName || "Detalhes do Criativo"}</DialogTitle>
                     <DialogDescription>
-                        {creative.campaignName} • {creative.platform}
+                        {creative.campaignName} &bull; {creative.platform === "FACEBOOK_ADS" ? "Facebook Ads" : creative.platform === "GOOGLE_ADS" ? "Google Ads" : creative.platform}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8 mt-2 h-full">
                     {/* Media Column */}
-                    <div className="space-y-4 flex flex-col justify-center">
-                        <div className="relative w-full h-[35vh] sm:h-[45vh] md:h-[500px] lg:h-[600px] bg-black/90 rounded-lg overflow-hidden flex items-center justify-center border border-border/50 shadow-lg">
-                            {isLoadingVideo ? (
-                                <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                                    <Loader2 className="w-8 h-8 animate-spin" />
-                                    <span className="text-sm">Buscando vídeo...</span>
+                    <div className="space-y-3 flex flex-col">
+                        <div
+                            ref={mediaContainerRef}
+                            className="relative w-full h-[35vh] sm:h-[45vh] md:h-[500px] lg:h-[600px] bg-black/90 rounded-lg overflow-hidden flex items-center justify-center border border-border/50 shadow-lg group"
+                        >
+                            {/* Loading State */}
+                            {(isLoading || mediaType === "loading") && (
+                                <div className="flex flex-col items-center gap-3 text-muted-foreground">
+                                    <Loader2 className="w-10 h-10 animate-spin text-primary/60" />
+                                    <span className="text-sm">Carregando criativo...</span>
                                 </div>
-                            ) : finalVideoUrl ? (
-                                // Video player with controls
-                                <video
-                                    src={finalVideoUrl}
-                                    controls
-                                    autoPlay
-                                    loop
-                                    muted
-                                    className="w-full h-full object-contain"
-                                    poster={creative.thumbnailUrl || undefined}
-                                    playsInline
-                                >
-                                    Seu navegador não suporta reprodução de vídeo.
-                                </video>
-                            ) : creative.thumbnailUrl ? (
-                                <Image
-                                    src={creative.thumbnailUrl}
-                                    alt={creative.adName || "Creative"}
-                                    fill
-                                    className="object-contain"
-                                    unoptimized
-                                />
-                            ) : (
-                                <div className="text-muted-foreground p-10 text-center">
-                                    Sem visualização disponivel
+                            )}
+
+                            {/* Video Player */}
+                            {showVideo && (
+                                <>
+                                    <video
+                                        ref={videoRef}
+                                        key={videoUrl}
+                                        src={videoUrl!}
+                                        controls
+                                        autoPlay
+                                        loop
+                                        muted={isMuted}
+                                        className="w-full h-full object-contain"
+                                        poster={creative.thumbnailUrl || undefined}
+                                        playsInline
+                                        onError={handleVideoError}
+                                    >
+                                        Seu navegador não suporta reprodução de vídeo.
+                                    </video>
+
+                                    {/* Video Controls Overlay */}
+                                    <div className="absolute bottom-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); toggleMute(); }}
+                                            className="w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center backdrop-blur-sm hover:bg-black/80 transition-colors"
+                                            aria-label={isMuted ? "Ativar som" : "Silenciar"}
+                                        >
+                                            {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                                        </button>
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
+                                            className="w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center backdrop-blur-sm hover:bg-black/80 transition-colors"
+                                            aria-label="Tela cheia"
+                                        >
+                                            <Maximize2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+
+                            {/* Video Error + Re-fetch */}
+                            {videoError && isLoading && (
+                                <div className="flex flex-col items-center gap-3 text-muted-foreground">
+                                    <Loader2 className="w-10 h-10 animate-spin text-primary/60" />
+                                    <span className="text-sm">Recarregando vídeo...</span>
+                                </div>
+                            )}
+
+                            {/* Image Display */}
+                            {showImage && !isLoading && displayImageUrl && (
+                                <>
+                                    <Image
+                                        src={displayImageUrl}
+                                        alt={creative.adName || "Criativo"}
+                                        fill
+                                        className="object-contain"
+                                        unoptimized
+                                        sizes="(max-width: 768px) 100vw, 50vw"
+                                    />
+                                    {/* Fullscreen button for images */}
+                                    <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
+                                            className="w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center backdrop-blur-sm hover:bg-black/80 transition-colors"
+                                            aria-label="Tela cheia"
+                                        >
+                                            <Maximize2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+
+                            {/* No Media Available */}
+                            {mediaType === "none" && !isLoading && !displayImageUrl && (
+                                <div className="flex flex-col items-center gap-3 text-muted-foreground">
+                                    <ImageIcon className="w-12 h-12 opacity-30" />
+                                    <span className="text-sm">Visualização não disponível</span>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => fetchCreativeMedia(creative.adId, true)}
+                                        className="gap-2"
+                                    >
+                                        <RefreshCw className="w-3.5 h-3.5" />
+                                        Tentar novamente
+                                    </Button>
                                 </div>
                             )}
                         </div>
 
-                        {/* Show indicator if playing fetched video */}
-                        {finalVideoUrl && (
-                            <p className="text-xs text-muted-foreground text-center">
-                                🎬 Clique no player acima para controlar o video
-                            </p>
-                        )}
-
-
+                        {/* Media Type Indicator */}
+                        <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                            {showVideo && (
+                                <>
+                                    <Play className="w-3.5 h-3.5" />
+                                    <span>Vídeo &bull; Clique no player para controlar</span>
+                                </>
+                            )}
+                            {showImage && !isLoading && (
+                                <>
+                                    <ImageIcon className="w-3.5 h-3.5" />
+                                    <span>Imagem &bull; Passe o mouse para ampliar</span>
+                                </>
+                            )}
+                        </div>
                     </div>
 
                     {/* Metrics Column */}
                     <div className="space-y-6">
+                        {/* Primary Metrics */}
                         <div className="grid grid-cols-2 gap-4">
                             <div className="p-4 rounded-lg bg-muted/20 border border-muted/50">
                                 <p className="text-sm text-muted-foreground mb-1">ROAS</p>
@@ -160,13 +293,14 @@ export function VideoModal({ isOpen, onClose, creative }: VideoModalProps) {
 
                         <Separator />
 
+                        {/* Detailed Metrics */}
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-4 sm:gap-y-6 gap-x-2">
                             <div>
                                 <p className="text-xs text-muted-foreground uppercase tracking-wider">Receita</p>
                                 <p className="font-semibold mt-1">{fmt(creative.revenue)}</p>
                             </div>
                             <div>
-                                <p className="text-xs text-muted-foreground uppercase tracking-wider">Conversoes</p>
+                                <p className="text-xs text-muted-foreground uppercase tracking-wider">Conversões</p>
                                 <p className="font-semibold mt-1">{fmtNum(creative.conversions)}</p>
                             </div>
                             <div>
@@ -175,7 +309,7 @@ export function VideoModal({ isOpen, onClose, creative }: VideoModalProps) {
                             </div>
 
                             <div>
-                                <p className="text-xs text-muted-foreground uppercase tracking-wider">Impressoes</p>
+                                <p className="text-xs text-muted-foreground uppercase tracking-wider">Impressões</p>
                                 <p className="font-semibold mt-1">{fmtNum(creative.impressions)}</p>
                             </div>
                             <div>
@@ -195,6 +329,16 @@ export function VideoModal({ isOpen, onClose, creative }: VideoModalProps) {
                                 <p className="text-xs text-muted-foreground uppercase tracking-wider">CPM</p>
                                 <p className="font-semibold mt-1">{creative.cpm > 0 ? fmt(creative.cpm) : "-"}</p>
                             </div>
+                        </div>
+
+                        {/* Status Badge */}
+                        <div className="pt-2">
+                            <Badge
+                                variant={creative.roas >= 3 ? "default" : creative.roas >= 1 ? "secondary" : "destructive"}
+                                className="text-xs"
+                            >
+                                {creative.roas >= 3 ? "Validado" : creative.roas >= 1 ? "Testando" : "Negativo"}
+                            </Badge>
                         </div>
                     </div>
                 </div>
