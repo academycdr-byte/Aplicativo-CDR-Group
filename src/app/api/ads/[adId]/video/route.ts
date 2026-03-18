@@ -6,6 +6,14 @@ import { auth } from "@/auth";
 
 const FB_GRAPH_VERSION = "v21.0";
 
+async function fbGet(path: string, accessToken: string) {
+    const res = await fetch(
+        `https://graph.facebook.com/${FB_GRAPH_VERSION}/${path}${path.includes("?") ? "&" : "?"}access_token=${accessToken}`
+    );
+    if (!res.ok) return null;
+    return res.json();
+}
+
 export async function GET(
     request: NextRequest,
     { params }: { params: Promise<{ adId: string }> }
@@ -50,53 +58,149 @@ export async function GET(
 
         const accessToken = decrypt(integration.accessToken);
 
-        // Fetch creative details from Ad ID
-        const adResponse = await fetch(
-            `https://graph.facebook.com/${FB_GRAPH_VERSION}/${adId}?fields=creative{id,video_id,thumbnail_url,image_url,object_story_spec{video_data{video_id},link_data{image_hash,picture}}}&access_token=${accessToken}`
+        // Step 1: Fetch ad with extended creative fields
+        const adData = await fbGet(
+            `${adId}?fields=creative{id,video_id,image_url,thumbnail_url,effective_object_story_id,object_story_spec{video_data{video_id},link_data{picture,image_hash}}}`,
+            accessToken
         );
 
-        if (!adResponse.ok) {
-            const error = await adResponse.text();
-            console.error("Facebook Ad fetch error:", error);
-            return NextResponse.json({ error: "Failed to fetch ad details" }, { status: adResponse.status });
+        if (!adData?.creative) {
+            return NextResponse.json({ videoUrl: null, imageUrl: null, type: "none" });
         }
 
-        const adData = await adResponse.json();
         const creative = adData.creative;
-        const videoId = creative?.video_id || creative?.object_story_spec?.video_data?.video_id;
 
-        // Try to get video source
-        if (videoId) {
-            const videoResponse = await fetch(
-                `https://graph.facebook.com/${FB_GRAPH_VERSION}/${videoId}?fields=source&access_token=${accessToken}`
+        // Step 2: Try to find video_id from multiple sources
+        let videoId: string | null =
+            creative.video_id ||
+            creative.object_story_spec?.video_data?.video_id ||
+            null;
+
+        // Step 3: If no direct video_id, try effective_object_story_id (post-based creatives)
+        if (!videoId && creative.effective_object_story_id) {
+            const storyData = await fbGet(
+                `${creative.effective_object_story_id}?fields=attachments{media{source,image{src,width,height}},type,subattachments{media{source,image{src}},type}},full_picture,type`,
+                accessToken
             );
 
-            if (videoResponse.ok) {
-                const videoData = await videoResponse.json();
-                if (videoData.source) {
-                    // Cache video URL
+            if (storyData) {
+                // Check if the post has a video attachment
+                const attachments = storyData.attachments?.data;
+                if (attachments) {
+                    for (const att of attachments) {
+                        // Direct video source from attachment
+                        if (att.media?.source) {
+                            // Cache and return video
+                            await prisma.adMetric.updateMany({
+                                where: { adId },
+                                data: { videoUrl: att.media.source },
+                            });
+
+                            // Also update thumbnail with high-res image
+                            const hiResImage = att.media.image?.src || storyData.full_picture;
+                            if (hiResImage) {
+                                await prisma.adMetric.updateMany({
+                                    where: { adId },
+                                    data: { thumbnailUrl: hiResImage },
+                                });
+                            }
+
+                            return NextResponse.json({
+                                videoUrl: att.media.source,
+                                imageUrl: hiResImage || null,
+                                type: "video",
+                            });
+                        }
+
+                        // High-res image from attachment (for image ads)
+                        if (att.media?.image?.src) {
+                            const hiResImage = att.media.image.src;
+                            // Update thumbnail in DB with high-res version
+                            await prisma.adMetric.updateMany({
+                                where: { adId },
+                                data: { thumbnailUrl: hiResImage },
+                            });
+
+                            return NextResponse.json({
+                                videoUrl: null,
+                                imageUrl: hiResImage,
+                                type: "image",
+                            });
+                        }
+
+                        // Check subattachments (carousel)
+                        if (att.subattachments?.data) {
+                            for (const sub of att.subattachments.data) {
+                                if (sub.media?.source) {
+                                    return NextResponse.json({
+                                        videoUrl: sub.media.source,
+                                        imageUrl: sub.media.image?.src || null,
+                                        type: "video",
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Fallback: use full_picture from the post (much higher res than thumbnail_url)
+                if (storyData.full_picture) {
                     await prisma.adMetric.updateMany({
                         where: { adId },
-                        data: { videoUrl: videoData.source },
+                        data: { thumbnailUrl: storyData.full_picture },
                     });
 
                     return NextResponse.json({
-                        videoUrl: videoData.source,
-                        imageUrl: null,
-                        type: "video",
+                        videoUrl: null,
+                        imageUrl: storyData.full_picture,
+                        type: "image",
                     });
                 }
             }
         }
 
-        // No video found — try to get full creative image
+        // Step 4: We have a video_id — fetch the video source
+        if (videoId) {
+            const videoData = await fbGet(
+                `${videoId}?fields=source,picture`,
+                accessToken
+            );
+
+            if (videoData?.source) {
+                // Cache video URL and high-res thumbnail
+                const updateData: { videoUrl: string; thumbnailUrl?: string } = {
+                    videoUrl: videoData.source,
+                };
+                if (videoData.picture) {
+                    updateData.thumbnailUrl = videoData.picture;
+                }
+                await prisma.adMetric.updateMany({
+                    where: { adId },
+                    data: updateData,
+                });
+
+                return NextResponse.json({
+                    videoUrl: videoData.source,
+                    imageUrl: videoData.picture || null,
+                    type: "video",
+                });
+            }
+        }
+
+        // Step 5: No video — get highest quality image available
+        // Priority: image_url > full_picture from story > link_data.picture > thumbnail_url
         const imageUrl =
-            creative?.image_url ||
-            creative?.thumbnail_url ||
-            creative?.object_story_spec?.link_data?.picture ||
+            creative.image_url ||
+            creative.object_story_spec?.link_data?.picture ||
             null;
 
         if (imageUrl) {
+            // Update thumbnail in DB with higher quality
+            await prisma.adMetric.updateMany({
+                where: { adId },
+                data: { thumbnailUrl: imageUrl },
+            });
+
             return NextResponse.json({
                 videoUrl: null,
                 imageUrl,
@@ -104,7 +208,15 @@ export async function GET(
             });
         }
 
-        // Nothing found
+        // Last resort: thumbnail_url (low res)
+        if (creative.thumbnail_url) {
+            return NextResponse.json({
+                videoUrl: null,
+                imageUrl: creative.thumbnail_url,
+                type: "image",
+            });
+        }
+
         return NextResponse.json({
             videoUrl: null,
             imageUrl: null,
