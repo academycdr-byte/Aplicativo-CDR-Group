@@ -58,9 +58,9 @@ export async function GET(
 
         const accessToken = decrypt(integration.accessToken);
 
-        // Step 1: Fetch ad with extended creative fields
+        // Step 1: Fetch ad with extended creative fields + object_story_id
         const adData = await fbGet(
-            `${adId}?fields=creative{id,video_id,image_url,thumbnail_url,effective_object_story_id,object_story_spec{video_data{video_id},link_data{picture,image_hash}}}`,
+            `${adId}?fields=creative{id,video_id,image_url,thumbnail_url,effective_object_story_id,object_story_id,object_story_spec{video_data{video_id},link_data{picture,image_hash}}}`,
             accessToken
         );
 
@@ -69,12 +69,31 @@ export async function GET(
         }
 
         const creative = adData.creative;
+        const creativeId = creative.id;
 
-        // Step 2: Try to find video_id from multiple sources
+        // Step 1b: If no video_id from above, try fetching creative directly with more fields
         let videoId: string | null =
             creative.video_id ||
             creative.object_story_spec?.video_data?.video_id ||
             null;
+
+        // Step 1c: If still no video_id, try adcreatives endpoint directly
+        if (!videoId && creativeId) {
+            const creativeData = await fbGet(
+                `${creativeId}?fields=video_id,object_story_id,effective_object_story_id,image_url,thumbnail_url`,
+                accessToken
+            );
+            if (creativeData?.video_id) {
+                videoId = creativeData.video_id;
+            }
+            // Also pick up any missing fields
+            if (!creative.effective_object_story_id && creativeData?.effective_object_story_id) {
+                creative.effective_object_story_id = creativeData.effective_object_story_id;
+            }
+            if (!creative.image_url && creativeData?.image_url) {
+                creative.image_url = creativeData.image_url;
+            }
+        }
 
         // Step 3: If no direct video_id, try effective_object_story_id (post-based creatives)
         if (!videoId && creative.effective_object_story_id) {
@@ -230,31 +249,56 @@ export async function GET(
         }
 
         // Step 5: No video — get highest quality image available
-        // Priority: image_url > full_picture from story > link_data.picture > thumbnail_url
+        // For Facebook CDN URLs, remove resize params to get full resolution
+        function getHiResUrl(url: string): string {
+            if (!url) return url;
+            // Remove size-limiting stp params like p64x64, dst-emg0, etc
+            try {
+                const u = new URL(url);
+                const stp = u.searchParams.get("stp");
+                if (stp && /p\d+x\d+/.test(stp)) {
+                    // Remove size restriction from stp param
+                    const newStp = stp.replace(/c[\d.]+x[\d.]+f_/, "").replace(/dst-emg\d+_/, "").replace(/p\d+x\d+_?/, "").replace(/tt\d+_?/, "").replace(/q\d+_?/, "").replace(/_+$/, "");
+                    if (newStp) {
+                        u.searchParams.set("stp", newStp);
+                    } else {
+                        u.searchParams.delete("stp");
+                    }
+                    return u.toString();
+                }
+            } catch { /* keep original */ }
+            return url;
+        }
+
+        // Priority: image_url > link_data.picture > enhanced thumbnail_url
         const imageUrl =
             creative.image_url ||
             creative.object_story_spec?.link_data?.picture ||
             null;
 
         if (imageUrl) {
-            // Update thumbnail in DB with higher quality
+            const hiRes = getHiResUrl(imageUrl);
             await prisma.adMetric.updateMany({
                 where: { adId },
-                data: { thumbnailUrl: imageUrl },
+                data: { thumbnailUrl: hiRes },
             });
-
             return NextResponse.json({
                 videoUrl: null,
-                imageUrl,
+                imageUrl: hiRes,
                 type: "image",
             });
         }
 
-        // Last resort: thumbnail_url (low res)
+        // Last resort: thumbnail_url with enhanced resolution
         if (creative.thumbnail_url) {
+            const hiRes = getHiResUrl(creative.thumbnail_url);
+            await prisma.adMetric.updateMany({
+                where: { adId },
+                data: { thumbnailUrl: hiRes },
+            });
             return NextResponse.json({
                 videoUrl: null,
-                imageUrl: creative.thumbnail_url,
+                imageUrl: hiRes,
                 type: "image",
             });
         }
