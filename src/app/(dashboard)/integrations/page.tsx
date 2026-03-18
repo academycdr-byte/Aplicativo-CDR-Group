@@ -657,7 +657,7 @@ function IntegrationsContent() {
           const isConnected = status === "CONNECTED";
 
           return (
-            <Card key={platform.platform} className="flex flex-col group border-border/20">
+            <Card key={platform.platform} className="flex flex-col group border-border/40 hover:border-border/60 transition-colors duration-300">
               <CardContent className="pt-6 flex flex-col flex-1">
                 <div className="flex items-center gap-4 mb-4">
                   <div className="relative w-14 h-14 rounded-2xl overflow-hidden flex-shrink-0 bg-white shadow-sm border border-black/5 flex items-center justify-center transition-transform duration-300">

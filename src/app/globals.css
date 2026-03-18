@@ -295,8 +295,8 @@
   }
 
   @keyframes fade-in {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
   }
 
   @keyframes slide-up {
@@ -664,6 +664,11 @@
    SCROLLBAR
    ============================================================================ */
 
+/* Safe area for bottom nav on iOS */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
@@ -694,27 +699,27 @@
    ============================================================================ */
 
 .recharts-default-tooltip {
-  background: var(--surface-glass) !important;
-  backdrop-filter: blur(16px) !important;
-  -webkit-backdrop-filter: blur(16px) !important;
+  background: var(--card) !important;
+  backdrop-filter: blur(20px) saturate(1.5) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.5) !important;
   border: 1px solid var(--border) !important;
   border-radius: 12px !important;
   box-shadow: var(--shadow-lg) !important;
-  padding: 12px 16px !important;
+  padding: 10px 14px !important;
 }
 
 .recharts-tooltip-label {
-  @apply !text-foreground !font-semibold !mb-1 !text-[13px];
+  @apply !text-foreground !font-semibold !mb-1.5 !text-xs;
 }
 
 .recharts-tooltip-item {
-  @apply !text-sm !font-medium !py-0.5;
+  @apply !text-[13px] !font-medium !py-0.5;
 }
 
 .recharts-cartesian-grid-horizontal line,
 .recharts-cartesian-grid-vertical line {
   stroke: var(--border) !important;
-  opacity: 0.5;
+  opacity: 0.3;
 }
 
 .recharts-legend-item-text {
