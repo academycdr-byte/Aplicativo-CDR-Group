@@ -64,7 +64,7 @@ async function fetchAdThumbnails(
     const ids = batch.join(",");
     try {
       const response = await fetch(
-        `https://graph.facebook.com/${FB_GRAPH_VERSION}/?ids=${ids}&fields=creative{thumbnail_url,image_url}&access_token=${accessToken}`
+        `https://graph.facebook.com/${FB_GRAPH_VERSION}/?ids=${ids}&fields=creative{thumbnail_url,image_url}&thumbnail_width=480&thumbnail_height=480&access_token=${accessToken}`
       );
       if (response.ok) {
         const data = await response.json();

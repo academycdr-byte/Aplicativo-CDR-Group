@@ -59,8 +59,9 @@ export async function GET(
         const accessToken = decrypt(integration.accessToken);
 
         // Step 1: Fetch ad with extended creative fields + object_story_id
+        // Use thumbnail_width/height to get hi-res thumbnail (default is 64x64)
         const adData = await fbGet(
-            `${adId}?fields=creative{id,video_id,image_url,thumbnail_url,effective_object_story_id,object_story_id,object_story_spec{video_data{video_id},link_data{picture,image_hash}}}`,
+            `${adId}?fields=creative{id,video_id,image_url,thumbnail_url,effective_object_story_id,object_story_id,object_story_spec{video_data{video_id},link_data{picture,image_hash}}}&thumbnail_width=720&thumbnail_height=720`,
             accessToken
         );
 
@@ -319,42 +320,20 @@ export async function GET(
         }
 
         // Step 5: No video — get highest quality image available
-        // For Facebook CDN URLs, remove resize params to get full resolution
-        function getHiResUrl(url: string): string {
-            if (!url) return url;
-            // Remove size-limiting stp params like p64x64, dst-emg0, etc
-            try {
-                const u = new URL(url);
-                const stp = u.searchParams.get("stp");
-                if (stp && /p\d+x\d+/.test(stp)) {
-                    // Remove size restriction from stp param
-                    const newStp = stp.replace(/c[\d.]+x[\d.]+f_/, "").replace(/dst-emg\d+_/, "").replace(/p\d+x\d+_?/, "").replace(/tt\d+_?/, "").replace(/q\d+_?/, "").replace(/_+$/, "");
-                    if (newStp) {
-                        u.searchParams.set("stp", newStp);
-                    } else {
-                        u.searchParams.delete("stp");
-                    }
-                    return u.toString();
-                }
-            } catch { /* keep original */ }
-            return url;
-        }
-
-        // Priority: image_url > link_data.picture > enhanced thumbnail_url
+        // Priority: image_url (full-res) > link_data.picture > thumbnail_url (now 720px via API params)
         const imageUrl =
             creative.image_url ||
             creative.object_story_spec?.link_data?.picture ||
             null;
 
         if (imageUrl) {
-            const hiRes = getHiResUrl(imageUrl);
             await prisma.adMetric.updateMany({
                 where: { adId },
-                data: { thumbnailUrl: hiRes },
+                data: { thumbnailUrl: imageUrl },
             });
             return NextResponse.json({
                 videoUrl: null,
-                imageUrl: hiRes,
+                imageUrl,
                 type: "image",
             });
         }
@@ -390,29 +369,18 @@ export async function GET(
             }
         }
 
-        // Last resort: thumbnail_url with enhanced resolution
+        // Last resort: thumbnail_url (now returned at 720px thanks to thumbnail_width param)
         if (creative.thumbnail_url) {
-            const hiRes = getHiResUrl(creative.thumbnail_url);
             await prisma.adMetric.updateMany({
                 where: { adId },
-                data: { thumbnailUrl: hiRes },
+                data: { thumbnailUrl: creative.thumbnail_url },
             });
-
-            // Build debug info to help diagnose video detection failures
-            let storyDebug = null;
-            if (isDebug && creative.effective_object_story_id) {
-                const sd = await fbGet(
-                    `${creative.effective_object_story_id}?fields=source,type,object_id,message,attachments{media{source,image{src}},type}`,
-                    accessToken
-                );
-                storyDebug = sd ? { source: sd.source || null, type: sd.type || null, object_id: sd.object_id || null, has_attachments: !!sd.attachments, attachment_types: sd.attachments?.data?.map((a: { type?: string; media?: { source?: string } }) => ({ type: a.type, has_source: !!a.media?.source })) || null } : "fetch_failed";
-            }
 
             return NextResponse.json({
                 videoUrl: null,
-                imageUrl: hiRes,
+                imageUrl: creative.thumbnail_url,
                 type: "image",
-                ...(isDebug ? { debug: { creative: { id: creativeId, video_id: creative.video_id || null, effective_object_story_id: creative.effective_object_story_id || null, object_story_id: creative.object_story_id || null, has_image_url: !!creative.image_url, has_thumbnail: !!creative.thumbnail_url, object_story_spec_keys: creative.object_story_spec ? Object.keys(creative.object_story_spec) : null }, story: storyDebug } } : {}),
+                ...(isDebug ? { debug: { creative: { id: creativeId, video_id: creative.video_id || null, effective_object_story_id: creative.effective_object_story_id || null, has_image_url: !!creative.image_url }, note: "Video source requires pages_read_engagement permission for Instagram posts" } } : {}),
             });
         }
 
