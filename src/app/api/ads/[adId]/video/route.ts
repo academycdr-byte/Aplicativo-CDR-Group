@@ -80,21 +80,25 @@ export async function GET(
             creative.object_story_spec?.video_data?.video_id ||
             null;
 
-        // Step 1c: If still no video_id, try adcreatives endpoint directly
-        if (!videoId && creativeId) {
+        // Step 1c: Fetch creative directly with hi-res thumbnail (720px)
+        if (creativeId) {
             const creativeData = await fbGet(
-                `${creativeId}?fields=video_id,object_story_id,effective_object_story_id,image_url,thumbnail_url`,
+                `${creativeId}?fields=video_id,object_story_id,effective_object_story_id,image_url,thumbnail_url&thumbnail_width=720&thumbnail_height=720`,
                 accessToken
             );
             if (creativeData?.video_id) {
                 videoId = creativeData.video_id;
             }
-            // Also pick up any missing fields
+            // Pick up missing fields + override thumbnail with hi-res version
             if (!creative.effective_object_story_id && creativeData?.effective_object_story_id) {
                 creative.effective_object_story_id = creativeData.effective_object_story_id;
             }
             if (!creative.image_url && creativeData?.image_url) {
                 creative.image_url = creativeData.image_url;
+            }
+            // Always prefer the hi-res thumbnail from creative endpoint
+            if (creativeData?.thumbnail_url) {
+                creative.thumbnail_url = creativeData.thumbnail_url;
             }
         }
 
