@@ -111,6 +111,7 @@ export async function GET(
             // 3-KEY: Get Page Token — required for reading post content (video source)
             // User Token can manage ads but Page Token is needed for pages_read_engagement
             let pageToken = accessToken; // fallback to user token
+            let pageTokenObtained = false;
             if (pageId) {
                 const pageData = await fbGet(
                     `${pageId}?fields=access_token`,
@@ -118,6 +119,7 @@ export async function GET(
                 );
                 if (pageData?.access_token) {
                     pageToken = pageData.access_token;
+                    pageTokenObtained = true;
                 }
             }
 
@@ -126,6 +128,27 @@ export async function GET(
                 `${storyId}?fields=source,type,full_picture,object_id,attachments{media{source,image{src,width,height}},type,subattachments{media{source,image{src}},type}}`,
                 pageToken
             );
+
+            // DEBUG: Return diagnostic info if debug mode
+            if (isDebug && !storyData?.source && !videoId) {
+                return NextResponse.json({
+                    videoUrl: null,
+                    imageUrl: creative.thumbnail_url || null,
+                    type: "image",
+                    debug: {
+                        pageId,
+                        pageTokenObtained,
+                        storyId,
+                        storyFetched: !!storyData,
+                        storySource: storyData?.source || null,
+                        storyType: storyData?.type || null,
+                        storyObjectId: storyData?.object_id || null,
+                        storyFullPicture: storyData?.full_picture ? "yes" : "no",
+                        storyAttachments: storyData?.attachments?.data?.length || 0,
+                        storyAttachmentTypes: storyData?.attachments?.data?.map((a: { type?: string; media?: { source?: string } }) => ({ type: a.type, hasSource: !!a.media?.source })) || null,
+                    }
+                });
+            }
 
             // 3a-extra: If story has object_id, it might be the video ID
             if (storyData?.object_id && !storyData?.source) {
