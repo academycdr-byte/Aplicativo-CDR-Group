@@ -7,12 +7,14 @@ export type DREInputs = {
   receitaMensal: number;
   numeroPedidos: number;
   percentualDevolucoes: number;
+  percentualAprovados: number;
   taxaGateway: number;
   taxaImpostos: number;
   freteUnitario: number;
   cmvUnitario: number;
   cpaAlvo: number;
   budgetAnuncios: number;
+  impostoMetaAds: number;
 };
 
 export type DREResult = {
@@ -37,6 +39,11 @@ export type DREResult = {
   markup: number;
   pedidosEfetivos: number;
   numeroDevolucoes: number;
+  // Campos ajustados por imposto Meta Ads e % aprovados
+  budgetEfetivo: number;
+  cpaReal: number;
+  receitaEfetiva: number;
+  pedidosAprovadosCount: number;
 };
 
 export type ROASSensitivityPoint = {
@@ -68,12 +75,14 @@ export const DEFAULT_INPUTS: DREInputs = {
   receitaMensal: 400000,
   numeroPedidos: 1264,
   percentualDevolucoes: 5,
+  percentualAprovados: 100,
   taxaGateway: 3.7,
   taxaImpostos: 3,
   freteUnitario: 0,
   cmvUnitario: 180,
   cpaAlvo: 40,
   budgetAnuncios: 50547,
+  impostoMetaAds: 0,
 };
 
 /**
@@ -85,20 +94,31 @@ export function calculateDRE(inputs: DREInputs): DREResult {
     receitaMensal,
     numeroPedidos,
     percentualDevolucoes,
+    percentualAprovados,
     taxaGateway,
     taxaImpostos,
     freteUnitario,
     cmvUnitario,
     cpaAlvo,
     budgetAnuncios,
+    impostoMetaAds,
   } = inputs;
 
   // Ticket medio
   const ticketMedio = numeroPedidos > 0 ? receitaMensal / numeroPedidos : 0;
 
-  // Devolucoes
-  const numeroDevolucoes = Math.round(numeroPedidos * (percentualDevolucoes / 100));
-  const pedidosEfetivos = numeroPedidos - numeroDevolucoes;
+  // Pedidos aprovados (antes de devolucoes)
+  const pedidosAprovadosCount = Math.round(numeroPedidos * (percentualAprovados / 100));
+
+  // Devolucoes (apenas sobre pedidos aprovados)
+  const numeroDevolucoes = Math.round(pedidosAprovadosCount * (percentualDevolucoes / 100));
+  const pedidosEfetivos = pedidosAprovadosCount - numeroDevolucoes;
+
+  // Receita efetiva (apenas pedidos aprovados)
+  const receitaEfetiva = receitaMensal * (percentualAprovados / 100);
+
+  // Budget efetivo (com imposto sobre Meta Ads)
+  const budgetEfetivo = budgetAnuncios * (1 + impostoMetaAds / 100);
 
   // Custos unitarios sobre ticket
   const custoGateway = ticketMedio * (taxaGateway / 100);
@@ -118,19 +138,28 @@ export function calculateDRE(inputs: DREInputs): DREResult {
   const margemBrutaUnit = ticketMedio - custoGateway - custoDevolucao - custoImpostos - cmv - custoFrete;
   const margemBrutaPct = ticketMedio > 0 ? (margemBrutaUnit / ticketMedio) * 100 : 0;
 
-  // Margem de contribuicao (por unidade, apos CPA)
-  const margemContribUnit = margemBrutaUnit - cpaAlvo;
+  // CPA real ajustado:
+  // - Imposto Meta Ads: custo real dos anuncios e maior
+  // - Pedidos aprovados: cada venda real custa mais porque parte dos pedidos nao converte
+  const aprovadosFator = percentualAprovados > 0 ? percentualAprovados / 100 : 1;
+  const cpaReal = cpaAlvo * (1 + impostoMetaAds / 100) / aprovadosFator;
+
+  // Margem de contribuicao (por unidade, apos CPA real)
+  const margemContribUnit = margemBrutaUnit - cpaReal;
   const mcPct = ticketMedio > 0 ? (margemContribUnit / ticketMedio) * 100 : 0;
 
-  // ROAS realizado
-  const roasRealizado = budgetAnuncios > 0 ? receitaMensal / budgetAnuncios : 0;
+  // ROAS realizado (receita efetiva / budget efetivo)
+  const roasRealizado = budgetEfetivo > 0 ? receitaEfetiva / budgetEfetivo : 0;
 
-  // Lucro bruto (usa total de pedidos porque devolucao ja esta no custo unitario)
-  const lucroBruto = margemContribUnit * numeroPedidos;
+  // Lucro bruto (MC * pedidos aprovados, devolucao ja no custo unitario)
+  const lucroBruto = margemContribUnit * pedidosAprovadosCount;
 
-  // ROAS breakeven: ponto onde MC% = 0, ou seja margemBrutaPct = 1/ROAS
-  // breakevenRoas = 1 / (margemBrutaPct / 100) = 100 / margemBrutaPct
-  const breakevenRoas = margemBrutaPct > 0 ? 100 / margemBrutaPct : 0;
+  // ROAS breakeven ajustado:
+  // Formula base: 100 / margemBrutaPct
+  // Ajuste imposto: multiplica por (1 + impostoMetaAds/100)
+  // Ajuste aprovados: divide por (aprovados/100) — menos aprovados = precisa mais ROAS
+  const breakevenBase = margemBrutaPct > 0 ? 100 / margemBrutaPct : 0;
+  const breakevenRoas = breakevenBase * (1 + impostoMetaAds / 100) / aprovadosFator;
 
   // Markup
   const markup = cmvUnitario > 0 ? ticketMedio / cmvUnitario : 0;
@@ -157,6 +186,10 @@ export function calculateDRE(inputs: DREInputs): DREResult {
     markup,
     pedidosEfetivos,
     numeroDevolucoes,
+    budgetEfetivo,
+    cpaReal,
+    receitaEfetiva,
+    pedidosAprovadosCount,
   };
 }
 
@@ -170,11 +203,17 @@ export function calculateROASSensitivity(
 ): ROASSensitivityPoint[] {
   const dre = calculateDRE(inputs);
 
+  // Fator de ajuste: imposto Meta Ads + taxa de aprovacao
+  const aprovadosFator = inputs.percentualAprovados > 0 ? inputs.percentualAprovados / 100 : 1;
+  const ajusteFator = (1 + inputs.impostoMetaAds / 100) / aprovadosFator;
+
   return roasLevels.map((roas) => {
-    const cpaImplicito = roas > 0 ? dre.ticketMedio / roas : 0;
+    // CPA implicito ajustado pelo imposto e aprovacao
+    const cpaBase = roas > 0 ? dre.ticketMedio / roas : 0;
+    const cpaImplicito = cpaBase * ajusteFator;
     const mcUnit = dre.margemBrutaUnit - cpaImplicito;
     const mcPct = dre.ticketMedio > 0 ? (mcUnit / dre.ticketMedio) * 100 : 0;
-    const lucroBruto = mcUnit * dre.pedidosEfetivos;
+    const lucroBruto = mcUnit * dre.pedidosAprovadosCount;
 
     return { roas, mcPct, cpaImplicito, lucroBruto };
   });
@@ -195,12 +234,17 @@ export function calculateRevenueMatrix(
   const custoVarUnit =
     dre.custoGateway + dre.custoDevolucao + dre.custoImpostos + dre.cmv + dre.custoFrete;
 
+  const aprovadosFator = inputs.percentualAprovados > 0 ? inputs.percentualAprovados / 100 : 1;
+
   return roasLevels.map((roas) =>
     budgetLevels.map((budget) => {
-      const receita = roas * budget;
-      const pedidos = dre.ticketMedio > 0 ? receita / dre.ticketMedio : 0;
+      // Receita efetiva = ROAS reportado * budget, ajustada pela taxa de aprovacao
+      const receitaEfetiva = roas * budget * aprovadosFator;
+      // Budget efetivo inclui imposto Meta Ads
+      const budgetEfetivo = budget * (1 + inputs.impostoMetaAds / 100);
+      const pedidos = dre.ticketMedio > 0 ? receitaEfetiva / dre.ticketMedio : 0;
       const custosVariaveis = custoVarUnit * pedidos;
-      const lucro = receita - budget - custosVariaveis;
+      const lucro = receitaEfetiva - budgetEfetivo - custosVariaveis;
 
       return { roas, budget, lucro };
     })
@@ -217,9 +261,9 @@ export function calculateRecompra(
 ): RecompraResult {
   const dre = calculateDRE(inputs);
 
-  // Recompras nao tem custo de aquisicao (CPA = 0), apenas custos variaveis
-  const pedidosD60 = inputs.numeroPedidos * (recompraD60Pct / 100);
-  const pedidosD90 = inputs.numeroPedidos * (recompraD90Pct / 100);
+  // Recompras: apenas clientes aprovados podem recomprar
+  const pedidosD60 = dre.pedidosAprovadosCount * (recompraD60Pct / 100);
+  const pedidosD90 = dre.pedidosAprovadosCount * (recompraD90Pct / 100);
 
   const receitaD60 = pedidosD60 * dre.ticketMedio;
   const receitaD90 = pedidosD90 * dre.ticketMedio;
@@ -230,9 +274,9 @@ export function calculateRecompra(
   const margemD90 = pedidosD90 * dre.margemBrutaUnit;
   const margemAdicional = margemD60 + margemD90;
 
-  // Margem total combinada
+  // Margem total combinada (usa receita efetiva, nao a total)
   const margemTotalComRecompra = dre.lucroBruto + margemAdicional;
-  const receitaTotal = inputs.receitaMensal + receitaAdicional;
+  const receitaTotal = dre.receitaEfetiva + receitaAdicional;
   const margemTotalPct = receitaTotal > 0 ? (margemTotalComRecompra / receitaTotal) * 100 : 0;
 
   return {

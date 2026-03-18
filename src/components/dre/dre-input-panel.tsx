@@ -158,6 +158,17 @@ export const DREInputPanel = memo(function DREInputPanel({
               help="Quantidade total de pedidos realizados no período"
             />
             <InputField
+              label="% Pedidos Aprovados"
+              field="percentualAprovados"
+              value={inputs.percentualAprovados}
+              onChange={onChange}
+              suffix="%"
+              step={1}
+              min={1}
+              max={100}
+              help="Percentual de pedidos que são efetivamente aprovados (pagamento confirmado)"
+            />
+            <InputField
               label="% Devoluções"
               field="percentualDevolucoes"
               value={inputs.percentualDevolucoes}
@@ -247,6 +258,17 @@ export const DREInputPanel = memo(function DREInputPanel({
               prefix="R$"
               step={1}
               help="Quanto você paga em média para conquistar cada venda via anúncios"
+            />
+            <InputField
+              label="Imposto Meta Ads"
+              field="impostoMetaAds"
+              value={inputs.impostoMetaAds}
+              onChange={onChange}
+              suffix="%"
+              step={0.5}
+              min={0}
+              max={100}
+              help="Percentual de imposto pago sobre o investimento em Meta Ads (ex: IOF, ISS)"
             />
           </div>
         </div>

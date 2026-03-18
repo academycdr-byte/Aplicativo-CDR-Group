@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -195,6 +195,10 @@ export default function DashboardPage() {
     if (!silent) { setLoading(false); setRefreshing(false); }
   }, [period, applyData, getCacheKey]);
 
+  // Keep a ref to the latest loadData so auto-sync always uses current period
+  const loadDataRef = useRef(loadData);
+  useEffect(() => { loadDataRef.current = loadData; }, [loadData]);
+
   // Load data on period change (fast - no sync, just DB queries)
   useEffect(() => {
     loadData();
@@ -203,12 +207,12 @@ export default function DashboardPage() {
   // Listen for BackgroundSync completion events
   useEffect(() => {
     const handleSyncComplete = () => {
-      loadData(true);
+      loadDataRef.current(true);
       getLastSyncTime().then((r) => setLastSyncAt(r.lastSyncAt));
     };
     window.addEventListener("sync-complete", handleSyncComplete);
     return () => window.removeEventListener("sync-complete", handleSyncComplete);
-  }, [loadData]);
+  }, []);
 
   // Auto-sync: only on MOUNT + interval (NOT on period change)
   useEffect(() => {
@@ -232,7 +236,7 @@ export default function DashboardPage() {
     // Initial sync on mount only (background, doesn't block data display)
     syncRecent().then(() => {
       if (cancelled) return;
-      loadData(true);
+      loadDataRef.current(true);
       getLastSyncTime().then((r) => { if (!cancelled) setLastSyncAt(r.lastSyncAt); });
     });
 
@@ -240,7 +244,7 @@ export default function DashboardPage() {
     const intervalId = setInterval(() => {
       syncRecent().then(() => {
         if (cancelled) return;
-        loadData(true);
+        loadDataRef.current(true);
         getLastSyncTime().then((r) => { if (!cancelled) setLastSyncAt(r.lastSyncAt); });
       });
     }, intervalMs);

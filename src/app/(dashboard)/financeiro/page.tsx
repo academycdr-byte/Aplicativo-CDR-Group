@@ -17,7 +17,6 @@ import {
     Receipt,
     AlertTriangle,
 } from "lucide-react";
-import { subDays } from "date-fns";
 import {
     getFinancialMetrics,
     getProductCosts,
@@ -26,6 +25,7 @@ import {
     getFinancialEntries,
     type FinancialMetrics,
 } from "@/actions/finance";
+import { getDateRange } from "@/lib/date-utils";
 import { ProductCostTable } from "@/components/finance/product-cost-table";
 import { SupplierPaymentTable } from "@/components/finance/supplier-payment-table";
 import { FinancialConfigDialog } from "@/components/finance/financial-config-dialog";
@@ -76,14 +76,11 @@ export default function FinancePage() {
         try {
             const { days, from, to } = periodToParams(period);
 
-            let fromDate: Date, toDate: Date;
-            if (from && to) {
-                fromDate = new Date(from);
-                toDate = new Date(to);
-            } else {
-                toDate = new Date();
-                fromDate = subDays(toDate, days);
-            }
+            // Use getDateRange for consistent Brasilia timezone handling
+            // (same logic as Dashboard and Sales pages)
+            const range = getDateRange(days, from, to);
+            const fromDate = range.since;
+            const toDate = range.until;
 
             const results = await Promise.allSettled([
                 getFinancialMetrics({ from: fromDate, to: toDate }),

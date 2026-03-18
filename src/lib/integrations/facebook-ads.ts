@@ -427,7 +427,7 @@ export async function syncFacebookAdsMetrics(
     const hasTimeLeft = () => Date.now() - startTime < timeBudgetMs;
 
     const buildUrl = (adAccountId: string, since: string, until: string) =>
-      `https://graph.facebook.com/${FB_GRAPH_VERSION}/act_${adAccountId}/insights?fields=${fields}&level=ad&time_range=${encodeURIComponent(JSON.stringify({ since, until }))}&time_increment=1&limit=500&access_token=${accessToken}`;
+      `https://graph.facebook.com/${FB_GRAPH_VERSION}/act_${adAccountId}/insights?fields=${fields}&level=ad&time_range=${encodeURIComponent(JSON.stringify({ since, until }))}&time_increment=1&limit=500&action_attribution_windows=${encodeURIComponent(JSON.stringify(["7d_click", "1d_view"]))}&access_token=${accessToken}`;
 
     // Helper: save phase cursor and return hasMore
     const saveCursorAndReturn = async (nextPhase: number, accountIdx?: number): Promise<FbSyncResult> => {

@@ -28,17 +28,17 @@ export async function getDashboardData(days: number = 30, from?: string, to?: st
     adRevenue,
   ] = await prisma.$transaction([
     prisma.order.count({
-      where: { organizationId: orgId, orderDate: dateFilter, status: "paid" },
+      where: { organizationId: orgId, orderDate: dateFilter, status: { in: ["paid", "partially_refunded"] } },
     }),
     prisma.order.count({
-      where: { organizationId: orgId, orderDate: prevDateFilter, status: "paid" },
+      where: { organizationId: orgId, orderDate: prevDateFilter, status: { in: ["paid", "partially_refunded"] } },
     }),
     prisma.order.aggregate({
-      where: { organizationId: orgId, orderDate: dateFilter, status: "paid" },
+      where: { organizationId: orgId, orderDate: dateFilter, status: { in: ["paid", "partially_refunded"] } },
       _sum: { totalAmount: true },
     }),
     prisma.order.aggregate({
-      where: { organizationId: orgId, orderDate: prevDateFilter, status: "paid" },
+      where: { organizationId: orgId, orderDate: prevDateFilter, status: { in: ["paid", "partially_refunded"] } },
       _sum: { totalAmount: true },
     }),
     prisma.adMetric.aggregate({
@@ -88,7 +88,7 @@ export async function getRevenueByDay(days: number = 30, from?: string, to?: str
     where: {
       organizationId: ctx.organization.id,
       orderDate: dateFilter,
-      status: "paid",
+      status: { in: ["paid", "partially_refunded"] },
     },
     select: { orderDate: true, totalAmount: true },
     orderBy: { orderDate: "asc" },
@@ -175,7 +175,7 @@ export async function getMetricsAnalysis(days: number = 30, from?: string, to?: 
   for (const o of orders) {
     const key = toDateKeyBrasilia(o.orderDate);
     if (!grouped[key]) grouped[key] = { date: key, faturamento: 0, investimento: 0, compras: 0, ticketMedio: 0, cpa: 0, roas: 0, fbConversions: 0, fbRevenue: 0 };
-    if (o.status === "paid") {
+    if (o.status === "paid" || o.status === "partially_refunded") {
       grouped[key].faturamento += Number(o.totalAmount);
       grouped[key].compras += 1;
     }

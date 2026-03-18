@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Image from "next/image";
 import {
   Card,
@@ -199,6 +199,14 @@ export default function AdsPage() {
   const [excludedTerms, setExcludedTerms] = useState<string[]>([]);
   const [period, setPeriod] = useState<PeriodValue>({ type: "preset", days: 30 });
 
+  // Stable callback to avoid spurious re-renders when AdsFilter fires on mount
+  const handleExcludeChange = useCallback((newTerms: string[]) => {
+    setExcludedTerms(prev => {
+      if (prev.length === newTerms.length && prev.every((t, i) => t === newTerms[i])) return prev;
+      return newTerms;
+    });
+  }, []);
+
   // Pagination State
   const [metricsPage, setMetricsPage] = useState(1);
   const [creativesPage, setCreativesPage] = useState(1);
@@ -233,8 +241,13 @@ export default function AdsPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
+  // Stale load prevention: each new load increments the counter.
+  // If the counter changes mid-load, the old load is discarded.
+  const loadIdRef = useRef(0);
+
   // Load Data
   const loadData = useCallback(async (retries = 2) => {
+    const currentLoadId = ++loadIdRef.current;
     setLoading(true);
     setLoadError(null);
     const { days, from, to } = periodToParams(period);
@@ -252,8 +265,15 @@ export default function AdsPage() {
 
     let lastError: unknown;
     for (let attempt = 0; attempt <= retries; attempt++) {
+      // Abort if a newer load was triggered
+      if (loadIdRef.current !== currentLoadId) return;
+
       try {
         const data = await loadAllAdsData(params, searchQuery || undefined, excludedTerms);
+
+        // Abort if a newer load was triggered while awaiting
+        if (loadIdRef.current !== currentLoadId) return;
+
         if (!data) {
           setLoading(false);
           return;
@@ -279,7 +299,8 @@ export default function AdsPage() {
       }
     }
 
-    // All retries exhausted
+    // All retries exhausted — only set error if still the current load
+    if (loadIdRef.current !== currentLoadId) return;
     console.error("[Ads] All retries exhausted:", lastError);
     setLoadError("Erro ao carregar dados dos anúncios. Tente novamente.");
     setLoading(false);
@@ -537,7 +558,7 @@ export default function AdsPage() {
       {/* Advanced Filter Component */}
       <AdsFilter
         onSearchChange={setSearchQuery}
-        onExcludeChange={setExcludedTerms}
+        onExcludeChange={handleExcludeChange}
       />
 
       {/* Error Banner */}

@@ -276,7 +276,7 @@ export default function DREPerformancePage() {
                 ? "text-emerald-600 dark:text-emerald-400"
                 : "text-red-600 dark:text-red-400"
             }
-            subText={`Resultado de ${inputs.numeroPedidos} pedidos no mês`}
+            subText={`${metrics.pedidosAprovadosCount} pedidos aprovados de ${inputs.numeroPedidos} totais`}
           />
         </div>
       </div>
@@ -292,7 +292,9 @@ export default function DREPerformancePage() {
             value={`${metrics.roasRealizado.toFixed(2)}x`}
             icon={BarChart3}
             iconClass="bg-indigo-500/10 text-indigo-500"
-            subText="Receita total dividida pelo investimento em anúncios"
+            subText={inputs.impostoMetaAds > 0 || inputs.percentualAprovados < 100
+              ? `Ajustado: ${formatBRL(metrics.receitaEfetiva, true)} receita ÷ ${formatBRL(metrics.budgetEfetivo, true)} custo real`
+              : "Receita total dividida pelo investimento em anúncios"}
           />
           <KPICard
             title="Markup"
@@ -306,7 +308,7 @@ export default function DREPerformancePage() {
             value={formatBRL(metrics.ticketMedio)}
             icon={DollarSign}
             iconClass="bg-sky-500/10 text-sky-500"
-            subText={`${inputs.numeroPedidos} pedidos, ${metrics.numeroDevolucoes} devoluções estimadas`}
+            subText={`${metrics.pedidosAprovadosCount} aprovados, ${metrics.numeroDevolucoes} devoluções`}
             className="col-span-2 sm:col-span-1"
           />
         </div>
@@ -338,7 +340,7 @@ export default function DREPerformancePage() {
         onD90Change={setRecompraD90}
         result={recompraResult}
         dreMetrics={metrics}
-        budgetAnuncios={inputs.budgetAnuncios}
+        budgetAnuncios={metrics.budgetEfetivo}
       />
     </div>
   );

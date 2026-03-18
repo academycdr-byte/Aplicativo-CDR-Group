@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { getSessionWithOrg } from "@/lib/session";
-import { getDateRange, getPreviousDateRange, buildDateFilter, toDateKeyDateOnly } from "@/lib/date-utils";
+import { getDateRange, getPreviousDateRange, buildDateOnlyFilter, toDateKeyDateOnly } from "@/lib/date-utils";
 import { Prisma } from "@prisma/client";
 import { getMetricsAnalysis, getOrdersByPlatform } from "@/actions/dashboard";
 
@@ -67,13 +67,13 @@ export async function getAdMetrics(params?: FilterParams) {
 
   // Current Period
   const currentRange = getDateRange(days, params?.from, params?.to);
-  const currentDateFilter = buildDateFilter(currentRange);
+  const currentDateFilter = buildDateOnlyFilter(currentRange);
 
   const currentWhere = buildWhereClause(ctx.organization.id, currentDateFilter, params);
 
   // Previous Period
   const prevRange = getPreviousDateRange(days, params?.from, params?.to);
-  const prevDateFilter = { gte: prevRange.since, lte: prevRange.until };
+  const prevDateFilter = buildDateOnlyFilter(prevRange);
   const prevWhere = buildWhereClause(ctx.organization.id, prevDateFilter, params);
 
   // Run queries in parallel
@@ -156,7 +156,7 @@ export async function getAdMetricsByDay(days: number = 30, from?: string, to?: s
   const ctx = await getSessionWithOrg();
   if (!ctx) return [];
 
-  const dateFilter = buildDateFilter(getDateRange(days, from, to));
+  const dateFilter = buildDateOnlyFilter(getDateRange(days, from, to));
 
   const params: FilterParams = { search, exclude, platform, accountId };
   const where = buildWhereClause(ctx.organization.id, dateFilter, params);
@@ -192,7 +192,7 @@ export async function getCreativePerformance(params?: FilterParams) {
   if (!ctx) return [];
 
   const days = params?.days ?? 30;
-  const dateFilter = buildDateFilter(getDateRange(days, params?.from, params?.to));
+  const dateFilter = buildDateOnlyFilter(getDateRange(days, params?.from, params?.to));
 
   const where = buildWhereClause(ctx.organization.id, dateFilter, params);
 
@@ -230,10 +230,11 @@ export async function getCreativePerformance(params?: FilterParams) {
   }> = {};
 
   for (const m of metrics) {
-    const key = m.adId || "unknown";
+    // Group by (platform, adId) to avoid mixing data across accounts
+    const key = `${m.platform}::${m.adId || "unknown"}`;
     if (!byAd[key]) {
       byAd[key] = {
-        adId: key,
+        adId: m.adId || "unknown",
         adName: m.adName,
         campaignName: m.campaignName,
         adSetName: m.adSetName,
@@ -285,7 +286,7 @@ export async function getAdSetPerformance(params?: FilterParams) {
   if (!ctx) return [];
 
   const days = params?.days ?? 30;
-  const dateFilter = buildDateFilter(getDateRange(days, params?.from, params?.to));
+  const dateFilter = buildDateOnlyFilter(getDateRange(days, params?.from, params?.to));
   const where = buildWhereClause(ctx.organization.id, dateFilter, params);
 
   where.adSetId = { not: null };
@@ -450,12 +451,13 @@ export async function loadAllAnalyticsData(days: number, from?: string, to?: str
  * Load Google Analytics data for the analytics page.
  */
 async function loadGoogleAnalyticsData(organizationId: string, days: number, from?: string, to?: string) {
-  const { since, until } = getDateRange(days, from, to);
+  const range = getDateRange(days, from, to);
+  const dateFilter = buildDateOnlyFilter(range);
 
   const metrics = await prisma.analyticsMetric.findMany({
     where: {
       organizationId,
-      date: { gte: since, lte: until },
+      date: dateFilter,
     },
     orderBy: { date: "asc" },
   });

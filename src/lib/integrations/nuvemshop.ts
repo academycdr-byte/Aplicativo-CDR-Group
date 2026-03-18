@@ -125,7 +125,7 @@ async function upsertOrdersParallel(
 async function fetchPageWithRetry(
   url: string,
   accessToken: string,
-  maxRetries = 1
+  maxRetries = 2
 ): Promise<Record<string, unknown>[] | null> {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
@@ -267,7 +267,13 @@ export async function syncNuvemshopOrders(
       const url = `https://api.nuvemshop.com.br/v1/${storeId}/orders?per_page=${PER_PAGE}&page=${currentPage}${sinceParam}`;
       const orders = await fetchPageWithRetry(url, accessToken);
 
-      if (!orders || orders.length === 0) {
+      if (orders === null) {
+        // API error — log and stop, don't treat as "no more data"
+        console.error(`[Nuvemshop] Failed to fetch page ${currentPage}, stopping sync to avoid data loss`);
+        hasMore = false;
+        break;
+      }
+      if (orders.length === 0) {
         hasMore = false;
         break;
       }

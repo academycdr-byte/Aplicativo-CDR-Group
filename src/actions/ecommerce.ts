@@ -72,7 +72,7 @@ export async function getBestSellersAction(
                     gte: startDate,
                     lte: endDate
                 },
-                status: { in: ["paid", "authorized", "partially_paid", "partially_refunded", "delivered", "shipped"] } // Count confirmed sales
+                status: { in: ["paid", "partially_refunded"] } // Only count actually paid orders
             },
             select: {
                 rawData: true
@@ -323,7 +323,7 @@ export async function getOrdersRevenueTotalAction(from?: Date, to?: Date): Promi
         where: {
             organizationId: membership.organizationId,
             orderDate: { gte: startDate, lte: endDate },
-            status: "paid",
+            status: { in: ["paid", "partially_refunded"] },
         },
         _sum: { totalAmount: true },
     });
