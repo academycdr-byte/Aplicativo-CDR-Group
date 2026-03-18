@@ -108,7 +108,7 @@ export function MobileSidebar() {
         </Button>
       </SheetTrigger>
       <SheetContent side="left" className="w-[85vw] max-w-64 p-0 bg-sidebar-bg text-sidebar-text flex flex-col">
-        <SheetHeader className="px-5 py-5 border-b border-white/5">
+        <SheetHeader className="px-5 py-5 border-b border-sidebar-border">
           <SheetTitle className="flex items-center gap-3 text-sidebar-text">
             <Image
               src="/logo-cdr.png"
@@ -153,7 +153,7 @@ export function MobileSidebar() {
         </nav>
 
         {/* User Profile */}
-        <div className="px-3 py-3 border-t border-white/5">
+        <div className="px-3 py-3 border-t border-sidebar-border">
           <Link
             href="/settings"
             onClick={() => setOpen(false)}
