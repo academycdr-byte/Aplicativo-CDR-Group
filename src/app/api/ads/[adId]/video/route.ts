@@ -123,153 +123,66 @@ export async function GET(
                 }
             }
 
-            // 3a: Fetch the post with Page Token — video posts have 'source' at top level
-            // Use raw fetch to capture error details
-            let storyData = null;
-            let storyError = null;
-            const storyUrl = `https://graph.facebook.com/${FB_GRAPH_VERSION}/${storyId}?fields=source,type,full_picture,object_id,attachments{media{source,image{src,width,height}},type,subattachments{media{source,image{src}},type}}&access_token=${pageToken}`;
-            try {
-                const storyRes = await fetch(storyUrl);
-                if (storyRes.ok) {
-                    storyData = await storyRes.json();
-                } else {
-                    storyError = await storyRes.text();
-                }
-            } catch (e) {
-                storyError = e instanceof Error ? e.message : "fetch exception";
-            }
+            // 3a: Fetch the post with Page Token — WITHOUT 'attachments' (deprecated in v3.3+)
+            let finalStoryData = await fbGet(
+                `${storyId}?fields=source,type,full_picture,object_id`,
+                pageToken
+            );
 
-            // 3a-alt: If story fetch failed, try just the post_id without page prefix
-            if (!storyData) {
+            // 3a-alt: If story fetch failed, try just the post_id part
+            if (!finalStoryData) {
                 const postId = storyId.split("_").slice(1).join("_");
                 if (postId) {
-                    const altData = await fbGet(
+                    finalStoryData = await fbGet(
                         `${postId}?fields=source,type,full_picture,object_id`,
                         pageToken
                     );
-                    if (altData) storyData = altData;
                 }
             }
 
-            // DEBUG: Return diagnostic info if debug mode
-            if (isDebug && !storyData?.source && !videoId) {
-                // Also try IG media API directly for debug
-                const igPostId = storyId.split("_").pop();
-                const igRes = igPostId ? await fbGet(`${igPostId}?fields=media_url,media_type,thumbnail_url`, pageToken) : null;
-
-                return NextResponse.json({
-                    videoUrl: null,
-                    imageUrl: creative.thumbnail_url || null,
-                    type: "image",
-                    debug: {
-                        pageId,
-                        pageTokenObtained,
-                        storyId,
-                        storyFetched: !!storyData,
-                        storyError: storyError ? storyError.substring(0, 300) : null,
-                        storySource: storyData?.source || null,
-                        storyType: storyData?.type || null,
-                        storyObjectId: storyData?.object_id || null,
-                        igMediaTest: igRes ? { media_type: igRes.media_type, has_media_url: !!igRes.media_url } : "ig_fetch_failed",
-                    }
-                });
-            }
-
-            // 3a-extra: If story has object_id, it might be the video ID
-            if (storyData?.object_id && !storyData?.source) {
-                const objVideo = await fbGet(
-                    `${storyData.object_id}?fields=source,picture`,
-                    pageToken
-                );
-                if (objVideo?.source) {
-                    await prisma.adMetric.updateMany({
-                        where: { adId },
-                        data: { videoUrl: objVideo.source },
-                    });
-                    const poster = objVideo.picture || storyData.full_picture;
-                    if (poster) {
-                        await prisma.adMetric.updateMany({
-                            where: { adId },
-                            data: { thumbnailUrl: poster },
-                        });
-                    }
-                    return NextResponse.json({
-                        videoUrl: objVideo.source,
-                        imageUrl: poster || null,
-                        type: "video",
-                    });
-                }
-            }
-
-            if (storyData) {
+            if (finalStoryData) {
                 // 3b: Video source directly on the post (most reliable for video posts)
-                if (storyData.source) {
+                if (finalStoryData.source) {
                     await prisma.adMetric.updateMany({
                         where: { adId },
-                        data: { videoUrl: storyData.source },
+                        data: { videoUrl: finalStoryData.source },
                     });
-                    if (storyData.full_picture) {
+                    if (finalStoryData.full_picture) {
                         await prisma.adMetric.updateMany({
                             where: { adId },
-                            data: { thumbnailUrl: storyData.full_picture },
+                            data: { thumbnailUrl: finalStoryData.full_picture },
                         });
                     }
                     return NextResponse.json({
-                        videoUrl: storyData.source,
-                        imageUrl: storyData.full_picture || null,
+                        videoUrl: finalStoryData.source,
+                        imageUrl: finalStoryData.full_picture || null,
                         type: "video",
                     });
                 }
 
-                // 3c: Check attachments for video source
-                const attachments = storyData.attachments?.data;
-                if (attachments) {
-                    for (const att of attachments) {
-                        if (att.media?.source) {
+                // 3c: If post has object_id (video object), try fetching video source
+                if (finalStoryData.object_id) {
+                    const objVideo = await fbGet(
+                        `${finalStoryData.object_id}?fields=source,picture`,
+                        pageToken
+                    );
+                    if (objVideo?.source) {
+                        await prisma.adMetric.updateMany({
+                            where: { adId },
+                            data: { videoUrl: objVideo.source },
+                        });
+                        const poster = objVideo.picture || finalStoryData.full_picture;
+                        if (poster) {
                             await prisma.adMetric.updateMany({
                                 where: { adId },
-                                data: { videoUrl: att.media.source },
-                            });
-                            const hiResImage = att.media.image?.src || storyData.full_picture;
-                            if (hiResImage) {
-                                await prisma.adMetric.updateMany({
-                                    where: { adId },
-                                    data: { thumbnailUrl: hiResImage },
-                                });
-                            }
-                            return NextResponse.json({
-                                videoUrl: att.media.source,
-                                imageUrl: hiResImage || null,
-                                type: "video",
+                                data: { thumbnailUrl: poster },
                             });
                         }
-
-                        // Check subattachments (carousel with videos)
-                        if (att.subattachments?.data) {
-                            for (const sub of att.subattachments.data) {
-                                if (sub.media?.source) {
-                                    return NextResponse.json({
-                                        videoUrl: sub.media.source,
-                                        imageUrl: sub.media.image?.src || null,
-                                        type: "video",
-                                    });
-                                }
-                            }
-                        }
-
-                        // High-res image from attachment (image ads)
-                        if (att.media?.image?.src) {
-                            const hiResImage = att.media.image.src;
-                            await prisma.adMetric.updateMany({
-                                where: { adId },
-                                data: { thumbnailUrl: hiResImage },
-                            });
-                            return NextResponse.json({
-                                videoUrl: null,
-                                imageUrl: hiResImage,
-                                type: "image",
-                            });
-                        }
+                        return NextResponse.json({
+                            videoUrl: objVideo.source,
+                            imageUrl: poster || null,
+                            type: "video",
+                        });
                     }
                 }
 
@@ -295,7 +208,7 @@ export async function GET(
                         }
                         return NextResponse.json({
                             videoUrl: videoCheck.source,
-                            imageUrl: videoCheck.picture || storyData.full_picture || null,
+                            imageUrl: videoCheck.picture || finalStoryData.full_picture || null,
                             type: "video",
                         });
                     }
@@ -315,7 +228,7 @@ export async function GET(
                                 where: { adId },
                                 data: { videoUrl: igMedia.media_url },
                             });
-                            const poster = igMedia.thumbnail_url || storyData?.full_picture;
+                            const poster = igMedia.thumbnail_url || finalStoryData?.full_picture;
                             if (poster) {
                                 await prisma.adMetric.updateMany({
                                     where: { adId },
@@ -343,14 +256,14 @@ export async function GET(
                 }
 
                 // 3f: Fallback to full_picture (high-res image, better than thumbnail_url)
-                if (storyData?.full_picture) {
+                if (finalStoryData?.full_picture) {
                     await prisma.adMetric.updateMany({
                         where: { adId },
-                        data: { thumbnailUrl: storyData.full_picture },
+                        data: { thumbnailUrl: finalStoryData.full_picture },
                     });
                     return NextResponse.json({
                         videoUrl: null,
-                        imageUrl: storyData.full_picture,
+                        imageUrl: finalStoryData.full_picture,
                         type: "image",
                     });
                 }
