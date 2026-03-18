@@ -64,8 +64,10 @@ export async function GET(
             accessToken
         );
 
+        const isDebug = request.nextUrl.searchParams.get("debug") === "1";
+
         if (!adData?.creative) {
-            return NextResponse.json({ videoUrl: null, imageUrl: null, type: "none" });
+            return NextResponse.json({ videoUrl: null, imageUrl: null, type: "none", ...(isDebug ? { debug: { adData } } : {}) });
         }
 
         const creative = adData.creative;
@@ -300,6 +302,7 @@ export async function GET(
                 videoUrl: null,
                 imageUrl: hiRes,
                 type: "image",
+                ...(isDebug ? { debug: { creative: { id: creativeId, video_id: creative.video_id, effective_object_story_id: creative.effective_object_story_id, object_story_id: creative.object_story_id, has_image_url: !!creative.image_url, has_thumbnail: !!creative.thumbnail_url, object_story_spec_keys: creative.object_story_spec ? Object.keys(creative.object_story_spec) : null } } } : {}),
             });
         }
 
