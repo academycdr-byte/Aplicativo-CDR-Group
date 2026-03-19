@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
             startPhase: body.forceFullSync ? 1 : body.startPhase,
             accountIndex: body.forceFullSync ? undefined : body.accountIndex,
             syncLogId: body.forceFullSync ? undefined : body.syncLogId,
-            timeBudgetMs: 8000,
+            timeBudgetMs: 50_000,
         });
 
         return NextResponse.json({

@@ -145,7 +145,7 @@ export async function syncRecent() {
   });
 
   const connectedPlatforms = new Set(integrations.map((i) => i.platform));
-  const TIME_BUDGET = 8000; // 8s per platform — short calls, auto-refresh handles rest
+  const TIME_BUDGET = 25_000; // 25s per platform — enough for Phase 0+1 to complete
 
   // Build sync tasks dynamically based on connected platforms
   // ALL platforms get timeBudgetMs to prevent unbounded execution
