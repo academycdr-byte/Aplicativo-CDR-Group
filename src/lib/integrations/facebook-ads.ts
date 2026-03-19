@@ -397,12 +397,13 @@ export async function syncFacebookAdsMetrics(
     // Support multiple accounts from metadata
     const latestMeta = (integration.metadata as Record<string, unknown>) || {};
     const selAccounts = (latestMeta as { selectedAccounts?: { id: string; name: string }[] }).selectedAccounts || [];
-    const accountIds: string[] = selAccounts.length > 0
+    const accountIds: string[] = (selAccounts.length > 0
       ? selAccounts.map((a) => a.id.replace("act_", ""))
-      : integration.externalAccountId ? [integration.externalAccountId] : [];
+      : integration.externalAccountId ? [integration.externalAccountId] : []
+    ).filter((id) => id && id.trim() !== "");
 
     if (accountIds.length === 0) {
-      throw new Error("No ad account selected");
+      throw new Error("No ad account selected. Please go to Integrations and select your ad accounts.");
     }
 
     const fields = [

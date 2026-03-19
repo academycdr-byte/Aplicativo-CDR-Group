@@ -76,14 +76,26 @@ export async function GET(request: NextRequest) {
         tokenExpiresAt: tokenData.expires_in
           ? new Date(Date.now() + tokenData.expires_in * 1000)
           : null,
-        metadata: {
-          adAccounts: adAccounts.map((a: { id: string; name: string; account_status: number }) => ({
-            id: a.id,
-            name: a.name,
-            account_status: a.account_status,
-          })),
-        },
+        // Preserve selectedAccounts from previous connection so sync doesn't break
+        metadata: await (async () => {
+          const existing = await prisma.integration.findUnique({
+            where: { organizationId_platform: { organizationId, platform: "FACEBOOK_ADS" } },
+            select: { metadata: true },
+          });
+          const prev = (existing?.metadata as Record<string, unknown>) || {};
+          return {
+            ...prev,
+            adAccounts: adAccounts.map((a: { id: string; name: string; account_status: number }) => ({
+              id: a.id,
+              name: a.name,
+              account_status: a.account_status,
+            })),
+            // Clear stale sync cursor since token changed
+            fbSyncCursor: undefined,
+          };
+        })(),
         errorMessage: null,
+        syncStatus: "IDLE",
       },
     });
 

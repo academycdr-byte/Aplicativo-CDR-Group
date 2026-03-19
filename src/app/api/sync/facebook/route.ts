@@ -46,9 +46,10 @@ export async function POST(request: NextRequest) {
         }
 
         const result = await syncFacebookAdsMetrics(orgId, {
-            startPhase: body.startPhase,
-            accountIndex: body.accountIndex,
-            syncLogId: body.syncLogId,
+            // When forcing full sync, explicitly start from phase 1 to avoid reading stale cursor
+            startPhase: body.forceFullSync ? 1 : body.startPhase,
+            accountIndex: body.forceFullSync ? undefined : body.accountIndex,
+            syncLogId: body.forceFullSync ? undefined : body.syncLogId,
             timeBudgetMs: 8000,
         });
 
