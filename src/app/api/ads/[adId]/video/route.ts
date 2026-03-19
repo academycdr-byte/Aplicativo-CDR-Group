@@ -42,8 +42,9 @@ export async function GET(
             }
         }
 
-        // Check DB cache: if we already have thumbnailUrl and/or videoUrl, return immediately
-        // while still fetching previewUrl in parallel (which is the slowest call)
+        // Check DB cache: only fast-return for VIDEO ads (they have reliable direct URLs).
+        // For image/catalog ads, continue to Meta API to get preview iframe + high-res images.
+        let dbFallbackThumbnail: string | null = null;
         if (!isRefresh) {
             const dbMetric = await prisma.adMetric.findFirst({
                 where: { adId, thumbnailUrl: { not: null } },
@@ -51,19 +52,22 @@ export async function GET(
                 orderBy: { date: "desc" },
             });
 
-            if (dbMetric?.thumbnailUrl) {
-                const videoUrl = dbMetric.videoUrl || null;
-                const imageUrl = dbMetric.thumbnailUrl;
-                const type = videoUrl ? "video" : imageUrl ? "image" : "none";
-
-                const result = { videoUrl, imageUrl, previewUrl: null as string | null, type };
-
-                // Cache the DB result
+            if (dbMetric?.videoUrl) {
+                // Video ads: return immediately (direct video source is reliable)
+                const result = {
+                    videoUrl: dbMetric.videoUrl,
+                    imageUrl: dbMetric.thumbnailUrl,
+                    previewUrl: null as string | null,
+                    type: "video",
+                };
                 previewCache.set(adId, { data: result, timestamp: Date.now() });
+                return NextResponse.json(result, { headers: { "X-Cache": "DB" } });
+            }
 
-                return NextResponse.json(result, {
-                    headers: { "X-Cache": "DB" },
-                });
+            // For image-only ads: save thumbnail as fallback but keep going to Meta API
+            // for preview iframe + high-res image
+            if (dbMetric?.thumbnailUrl) {
+                dbFallbackThumbnail = dbMetric.thumbnailUrl;
             }
         }
 
@@ -77,6 +81,11 @@ export async function GET(
         });
 
         if (!integration?.accessToken) {
+            // No integration — return DB fallback if available
+            if (dbFallbackThumbnail) {
+                const result = { videoUrl: null as string | null, imageUrl: dbFallbackThumbnail, previewUrl: null as string | null, type: "image" };
+                return NextResponse.json(result, { headers: { "X-Cache": "DB-FALLBACK" } });
+            }
             return NextResponse.json({ error: "No Facebook integration" }, { status: 404 });
         }
 
@@ -154,11 +163,14 @@ export async function GET(
             Promise.all(dbUpdates).catch(() => { /* non-fatal */ });
         }
 
+        // Use DB fallback thumbnail if Meta API didn't return one
+        const finalImageUrl = thumbnailUrl || dbFallbackThumbnail;
+
         const result = {
             videoUrl,
-            imageUrl: thumbnailUrl,
+            imageUrl: finalImageUrl,
             previewUrl,
-            type: videoUrl ? "video" : previewUrl ? "preview" : thumbnailUrl ? "image" : "none",
+            type: videoUrl ? "video" : previewUrl ? "preview" : finalImageUrl ? "image" : "none",
         };
 
         // Cache the full result in memory

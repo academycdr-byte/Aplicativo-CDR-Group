@@ -80,25 +80,25 @@ export function VideoModal({ isOpen, onClose, creative }: VideoModalProps) {
         }
     }, []);
 
-    // Reset and fetch when creative changes
-    // ALWAYS fetch from API to get high-res media (cached thumbnails are low-res ~130px)
+    // Reset and ALWAYS fetch from API to get high-res media + preview iframe
+    // Cached thumbnails from DB are low-res (~130px) and don't include preview iframes
     useEffect(() => {
         if (!isOpen || !creative) return;
 
         setVideoUrl(null);
         setImageUrl(null);
+        setPreviewUrl(null);
         setVideoError(false);
         setIsMuted(true);
         setIsFullscreen(false);
 
-        // If we have a cached videoUrl, use it immediately but still try API for fresh URL
         if (creative.videoUrl) {
+            // Show video immediately for fast UX, API will update if URL expired
             setVideoUrl(creative.videoUrl);
             setMediaType("video");
             setIsLoading(false);
         } else {
-            // Always fetch from API — it returns high-res images + finds videos
-            // that the sync might have missed
+            // For image/catalog ads: always fetch from API to get preview iframe + high-res
             setMediaType("loading");
             fetchCreativeMedia(creative.adId);
         }
