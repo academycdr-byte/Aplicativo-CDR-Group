@@ -507,10 +507,11 @@ export async function syncFacebookAdsMetrics(
         if (!hasTimeLeft()) return;
         try {
           // Fetch Today only for max speed (Yesterday is handled in Phase 1)
-          await fetchAndSavePageByPage(
+          const result = await fetchAndSavePageByPage(
             buildUrl(accountId, daysAgo(0), daysAgo(0)),
             accountId,
           );
+          totalSynced += result.synced;
         } catch (err) {
           // Non-fatal, just log
           console.warn(`[Facebook Ads] Phase 0 freshness fetch failed for ${accountId}:`, err);
@@ -518,6 +519,35 @@ export async function syncFacebookAdsMetrics(
       });
 
       await Promise.all(freshnessPromises);
+
+      // Phase 0b: Fetch thumbnails for ads with missing thumbnails (quick batch)
+      if (hasTimeLeft()) {
+        try {
+          const missingThumbnails = await prisma.adMetric.findMany({
+            where: { organizationId, platform: "FACEBOOK_ADS", thumbnailUrl: null, adId: { not: null } },
+            select: { adId: true },
+            distinct: ["adId"],
+            take: 50,
+          });
+          const adIdsToFetch = missingThumbnails.map((m) => m.adId).filter(Boolean) as string[];
+          if (adIdsToFetch.length > 0 && hasTimeLeft()) {
+            const thumbnails = await fetchAdThumbnails(adIdsToFetch, accessToken);
+            const updateIds = adIdsToFetch.filter((id) => thumbnails[id]);
+            if (updateIds.length > 0) {
+              await Promise.all(
+                updateIds.slice(0, 30).map((adId) =>
+                  prisma.adMetric.updateMany({
+                    where: { organizationId, platform: "FACEBOOK_ADS", adId },
+                    data: { thumbnailUrl: thumbnails[adId] },
+                  })
+                )
+              );
+            }
+          }
+        } catch {
+          // Non-fatal: thumbnails will be fetched in Phase 4
+        }
+      }
     }
 
 
