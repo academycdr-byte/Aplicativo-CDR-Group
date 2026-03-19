@@ -466,6 +466,8 @@ export async function syncFacebookAdsMetrics(
 
     // Helper: fetch insights page by page, saving each page immediately
     // Returns number of records synced. Checks time budget between pages.
+    // Retries failed pages up to 2 times with exponential backoff to handle
+    // transient Meta API errors (rate limits, 500s, timeouts).
     const fetchAndSavePageByPage = async (
       url: string,
       adAccountId: string,
@@ -474,17 +476,43 @@ export async function syncFacebookAdsMetrics(
       let pageUrl: string | null = url;
 
       while (pageUrl) {
-        const response: Response = await fetch(pageUrl);
-        if (!response.ok) {
-          const errorBody = await response.text();
-          console.error("[Facebook Ads] Insights fetch failed:", response.status, errorBody);
-          break;
+        let response: Response | null = null;
+        let lastError = "";
+
+        // Retry up to 3 attempts (1 original + 2 retries) with backoff
+        for (let attempt = 0; attempt < 3; attempt++) {
+          if (attempt > 0) {
+            // Exponential backoff: 1s, 2s
+            const delay = attempt * 1000;
+            await new Promise(r => setTimeout(r, delay));
+            if (!hasTimeLeft()) return { synced, timedOut: true };
+          }
+
+          try {
+            response = await fetch(pageUrl);
+            if (response.ok) break; // Success — exit retry loop
+
+            lastError = `HTTP ${response.status}`;
+            const errorBody = await response.text().catch(() => "");
+            console.warn(`[Facebook Ads] Page fetch attempt ${attempt + 1}/3 failed: ${response.status} ${errorBody.substring(0, 200)}`);
+            response = null; // Mark as failed for retry
+          } catch (err) {
+            lastError = err instanceof Error ? err.message : "Network error";
+            console.warn(`[Facebook Ads] Page fetch attempt ${attempt + 1}/3 error: ${lastError}`);
+            response = null;
+          }
+        }
+
+        // All retries exhausted
+        if (!response || !response.ok) {
+          console.error(`[Facebook Ads] Insights page failed after 3 attempts (${lastError}), returning timedOut to resume later`);
+          return { synced, timedOut: true }; // Signal to resume, not silently skip
         }
 
         const data: FbPaginatedInsightsResponse = await response.json();
         if (data.error) {
           console.error("[Facebook Ads] API error:", JSON.stringify(data.error));
-          break;
+          return { synced, timedOut: true }; // Signal to resume, not silently skip
         }
 
         if (data.data && data.data.length > 0) {
