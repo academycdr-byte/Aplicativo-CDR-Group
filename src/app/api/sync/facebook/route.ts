@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
             // No body or invalid JSON — use defaults
         }
 
-        // Force full sync: clear any stale cursor and reset sync status
+        // Force full sync: clear any stale cursor, reset sync status, and clear old thumbnails
         if (body.forceFullSync) {
             const integration = await prisma.integration.findUnique({
                 where: { organizationId_platform: { organizationId: orgId, platform: "FACEBOOK_ADS" } },
@@ -74,6 +74,11 @@ export async function POST(request: NextRequest) {
                 await prisma.integration.update({
                     where: { id: integration.id },
                     data: { syncStatus: "IDLE", metadata: rest as Record<string, string | number | boolean | null>, errorMessage: null },
+                });
+                // Clear old/expired thumbnail URLs so Phase 0b re-fetches them
+                await prisma.adMetric.updateMany({
+                    where: { organizationId: orgId, platform: "FACEBOOK_ADS", thumbnailUrl: { not: null } },
+                    data: { thumbnailUrl: null, videoUrl: null },
                 });
             }
         }
