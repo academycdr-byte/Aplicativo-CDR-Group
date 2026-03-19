@@ -24,7 +24,16 @@ export async function GET() {
     const adAccounts = (meta as { adAccounts?: { id: string; name: string }[] }).adAccounts;
     const cursor = (meta as { fbSyncCursor?: unknown }).fbSyncCursor;
 
+    // Count thumbnails
+    const [totalAds, withThumbnails] = await Promise.all([
+        prisma.adMetric.count({ where: { organizationId: membership.organizationId, platform: "FACEBOOK_ADS", adId: { not: null } } }),
+        prisma.adMetric.count({ where: { organizationId: membership.organizationId, platform: "FACEBOOK_ADS", adId: { not: null }, thumbnailUrl: { not: null } } }),
+    ]);
+
     return NextResponse.json({
+        totalAds,
+        withThumbnails,
+        withoutThumbnails: totalAds - withThumbnails,
         status: integration.status,
         syncStatus: integration.syncStatus,
         externalAccountId: integration.externalAccountId || "(empty)",
