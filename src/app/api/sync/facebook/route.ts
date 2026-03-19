@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
             startPhase: body.forceFullSync ? 1 : body.startPhase,
             accountIndex: body.forceFullSync ? undefined : body.accountIndex,
             syncLogId: body.forceFullSync ? undefined : body.syncLogId,
-            timeBudgetMs: 50000,
+            timeBudgetMs: 8000,
         });
 
         return NextResponse.json({
