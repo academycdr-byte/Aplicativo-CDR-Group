@@ -102,6 +102,13 @@ export async function GET(
             }
         }
 
+        // Debug tracking variables
+        let _dbg_pageTokenObtained = false;
+        let _dbg_storyFetched = false;
+        let _dbg_storyType: string | null = null;
+        let _dbg_storyObjectId: string | null = null;
+        let _dbg_igAccountId: string | null = null;
+
         // Step 3: If no direct video_id, try effective_object_story_id (post-based creatives)
         if (!videoId && creative.effective_object_story_id) {
             const storyId = creative.effective_object_story_id;
@@ -120,6 +127,7 @@ export async function GET(
                 if (pageData?.access_token) {
                     pageToken = pageData.access_token;
                     pageTokenObtained = true;
+                    _dbg_pageTokenObtained = true;
                 }
             }
 
@@ -141,6 +149,10 @@ export async function GET(
             }
 
             if (finalStoryData) {
+                _dbg_storyFetched = true;
+                _dbg_storyType = finalStoryData.type || null;
+                _dbg_storyObjectId = finalStoryData.object_id || null;
+
                 // 3b: Video source directly on the post (most reliable for video posts)
                 if (finalStoryData.source) {
                     await prisma.adMetric.updateMany({
@@ -214,14 +226,29 @@ export async function GET(
                     }
                 }
 
-                // 3e: Try Instagram Media API (for Instagram-placed ads)
-                // Instagram media can be fetched via /{ig_media_id}?fields=media_url,media_type
+                // 3e: Try Instagram Business Account approach
+                // Get IG business account from the page, then try IG media ID
+                const igBizAccount = await fbGet(
+                    `${pageId}?fields=instagram_business_account`,
+                    pageToken
+                );
+                const igAccountId = igBizAccount?.instagram_business_account?.id;
+                _dbg_igAccountId = igAccountId || null;
+
+                // Try the post_id as an IG media ID using the IG account context
                 const igMediaId = storyId.split("_").pop();
                 if (igMediaId) {
-                    const igMedia = await fbGet(
+                    // Try with page token first, then with user token
+                    let igMedia = await fbGet(
                         `${igMediaId}?fields=media_url,media_type,thumbnail_url`,
                         pageToken
                     );
+                    if (!igMedia) {
+                        igMedia = await fbGet(
+                            `${igMediaId}?fields=media_url,media_type,thumbnail_url`,
+                            accessToken
+                        );
+                    }
                     if (igMedia?.media_url) {
                         if (igMedia.media_type === "VIDEO") {
                             await prisma.adMetric.updateMany({
@@ -359,7 +386,7 @@ export async function GET(
                 videoUrl: null,
                 imageUrl: creative.thumbnail_url,
                 type: "image",
-                ...(isDebug ? { debug: { creative: { id: creativeId, video_id: creative.video_id || null, effective_object_story_id: creative.effective_object_story_id || null, has_image_url: !!creative.image_url }, note: "Video source requires pages_read_engagement permission for Instagram posts" } } : {}),
+                ...(isDebug ? { debug: { creative: { id: creativeId, video_id: creative.video_id || null, effective_object_story_id: creative.effective_object_story_id || null, has_image_url: !!creative.image_url }, step3: { pageTokenObtained: _dbg_pageTokenObtained, storyFetched: _dbg_storyFetched, storyType: _dbg_storyType, storyObjectId: _dbg_storyObjectId, igAccountId: _dbg_igAccountId } } } : {}),
             });
         }
 
