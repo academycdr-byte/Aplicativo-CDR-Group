@@ -32,12 +32,13 @@ interface VideoModalProps {
     creative: Creative | null;
 }
 
-type MediaType = "video" | "image" | "none" | "loading";
+type MediaType = "video" | "image" | "preview" | "none" | "loading";
 
 export function VideoModal({ isOpen, onClose, creative }: VideoModalProps) {
     const [mediaType, setMediaType] = useState<MediaType>("loading");
     const [videoUrl, setVideoUrl] = useState<string | null>(null);
     const [imageUrl, setImageUrl] = useState<string | null>(null);
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [videoError, setVideoError] = useState(false);
     const [isMuted, setIsMuted] = useState(true);
@@ -55,11 +56,18 @@ export function VideoModal({ isOpen, onClose, creative }: VideoModalProps) {
 
             if (data.type === "video" && data.videoUrl) {
                 setVideoUrl(data.videoUrl);
-                setImageUrl(null);
+                setImageUrl(data.imageUrl || null);
+                setPreviewUrl(null);
                 setMediaType("video");
-            } else if (data.type === "image" && data.imageUrl) {
+            } else if (data.type === "preview" && data.previewUrl) {
+                setVideoUrl(null);
+                setImageUrl(data.imageUrl || null);
+                setPreviewUrl(data.previewUrl);
+                setMediaType("preview");
+            } else if (data.imageUrl) {
                 setVideoUrl(null);
                 setImageUrl(data.imageUrl);
+                setPreviewUrl(data.previewUrl || null);
                 setMediaType("image");
             } else {
                 setMediaType("none");
@@ -141,7 +149,8 @@ export function VideoModal({ isOpen, onClose, creative }: VideoModalProps) {
     }
 
     const showVideo = mediaType === "video" && videoUrl && !videoError;
-    const showImage = mediaType === "image" || (!showVideo && !isLoading && (imageUrl || creative.thumbnailUrl));
+    const showPreview = mediaType === "preview" && previewUrl;
+    const showImage = !showVideo && !showPreview && !isLoading && (imageUrl || creative.thumbnailUrl);
     const displayImageUrl = imageUrl || creative.thumbnailUrl;
 
     return (
@@ -216,6 +225,17 @@ export function VideoModal({ isOpen, onClose, creative }: VideoModalProps) {
                                 </div>
                             )}
 
+                            {/* Ad Preview (Facebook iframe — shows exact creative with video playback) */}
+                            {showPreview && (
+                                <iframe
+                                    src={previewUrl!}
+                                    className="w-full h-full border-0"
+                                    title="Pré-visualização do criativo"
+                                    allow="autoplay"
+                                    sandbox="allow-scripts allow-same-origin allow-popups"
+                                />
+                            )}
+
                             {/* Image Display */}
                             {showImage && !isLoading && displayImageUrl && (
                                 <>
@@ -264,6 +284,12 @@ export function VideoModal({ isOpen, onClose, creative }: VideoModalProps) {
                                 <>
                                     <Play className="w-3.5 h-3.5" />
                                     <span>Vídeo &bull; Clique no player para controlar</span>
+                                </>
+                            )}
+                            {showPreview && (
+                                <>
+                                    <Play className="w-3.5 h-3.5" />
+                                    <span>Pré-visualização do criativo &bull; Interaja diretamente</span>
                                 </>
                             )}
                             {showImage && !isLoading && (
