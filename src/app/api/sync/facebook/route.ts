@@ -5,6 +5,39 @@ import { syncFacebookAdsMetrics } from "@/lib/integrations/facebook-ads";
 
 export const maxDuration = 60;
 
+// Diagnostic endpoint to check integration state
+export async function GET() {
+    const session = await auth();
+    if (!session?.user?.id) return NextResponse.json({ error: "Not auth" }, { status: 401 });
+    const membership = await prisma.membership.findFirst({ where: { userId: session.user.id } });
+    if (!membership) return NextResponse.json({ error: "No org" }, { status: 400 });
+
+    const integration = await prisma.integration.findFirst({
+        where: { organizationId: membership.organizationId, platform: "FACEBOOK_ADS" },
+        select: { status: true, syncStatus: true, externalAccountId: true, metadata: true, errorMessage: true },
+    });
+
+    if (!integration) return NextResponse.json({ error: "No FB integration" });
+
+    const meta = (integration.metadata as Record<string, unknown>) || {};
+    const selAccounts = (meta as { selectedAccounts?: { id: string; name: string }[] }).selectedAccounts;
+    const adAccounts = (meta as { adAccounts?: { id: string; name: string }[] }).adAccounts;
+    const cursor = (meta as { fbSyncCursor?: unknown }).fbSyncCursor;
+
+    return NextResponse.json({
+        status: integration.status,
+        syncStatus: integration.syncStatus,
+        externalAccountId: integration.externalAccountId || "(empty)",
+        selectedAccountsCount: selAccounts?.length ?? "NOT SET",
+        selectedAccountIds: selAccounts?.map(a => a.id) ?? null,
+        adAccountsCount: adAccounts?.length ?? "NOT SET",
+        adAccountIds: adAccounts?.map(a => a.id) ?? null,
+        hasCursor: !!cursor,
+        cursor: cursor || null,
+        errorMessage: integration.errorMessage,
+    });
+}
+
 export async function POST(request: NextRequest) {
     const session = await auth();
     if (!session?.user?.id) {
