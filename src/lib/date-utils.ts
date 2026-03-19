@@ -122,23 +122,31 @@ export function getDateRange(
   let untilStr: string;
 
   if (from && to) {
+    // Custom date range: use exactly what the user specified
     sinceStr = from.split("T")[0];
     untilStr = to.split("T")[0];
   } else {
-    // Use Brazil timezone to determine "today"
-    untilStr = getBrazilToday();
+    const todayStr = getBrazilToday();
+    const yesterdayRef = parseDateUTC(todayStr);
+    yesterdayRef.setUTCDate(yesterdayRef.getUTCDate() - 1);
+    const yesterdayStr = yesterdayRef.toISOString().split("T")[0];
+
     if (days === 0) {
-      sinceStr = untilStr;
+      // "Hoje": today only (user explicitly wants today, even if partial)
+      sinceStr = todayStr;
+      untilStr = todayStr;
     } else if (days === -1) {
-      // Yesterday only: both since and until point to yesterday
-      const ref = parseDateUTC(untilStr);
-      ref.setUTCDate(ref.getUTCDate() - 1);
-      sinceStr = ref.toISOString().split("T")[0];
-      untilStr = sinceStr;
+      // "Ontem": yesterday only
+      sinceStr = yesterdayStr;
+      untilStr = yesterdayStr;
     } else {
-      const ref = parseDateUTC(untilStr);
-      ref.setUTCDate(ref.getUTCDate() - days);
-      sinceStr = ref.toISOString().split("T")[0];
+      // Preset periods (7d, 14d, 30d, 90d): end at YESTERDAY.
+      // Today's data from Meta/Google Ads is always incomplete (attribution delay).
+      // Using yesterday ensures metrics match the source platforms.
+      untilStr = yesterdayStr;
+      const sinceRef = parseDateUTC(todayStr);
+      sinceRef.setUTCDate(sinceRef.getUTCDate() - days);
+      sinceStr = sinceRef.toISOString().split("T")[0];
     }
   }
 

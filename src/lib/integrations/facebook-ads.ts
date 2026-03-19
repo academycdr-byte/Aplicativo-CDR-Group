@@ -502,23 +502,21 @@ export async function syncFacebookAdsMetrics(
       return { synced, timedOut: false };
     };
 
-    // PHASE 0: MANDATORY FRESHNESS (Yesterday + Today)
-    // Always run this first to ensure dashboard shows current data immediately
-    // Do not save cursor for this phase, as it must run on every sync start
-    if (currentPhase <= 1) { // Implicitly includes "start of sync"
-      console.log(`[Facebook Ads] Phase 0: Fetching recent data (Yesterday + Today) for freshness`);
+    // PHASE 0: MANDATORY FRESHNESS (Yesterday only — complete data)
+    // Today's data is NEVER complete (Meta attribution delay of up to 7 days).
+    // Always fetch yesterday to ensure dashboard shows accurate finalized data.
+    if (currentPhase <= 1) {
+      console.log(`[Facebook Ads] Phase 0: Fetching yesterday's data for freshness`);
 
       const freshnessPromises = accountIds.map(async (accountId) => {
         if (!hasTimeLeft()) return;
         try {
-          // Fetch Today only for max speed (Yesterday is handled in Phase 1)
           const result = await fetchAndSavePageByPage(
-            buildUrl(accountId, daysAgo(0), daysAgo(0)),
+            buildUrl(accountId, daysAgo(1), daysAgo(1)),
             accountId,
           );
           totalSynced += result.synced;
         } catch (err) {
-          // Non-fatal, just log
           console.warn(`[Facebook Ads] Phase 0 freshness fetch failed for ${accountId}:`, err);
         }
       });
@@ -565,13 +563,15 @@ export async function syncFacebookAdsMetrics(
     }
 
     // PHASE 1: Last 7 days for ALL accounts (highest priority history)
+    // Ends at yesterday — today's data is incomplete and would show wrong metrics.
+    // Re-syncing last 7 days also captures retroactive attribution from Meta (7d_click window).
     if (currentPhase <= 1) {
       const startIdx = (currentPhase === 1 && startAccountIndex !== undefined) ? startAccountIndex : 0;
       for (let ai = startIdx; ai < accountIds.length; ai++) {
         if (!hasTimeLeft()) return saveCursorAndReturn(1, ai);
         try {
           const result = await fetchAndSavePageByPage(
-            buildUrl(accountIds[ai], daysAgo(7), daysAgo(0)),
+            buildUrl(accountIds[ai], daysAgo(7), daysAgo(1)),
             accountIds[ai],
           );
           totalSynced += result.synced;

@@ -30,10 +30,15 @@ export async function syncGoogleAdsMetrics(organizationId: string) {
     const customerId = integration.externalAccountId || "";
     const developerToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN || "";
 
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const since = thirtyDaysAgo.toISOString().split("T")[0];
-    const until = new Date().toISOString().split("T")[0];
+    // Use Brazil timezone for date boundaries and end at YESTERDAY (today's data is incomplete)
+    const now = new Date();
+    const todayBR = now.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+    const yesterdayRef = new Date(todayBR + "T00:00:00Z");
+    yesterdayRef.setUTCDate(yesterdayRef.getUTCDate() - 1);
+    const until = yesterdayRef.toISOString().split("T")[0];
+    const sinceRef = new Date(todayBR + "T00:00:00Z");
+    sinceRef.setUTCDate(sinceRef.getUTCDate() - 30);
+    const since = sinceRef.toISOString().split("T")[0];
 
     const query = `
       SELECT
