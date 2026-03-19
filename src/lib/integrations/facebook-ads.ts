@@ -502,17 +502,17 @@ export async function syncFacebookAdsMetrics(
       return { synced, timedOut: false };
     };
 
-    // PHASE 0: MANDATORY FRESHNESS (Yesterday only — complete data)
-    // Today's data is NEVER complete (Meta attribution delay of up to 7 days).
-    // Always fetch yesterday to ensure dashboard shows accurate finalized data.
+    // PHASE 0: MANDATORY FRESHNESS (Yesterday + Today)
+    // Fetch both yesterday (finalized) and today (partial but real-time spend).
+    // This ensures dashboard always shows current data.
     if (currentPhase <= 1) {
-      console.log(`[Facebook Ads] Phase 0: Fetching yesterday's data for freshness`);
+      console.log(`[Facebook Ads] Phase 0: Fetching recent data (Yesterday + Today) for freshness`);
 
       const freshnessPromises = accountIds.map(async (accountId) => {
         if (!hasTimeLeft()) return;
         try {
           const result = await fetchAndSavePageByPage(
-            buildUrl(accountId, daysAgo(1), daysAgo(1)),
+            buildUrl(accountId, daysAgo(1), daysAgo(0)),
             accountId,
           );
           totalSynced += result.synced;
@@ -563,15 +563,15 @@ export async function syncFacebookAdsMetrics(
     }
 
     // PHASE 1: Last 7 days for ALL accounts (highest priority history)
-    // Ends at yesterday — today's data is incomplete and would show wrong metrics.
-    // Re-syncing last 7 days also captures retroactive attribution from Meta (7d_click window).
+    // Re-syncing last 7 days captures retroactive attribution (7d_click window).
+    // Includes today for real-time spend accuracy.
     if (currentPhase <= 1) {
       const startIdx = (currentPhase === 1 && startAccountIndex !== undefined) ? startAccountIndex : 0;
       for (let ai = startIdx; ai < accountIds.length; ai++) {
         if (!hasTimeLeft()) return saveCursorAndReturn(1, ai);
         try {
           const result = await fetchAndSavePageByPage(
-            buildUrl(accountIds[ai], daysAgo(7), daysAgo(1)),
+            buildUrl(accountIds[ai], daysAgo(7), daysAgo(0)),
             accountIds[ai],
           );
           totalSynced += result.synced;

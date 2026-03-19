@@ -127,25 +127,25 @@ export function getDateRange(
     untilStr = to.split("T")[0];
   } else {
     const todayStr = getBrazilToday();
-    const yesterdayRef = parseDateUTC(todayStr);
-    yesterdayRef.setUTCDate(yesterdayRef.getUTCDate() - 1);
-    const yesterdayStr = yesterdayRef.toISOString().split("T")[0];
 
     if (days === 0) {
-      // "Hoje": today only (user explicitly wants today, even if partial)
+      // "Hoje": today only
       sinceStr = todayStr;
       untilStr = todayStr;
     } else if (days === -1) {
       // "Ontem": yesterday only
-      sinceStr = yesterdayStr;
-      untilStr = yesterdayStr;
+      const ref = parseDateUTC(todayStr);
+      ref.setUTCDate(ref.getUTCDate() - 1);
+      sinceStr = ref.toISOString().split("T")[0];
+      untilStr = sinceStr;
     } else {
-      // Preset periods (7d, 14d, 30d, 90d): end at YESTERDAY.
-      // Today's data from Meta/Google Ads is always incomplete (attribution delay).
-      // Using yesterday ensures metrics match the source platforms.
-      untilStr = yesterdayStr;
+      // Preset periods (7d, 14d, 30d, 90d): last N days ending TODAY.
+      // "7d" = today minus 6 days TO today = exactly 7 days.
+      // This matches Meta Ads Manager "Last 7 days" definition.
+      // (Old code used today - N, which gave N+1 days — off by one.)
+      untilStr = todayStr;
       const sinceRef = parseDateUTC(todayStr);
-      sinceRef.setUTCDate(sinceRef.getUTCDate() - days);
+      sinceRef.setUTCDate(sinceRef.getUTCDate() - (days - 1));
       sinceStr = sinceRef.toISOString().split("T")[0];
     }
   }
