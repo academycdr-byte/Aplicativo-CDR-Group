@@ -137,24 +137,24 @@ export async function GET(
                 `${storyId}?fields=source,type,full_picture,object_id`,
                 pageToken
             );
-            // If failed, capture exact error for debug
+            // If Facebook fields failed, try Instagram Graph API fields
+            // Instagram posts use media_url/media_type instead of source/type
             if (!finalStoryData) {
-                try {
-                    const errRes = await fetch(`https://graph.facebook.com/${FB_GRAPH_VERSION}/${storyId}?fields=id&access_token=${pageToken}`);
-                    if (!errRes.ok) {
-                        const errBody = await errRes.text();
-                        _dbg_storyError = errBody.substring(0, 200);
-                    } else {
-                        // Story exists but fields cause error — try without full_picture
-                        finalStoryData = await fbGet(
-                            `${storyId}?fields=source,type,object_id`,
-                            pageToken
-                        );
-                        if (!finalStoryData) _dbg_storyError = "exists_but_fields_fail";
+                // Try with Instagram-style fields
+                finalStoryData = await fbGet(
+                    `${storyId}?fields=media_url,media_type,thumbnail_url`,
+                    pageToken
+                );
+                // Map Instagram fields to our expected format
+                if (finalStoryData?.media_url) {
+                    if (finalStoryData.media_type === "VIDEO") {
+                        finalStoryData.source = finalStoryData.media_url;
                     }
-                } catch (e) {
-                    _dbg_storyError = "exception: " + (e instanceof Error ? e.message : String(e));
+                    if (!finalStoryData.full_picture) {
+                        finalStoryData.full_picture = finalStoryData.thumbnail_url || finalStoryData.media_url;
+                    }
                 }
+                _dbg_storyError = finalStoryData ? "resolved_via_ig_fields" : "ig_fields_also_failed";
             }
 
             // 3a-alt: If story fetch failed, try just the post_id part
