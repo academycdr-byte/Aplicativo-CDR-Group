@@ -30,6 +30,28 @@ export async function GET() {
         prisma.adMetric.count({ where: { organizationId: membership.organizationId, platform: "FACEBOOK_ADS", adId: { not: null }, thumbnailUrl: { not: null } } }),
     ]);
 
+    // Per-account, per-date spend breakdown (last 7 days)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const spendByAccountDate = await prisma.adMetric.groupBy({
+        by: ["accountId", "date"],
+        where: {
+            organizationId: membership.organizationId,
+            platform: "FACEBOOK_ADS",
+            date: { gte: new Date(sevenDaysAgo.toISOString().split("T")[0] + "T00:00:00Z") },
+        },
+        _sum: { spend: true },
+        _count: { adId: true },
+        orderBy: [{ date: "desc" }, { accountId: "asc" }],
+    });
+
+    const spendBreakdown = spendByAccountDate.map(row => ({
+        accountId: row.accountId,
+        date: row.date.toISOString().split("T")[0],
+        spend: Number(row._sum.spend || 0),
+        adCount: row._count.adId,
+    }));
+
     return NextResponse.json({
         totalAds,
         withThumbnails,
@@ -44,6 +66,7 @@ export async function GET() {
         hasCursor: !!cursor,
         cursor: cursor || null,
         errorMessage: integration.errorMessage,
+        spendBreakdown,
     });
 }
 
