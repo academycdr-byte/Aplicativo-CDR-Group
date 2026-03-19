@@ -591,24 +591,30 @@ export async function syncFacebookAdsMetrics(
     }
 
     // PHASE 1: Last 7 days for ALL accounts (highest priority history)
-    // Re-syncing last 7 days captures retroactive attribution (7d_click window).
-    // Includes today for real-time spend accuracy.
+    // Fetch DAY-BY-DAY instead of 7-day range to ensure each day completes
+    // independently. Meta API returns results in non-deterministic order within
+    // a multi-day range, so incomplete pagination causes random days to be missing.
     if (currentPhase <= 1) {
       const startIdx = (currentPhase === 1 && startAccountIndex !== undefined) ? startAccountIndex : 0;
       for (let ai = startIdx; ai < accountIds.length; ai++) {
         if (!hasTimeLeft()) return saveCursorAndReturn(1, ai);
-        try {
-          const result = await fetchAndSavePageByPage(
-            buildUrl(accountIds[ai], daysAgo(7), daysAgo(0)),
-            accountIds[ai],
-          );
-          totalSynced += result.synced;
-          if (result.timedOut) return saveCursorAndReturn(1, ai);
-        } catch (err) {
-          accountErrors.push(`Phase1 act_${accountIds[ai]}: ${err instanceof Error ? err.message : "Unknown"}`);
+        // Fetch each day separately: yesterday (1) back to 7 days ago
+        for (let d = 1; d <= 7; d++) {
+          if (!hasTimeLeft()) return saveCursorAndReturn(1, ai);
+          try {
+            const dayStr = daysAgo(d);
+            const result = await fetchAndSavePageByPage(
+              buildUrl(accountIds[ai], dayStr, dayStr),
+              accountIds[ai],
+            );
+            totalSynced += result.synced;
+            if (result.timedOut) return saveCursorAndReturn(1, ai);
+          } catch (err) {
+            accountErrors.push(`Phase1 act_${accountIds[ai]} day-${d}: ${err instanceof Error ? err.message : "Unknown"}`);
+          }
         }
       }
-      startAccountIndex = undefined; // Reset for next phase
+      startAccountIndex = undefined;
       if (!hasTimeLeft()) return saveCursorAndReturn(2);
     }
 
