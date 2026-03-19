@@ -64,18 +64,23 @@ async function fetchAdThumbnails(
     const ids = batch.join(",");
     try {
       const response = await fetch(
-        `https://graph.facebook.com/${FB_GRAPH_VERSION}/?ids=${ids}&fields=creative{thumbnail_url,image_url}&thumbnail_width=480&thumbnail_height=480&access_token=${accessToken}`
+        `https://graph.facebook.com/${FB_GRAPH_VERSION}/?ids=${ids}&fields=creative{thumbnail_url,image_url}&access_token=${accessToken}`
       );
       if (response.ok) {
         const data = await response.json();
-        for (const [adId, adData] of Object.entries(data)) {
-          const creative = (adData as { creative?: { thumbnail_url?: string; image_url?: string } })?.creative;
-          // Prefer image_url (full res) over thumbnail_url (64x64)
-          const url = creative?.image_url || creative?.thumbnail_url;
-          if (url) {
-            thumbnails[adId] = url;
+        if (data.error) {
+          console.error("[fetchAdThumbnails] API error:", JSON.stringify(data.error));
+        } else {
+          for (const [adId, adData] of Object.entries(data)) {
+            const creative = (adData as { creative?: { thumbnail_url?: string; image_url?: string } })?.creative;
+            const url = creative?.image_url || creative?.thumbnail_url;
+            if (url) {
+              thumbnails[adId] = url;
+            }
           }
         }
+      } else {
+        console.error("[fetchAdThumbnails] HTTP error:", response.status, await response.text().catch(() => ""));
       }
     } catch {
       // Continue without thumbnails if fetch fails
@@ -530,8 +535,10 @@ export async function syncFacebookAdsMetrics(
             take: 50,
           });
           const adIdsToFetch = missingThumbnails.map((m) => m.adId).filter(Boolean) as string[];
+          console.log(`[Facebook Ads] Phase 0b: ${adIdsToFetch.length} ads need thumbnails`);
           if (adIdsToFetch.length > 0 && hasTimeLeft()) {
             const thumbnails = await fetchAdThumbnails(adIdsToFetch, accessToken);
+            console.log(`[Facebook Ads] Phase 0b: Got ${Object.keys(thumbnails).length} thumbnails from API`);
             const updateIds = adIdsToFetch.filter((id) => thumbnails[id]);
             if (updateIds.length > 0) {
               await Promise.all(
