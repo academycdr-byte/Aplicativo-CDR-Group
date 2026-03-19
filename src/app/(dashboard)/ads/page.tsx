@@ -153,7 +153,7 @@ const platformLabels: Record<string, string> = {
   GOOGLE_ADS: "Google Ads",
 };
 
-function AdThumbnail({ src, alt, fill, width, height, className, sizes }: {
+function AdThumbnail({ src, alt, fill, width, height, className, sizes, adId }: {
   src: string;
   alt: string;
   fill?: boolean;
@@ -161,18 +161,42 @@ function AdThumbnail({ src, alt, fill, width, height, className, sizes }: {
   height?: number;
   className?: string;
   sizes?: string;
+  adId?: string;
 }) {
   const [error, setError] = useState(false);
-  if (error || !src) {
+  const [lazySrc, setLazySrc] = useState<string | null>(null);
+  const [lazyLoading, setLazyLoading] = useState(false);
+
+  // Lazy-fetch thumbnail from API when src is missing or broken
+  useEffect(() => {
+    if ((!src || error) && adId && !lazySrc && !lazyLoading) {
+      setLazyLoading(true);
+      fetch(`/api/ads/${adId}/video`)
+        .then(r => r.json())
+        .then(d => {
+          if (d.imageUrl) setLazySrc(d.imageUrl);
+        })
+        .catch(() => {})
+        .finally(() => setLazyLoading(false));
+    }
+  }, [src, error, adId, lazySrc, lazyLoading]);
+
+  const displaySrc = lazySrc || src;
+
+  if ((error && !lazySrc) || (!displaySrc && !lazyLoading)) {
     return (
       <div className={`flex items-center justify-center bg-muted/30 ${fill ? "absolute inset-0" : ""}`} style={!fill ? { width, height } : undefined}>
-        <ImageIcon className="w-5 h-5 text-muted-foreground/50" />
+        {lazyLoading ? (
+          <div className="w-5 h-5 border-2 border-muted-foreground/30 border-t-muted-foreground/60 rounded-full animate-spin" />
+        ) : (
+          <ImageIcon className="w-5 h-5 text-muted-foreground/50" />
+        )}
       </div>
     );
   }
   return (
     <Image
-      src={src}
+      src={displaySrc}
       alt={alt}
       fill={fill}
       width={!fill ? width : undefined}
@@ -180,6 +204,7 @@ function AdThumbnail({ src, alt, fill, width, height, className, sizes }: {
       className={className}
       sizes={sizes}
       onError={() => setError(true)}
+      unoptimized
     />
   );
 }
@@ -802,9 +827,7 @@ export default function AdsPage() {
               >
                 {/* Thumbnail */}
                 <div className="relative aspect-video bg-muted flex items-center justify-center overflow-hidden">
-                  {c.thumbnailUrl ? (
-                    <AdThumbnail src={c.thumbnailUrl} alt="" fill className="object-cover transition-transform group-hover:scale-105" sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw" />
-                  ) : <ImageIcon className="w-8 h-8 opacity-20" />}
+                  <AdThumbnail src={c.thumbnailUrl || ""} alt="" fill className="object-cover transition-transform group-hover:scale-105" sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw" adId={c.adId} />
 
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex flex-col items-center justify-center gap-2">
                     <div className="w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm">
