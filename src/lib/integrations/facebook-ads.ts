@@ -502,17 +502,17 @@ export async function syncFacebookAdsMetrics(
       return { synced, timedOut: false };
     };
 
-    // PHASE 0: MANDATORY FRESHNESS (Yesterday + Today)
-    // Fetch both yesterday (finalized) and today (partial but real-time spend).
-    // This ensures dashboard always shows current data.
+    // PHASE 0: MANDATORY FRESHNESS (Today only — fast)
+    // Only fetch today for speed. Phase 1 re-syncs last 7 days (including yesterday).
+    // This keeps Phase 0 lightweight so Phase 1 can run within the time budget.
     if (currentPhase <= 1) {
-      console.log(`[Facebook Ads] Phase 0: Fetching recent data (Yesterday + Today) for freshness`);
+      console.log(`[Facebook Ads] Phase 0: Fetching today's data for freshness`);
 
       const freshnessPromises = accountIds.map(async (accountId) => {
         if (!hasTimeLeft()) return;
         try {
           const result = await fetchAndSavePageByPage(
-            buildUrl(accountId, daysAgo(1), daysAgo(0)),
+            buildUrl(accountId, daysAgo(0), daysAgo(0)),
             accountId,
           );
           totalSynced += result.synced;
