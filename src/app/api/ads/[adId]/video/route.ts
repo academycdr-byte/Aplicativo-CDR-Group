@@ -108,6 +108,7 @@ export async function GET(
         let _dbg_storyType: string | null = null;
         let _dbg_storyObjectId: string | null = null;
         let _dbg_igAccountId: string | null = null;
+        let _dbg_storyError: string | null = null;
 
         // Step 3: If no direct video_id, try effective_object_story_id (post-based creatives)
         if (!videoId && creative.effective_object_story_id) {
@@ -136,6 +137,25 @@ export async function GET(
                 `${storyId}?fields=source,type,full_picture,object_id`,
                 pageToken
             );
+            // If failed, capture exact error for debug
+            if (!finalStoryData) {
+                try {
+                    const errRes = await fetch(`https://graph.facebook.com/${FB_GRAPH_VERSION}/${storyId}?fields=id&access_token=${pageToken}`);
+                    if (!errRes.ok) {
+                        const errBody = await errRes.text();
+                        _dbg_storyError = errBody.substring(0, 200);
+                    } else {
+                        // Story exists but fields cause error — try without full_picture
+                        finalStoryData = await fbGet(
+                            `${storyId}?fields=source,type,object_id`,
+                            pageToken
+                        );
+                        if (!finalStoryData) _dbg_storyError = "exists_but_fields_fail";
+                    }
+                } catch (e) {
+                    _dbg_storyError = "exception: " + (e instanceof Error ? e.message : String(e));
+                }
+            }
 
             // 3a-alt: If story fetch failed, try just the post_id part
             if (!finalStoryData) {
@@ -386,7 +406,7 @@ export async function GET(
                 videoUrl: null,
                 imageUrl: creative.thumbnail_url,
                 type: "image",
-                ...(isDebug ? { debug: { creative: { id: creativeId, video_id: creative.video_id || null, effective_object_story_id: creative.effective_object_story_id || null, has_image_url: !!creative.image_url }, step3: { pageTokenObtained: _dbg_pageTokenObtained, storyFetched: _dbg_storyFetched, storyType: _dbg_storyType, storyObjectId: _dbg_storyObjectId, igAccountId: _dbg_igAccountId } } } : {}),
+                ...(isDebug ? { debug: { creative: { id: creativeId, video_id: creative.video_id || null, effective_object_story_id: creative.effective_object_story_id || null, has_image_url: !!creative.image_url }, step3: { pageTokenObtained: _dbg_pageTokenObtained, storyFetched: _dbg_storyFetched, storyError: _dbg_storyError, storyType: _dbg_storyType, storyObjectId: _dbg_storyObjectId, igAccountId: _dbg_igAccountId } } } : {}),
             });
         }
 
