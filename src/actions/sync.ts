@@ -145,21 +145,20 @@ export async function syncRecent() {
   });
 
   const connectedPlatforms = new Set(integrations.map((i) => i.platform));
-  const TIME_BUDGET = 25_000; // 25s per platform — enough for Phase 0+1 to complete
 
   // Build sync tasks dynamically based on connected platforms
-  // ALL platforms get timeBudgetMs to prevent unbounded execution
+  // Facebook Ads needs more time: Phase 0 (today) + Phase 1 (7 days × multiple accounts with many ads)
+  // Other platforms are faster. All run in PARALLEL, so wall time = max(individual times).
   const syncTasks: Promise<unknown>[] = [];
 
   if (connectedPlatforms.has("FACEBOOK_ADS")) {
-    // Full phased sync (not freshnessOnly) — phases handle time budget internally
-    syncTasks.push(syncFacebookAdsMetrics(orgId, { timeBudgetMs: TIME_BUDGET }));
+    syncTasks.push(syncFacebookAdsMetrics(orgId, { timeBudgetMs: 45_000 }));
   }
   if (connectedPlatforms.has("SHOPIFY")) {
-    syncTasks.push(syncShopifyOrders(orgId, { timeBudgetMs: TIME_BUDGET }));
+    syncTasks.push(syncShopifyOrders(orgId, { timeBudgetMs: 25_000 }));
   }
   if (connectedPlatforms.has("NUVEMSHOP")) {
-    syncTasks.push(syncNuvemshopOrders(orgId, { timeBudgetMs: TIME_BUDGET }));
+    syncTasks.push(syncNuvemshopOrders(orgId, { timeBudgetMs: 25_000 }));
   }
   if (connectedPlatforms.has("GOOGLE_ADS")) {
     syncTasks.push(syncGoogleAdsMetrics(orgId));
