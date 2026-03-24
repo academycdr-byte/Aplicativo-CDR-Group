@@ -471,17 +471,20 @@ export async function syncFacebookAdsMetrics(
     const fetchAndSavePageByPage = async (
       url: string,
       adAccountId: string,
-    ): Promise<{ synced: number; timedOut: boolean }> => {
+    ): Promise<{ synced: number; timedOut: boolean; tokenExpired?: boolean }> => {
       let synced = 0;
       let pageUrl: string | null = url;
 
       while (pageUrl) {
         let response: Response | null = null;
         let lastError = "";
+        let isTokenError = false;
 
         // Retry up to 3 attempts (1 original + 2 retries) with backoff
         for (let attempt = 0; attempt < 3; attempt++) {
           if (attempt > 0) {
+            // Don't retry token/auth errors — they won't self-heal
+            if (isTokenError) break;
             // Exponential backoff: 1s, 2s
             const delay = attempt * 1000;
             await new Promise(r => setTimeout(r, delay));
@@ -494,6 +497,20 @@ export async function syncFacebookAdsMetrics(
 
             lastError = `HTTP ${response.status}`;
             const errorBody = await response.text().catch(() => "");
+
+            // Detect token/auth errors (Meta returns 400 with OAuthException code 190)
+            if (response.status === 401 || response.status === 400) {
+              try {
+                const errJson = JSON.parse(errorBody);
+                if (errJson?.error?.code === 190 || errJson?.error?.type === "OAuthException") {
+                  isTokenError = true;
+                  lastError = `Token expired or invalid (code ${errJson?.error?.code}): ${errJson?.error?.message || "OAuthException"}`;
+                  console.error(`[Facebook Ads] TOKEN EXPIRED: ${lastError}`);
+                  break; // Don't retry auth errors
+                }
+              } catch { /* not JSON, continue with normal retry */ }
+            }
+
             console.warn(`[Facebook Ads] Page fetch attempt ${attempt + 1}/3 failed: ${response.status} ${errorBody.substring(0, 200)}`);
             response = null; // Mark as failed for retry
           } catch (err) {
@@ -501,6 +518,12 @@ export async function syncFacebookAdsMetrics(
             console.warn(`[Facebook Ads] Page fetch attempt ${attempt + 1}/3 error: ${lastError}`);
             response = null;
           }
+        }
+
+        // Token expired — abort immediately, don't treat as resumable timeout
+        if (isTokenError) {
+          console.error(`[Facebook Ads] Aborting sync: token expired. User must reconnect Facebook Ads.`);
+          return { synced, timedOut: false, tokenExpired: true };
         }
 
         // All retries exhausted
@@ -511,6 +534,11 @@ export async function syncFacebookAdsMetrics(
 
         const data: FbPaginatedInsightsResponse = await response.json();
         if (data.error) {
+          // Check for token error in response body too
+          if (data.error.code === 190 || data.error.type === "OAuthException") {
+            console.error(`[Facebook Ads] TOKEN EXPIRED in response body: ${JSON.stringify(data.error)}`);
+            return { synced, timedOut: false, tokenExpired: true };
+          }
           console.error("[Facebook Ads] API error:", JSON.stringify(data.error));
           return { synced, timedOut: true }; // Signal to resume, not silently skip
         }
@@ -536,13 +564,15 @@ export async function syncFacebookAdsMetrics(
     if (currentPhase <= 1) {
       console.log(`[Facebook Ads] Phase 0: Fetching today's data for freshness`);
 
+      let tokenExpiredDetected = false;
       const freshnessPromises = accountIds.map(async (accountId) => {
-        if (!hasTimeLeft()) return;
+        if (!hasTimeLeft() || tokenExpiredDetected) return;
         try {
           const result = await fetchAndSavePageByPage(
             buildUrl(accountId, daysAgo(0), daysAgo(0)),
             accountId,
           );
+          if (result.tokenExpired) { tokenExpiredDetected = true; return; }
           totalSynced += result.synced;
         } catch (err) {
           console.warn(`[Facebook Ads] Phase 0 freshness fetch failed for ${accountId}:`, err);
@@ -550,6 +580,22 @@ export async function syncFacebookAdsMetrics(
       });
 
       await Promise.all(freshnessPromises);
+
+      // If token expired in Phase 0, abort immediately with clear error
+      if (tokenExpiredDetected) {
+        const errMsg = "Token do Facebook expirado. Reconecte o Facebook Ads em Integrações.";
+        await prisma.integration.update({
+          where: { id: integration.id },
+          data: { syncStatus: "FAILED", errorMessage: errMsg },
+        });
+        if (logId) {
+          await prisma.syncLog.update({
+            where: { id: logId },
+            data: { status: "FAILED", errorMessage: errMsg, completedAt: new Date() },
+          }).catch(() => { });
+        }
+        return { error: errMsg, synced: 0, hasMore: false };
+      }
 
       // Phase 0b: Fetch thumbnails for ads with missing thumbnails (quick batch)
       if (hasTimeLeft()) {
@@ -590,6 +636,22 @@ export async function syncFacebookAdsMetrics(
       return { success: true, synced: totalSynced, hasMore: false };
     }
 
+    // Helper: abort sync with token expired error
+    const abortTokenExpired = async (): Promise<FbSyncResult> => {
+      const errMsg = "Token do Facebook expirado. Reconecte o Facebook Ads em Integrações.";
+      await prisma.integration.update({
+        where: { id: integration.id },
+        data: { syncStatus: "FAILED", errorMessage: errMsg },
+      });
+      if (logId) {
+        await prisma.syncLog.update({
+          where: { id: logId },
+          data: { status: "FAILED", errorMessage: errMsg, completedAt: new Date() },
+        }).catch(() => { });
+      }
+      return { error: errMsg, synced: totalSynced, hasMore: false };
+    };
+
     // PHASE 1: Last 7 days for ALL accounts (highest priority history)
     // Fetch DAY-BY-DAY instead of 7-day range to ensure each day completes
     // independently. Meta API returns results in non-deterministic order within
@@ -607,6 +669,7 @@ export async function syncFacebookAdsMetrics(
               buildUrl(accountIds[ai], dayStr, dayStr),
               accountIds[ai],
             );
+            if (result.tokenExpired) return abortTokenExpired();
             totalSynced += result.synced;
             if (result.timedOut) return saveCursorAndReturn(1, ai);
           } catch (err) {
@@ -628,6 +691,7 @@ export async function syncFacebookAdsMetrics(
             buildUrl(accountIds[ai], daysAgo(30), daysAgo(7)),
             accountIds[ai],
           );
+          if (result.tokenExpired) return abortTokenExpired();
           totalSynced += result.synced;
           if (result.timedOut) return saveCursorAndReturn(2, ai);
         } catch (err) {
@@ -648,6 +712,7 @@ export async function syncFacebookAdsMetrics(
             buildUrl(accountIds[ai], daysAgo(90), daysAgo(30)),
             accountIds[ai],
           );
+          if (result.tokenExpired) return abortTokenExpired();
           totalSynced += result.synced;
           if (result.timedOut) return saveCursorAndReturn(3, ai);
         } catch (err) {

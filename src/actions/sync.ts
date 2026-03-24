@@ -65,7 +65,7 @@ export async function smartSync(): Promise<{ triggered: boolean; lastSyncAt: Dat
 
   const integrations = await prisma.integration.findMany({
     where: { organizationId: ctx.organization.id, status: "CONNECTED" },
-    select: { id: true, lastSyncAt: true, syncStatus: true, updatedAt: true, metadata: true, platform: true, status: true },
+    select: { id: true, lastSyncAt: true, syncStatus: true, updatedAt: true, metadata: true, platform: true, status: true, errorMessage: true },
   });
 
   if (integrations.length === 0) return { triggered: false, lastSyncAt: null };
@@ -93,18 +93,41 @@ export async function smartSync(): Promise<{ triggered: boolean; lastSyncAt: Dat
   });
 
   if (stuckSyncing.length > 0) {
-    // Clear stuck cursors along with resetting status
+    // Reset status to allow re-sync, but PRESERVE cursors so sync resumes
+    // from where it left off instead of restarting from Phase 1 each time.
+    // This is critical for large accounts (440+ campaigns) where Phase 2
+    // takes many calls to complete.
     for (const integration of stuckSyncing) {
       const meta = (integration.metadata as Record<string, unknown>) || {};
-      const { fbSyncCursor: _fb, syncCursor: _sc, ...cleanMeta } = meta;
-      await prisma.integration.update({
-        where: { id: integration.id },
-        data: {
-          syncStatus: "FAILED",
-          errorMessage: "Sync timed out (recovered by smartSync)",
-          metadata: cleanMeta as Record<string, string | number | boolean | null>,
-        },
-      });
+      const hasCursor = !!(meta?.fbSyncCursor || meta?.syncCursor);
+
+      // Only clear cursor if the error is a token/auth issue (not recoverable by retry)
+      const errorMsg = integration.errorMessage || "";
+      const isTokenError = errorMsg.includes("Token") || errorMsg.includes("OAuthException") || errorMsg.includes("expirado");
+
+      if (isTokenError) {
+        // Token error: clear cursor, no point resuming with bad token
+        const { fbSyncCursor: _fb, syncCursor: _sc, ...cleanMeta } = meta;
+        await prisma.integration.update({
+          where: { id: integration.id },
+          data: {
+            syncStatus: "FAILED",
+            errorMessage: errorMsg,
+            metadata: cleanMeta as Record<string, string | number | boolean | null>,
+          },
+        });
+      } else {
+        // Timeout/transient: preserve cursor so sync resumes from where it stopped
+        await prisma.integration.update({
+          where: { id: integration.id },
+          data: {
+            syncStatus: "IDLE",
+            errorMessage: hasCursor
+              ? `Sync resuming from saved checkpoint (Phase ${(meta.fbSyncCursor as { nextPhase?: number })?.nextPhase || "?"})`
+              : "Sync timed out (recovered by smartSync)",
+          },
+        });
+      }
     }
   }
 
