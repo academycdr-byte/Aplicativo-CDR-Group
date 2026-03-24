@@ -47,6 +47,8 @@ type DashboardStats = {
   ordersChange: string;
   revenue: number;
   revenueChange: string;
+  generatedRevenue: number;
+  generatedRevenueChange: string;
   adSpend: number;
   adSpendChange: string;
   roas: number;
@@ -374,14 +376,14 @@ export default function DashboardPage() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
         <KPICard
           label="FATURAMENTO"
-          value={fmtRevenue(stats?.revenue || 0)}
-          change={stats?.revenueChange || "0%"}
-          icon={TrendingUp}
+          value={fmtRevenue(stats?.generatedRevenue || 0)}
+          change={stats?.generatedRevenueChange || "0%"}
+          icon={BarChart}
           trend="up"
-          tag="Pagos"
+          tag="Gerado"
           action={
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -399,6 +401,14 @@ export default function DashboardPage() {
               </DropdownMenuContent>
             </DropdownMenu>
           }
+        />
+        <KPICard
+          label="FATURAMENTO"
+          value={fmtRevenue(stats?.revenue || 0)}
+          change={stats?.revenueChange || "0%"}
+          icon={TrendingUp}
+          trend="up"
+          tag="Pagos"
         />
         <KPICard
           label="INVESTIMENTO"

@@ -23,6 +23,8 @@ export async function getDashboardData(days: number = 30, from?: string, to?: st
     prevTotalOrders,
     revenue,
     prevRevenue,
+    generatedRev,
+    prevGeneratedRev,
     adSpend,
     prevAdSpend,
     adRevenue,
@@ -41,6 +43,15 @@ export async function getDashboardData(days: number = 30, from?: string, to?: st
       where: { organizationId: orgId, orderDate: prevDateFilter, status: { in: ["paid", "partially_refunded"] } },
       _sum: { totalAmount: true },
     }),
+    // Faturamento Gerado: all orders from the store except refunded/cancelled
+    prisma.order.aggregate({
+      where: { organizationId: orgId, orderDate: dateFilter, status: { notIn: ["refunded", "cancelled"] } },
+      _sum: { totalAmount: true },
+    }),
+    prisma.order.aggregate({
+      where: { organizationId: orgId, orderDate: prevDateFilter, status: { notIn: ["refunded", "cancelled"] } },
+      _sum: { totalAmount: true },
+    }),
     prisma.adMetric.aggregate({
       where: { organizationId: orgId, date: dateOnlyFilter },
       _sum: { spend: true },
@@ -57,6 +68,8 @@ export async function getDashboardData(days: number = 30, from?: string, to?: st
 
   const currentRevenue = Number(revenue._sum.totalAmount || 0);
   const previousRevenue = Number(prevRevenue._sum.totalAmount || 0);
+  const currentGeneratedRevenue = Number(generatedRev._sum.totalAmount || 0);
+  const previousGeneratedRevenue = Number(prevGeneratedRev._sum.totalAmount || 0);
   const currentAdSpend = Number(adSpend._sum.spend || 0);
   const previousAdSpend = Number(prevAdSpend._sum.spend || 0);
   const currentAdRevenue = Number(adRevenue._sum.revenue || 0);
@@ -72,6 +85,8 @@ export async function getDashboardData(days: number = 30, from?: string, to?: st
     ordersChange: calcChange(totalOrders, prevTotalOrders),
     revenue: currentRevenue,
     revenueChange: calcChange(currentRevenue, previousRevenue),
+    generatedRevenue: currentGeneratedRevenue,
+    generatedRevenueChange: calcChange(currentGeneratedRevenue, previousGeneratedRevenue),
     adSpend: currentAdSpend,
     adSpendChange: calcChange(currentAdSpend, previousAdSpend),
     roas: currentAdSpend > 0 ? currentAdRevenue / currentAdSpend : 0,
