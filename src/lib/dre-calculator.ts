@@ -120,29 +120,31 @@ export function calculateDRE(inputs: DREInputs): DREResult {
   // Budget efetivo (com imposto sobre Meta Ads)
   const budgetEfetivo = budgetAnuncios * (1 + impostoMetaAds / 100);
 
+  // CPA real ajustado (calculado ANTES do imposto — imposto depende do CPA)
+  const aprovadosFator = percentualAprovados > 0 ? percentualAprovados / 100 : 1;
+  const cpaReal = cpaAlvo * (1 + impostoMetaAds / 100) / aprovadosFator;
+
   // Custos unitarios sobre ticket
   const custoGateway = ticketMedio * (taxaGateway / 100);
   const custoDevolucao = ticketMedio * (percentualDevolucoes / 100);
-  const custoImpostos = ticketMedio * (taxaImpostos / 100);
   const cmv = cmvUnitario;
   const custoFrete = freteUnitario;
+
+  // Imposto sobre margem liquida (apos TODOS os custos incluindo CPA)
+  // Formula da planilha: (ticket - gateway - devolucoes - CMV - frete - CPA) * taxRate
+  const taxBase = ticketMedio - custoGateway - custoDevolucao - cmv - custoFrete - cpaReal;
+  const custoImpostos = taxBase * (taxaImpostos / 100);
 
   // Percentuais sobre ticket
   const custoGatewayPct = taxaGateway;
   const custoDevolucaoPct = percentualDevolucoes;
-  const custoImpostosPct = taxaImpostos;
+  const custoImpostosPct = ticketMedio > 0 ? (custoImpostos / ticketMedio) * 100 : 0;
   const cmvPct = ticketMedio > 0 ? (cmv / ticketMedio) * 100 : 0;
   const custoFretePct = ticketMedio > 0 ? (custoFrete / ticketMedio) * 100 : 0;
 
   // Margem bruta (por unidade, antes do CPA)
   const margemBrutaUnit = ticketMedio - custoGateway - custoDevolucao - custoImpostos - cmv - custoFrete;
   const margemBrutaPct = ticketMedio > 0 ? (margemBrutaUnit / ticketMedio) * 100 : 0;
-
-  // CPA real ajustado:
-  // - Imposto Meta Ads: custo real dos anuncios e maior
-  // - Pedidos aprovados: cada venda real custa mais porque parte dos pedidos nao converte
-  const aprovadosFator = percentualAprovados > 0 ? percentualAprovados / 100 : 1;
-  const cpaReal = cpaAlvo * (1 + impostoMetaAds / 100) / aprovadosFator;
 
   // Margem de contribuicao (por unidade, apos CPA real)
   const margemContribUnit = margemBrutaUnit - cpaReal;
@@ -151,8 +153,8 @@ export function calculateDRE(inputs: DREInputs): DREResult {
   // ROAS realizado (receita efetiva / budget efetivo)
   const roasRealizado = budgetEfetivo > 0 ? receitaEfetiva / budgetEfetivo : 0;
 
-  // Lucro bruto (MC * pedidos aprovados, devolucao ja no custo unitario)
-  const lucroBruto = margemContribUnit * pedidosAprovadosCount;
+  // Lucro bruto = Receita efetiva * MC% (formula exata da planilha, sem arredondamento de pedidos)
+  const lucroBruto = receitaEfetiva * (mcPct / 100);
 
   // ROAS breakeven ajustado:
   // Formula base: 100 / margemBrutaPct
