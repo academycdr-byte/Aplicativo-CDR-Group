@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useMemo } from "react";
+import { memo, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,8 +13,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { RotateCcw, HelpCircle } from "lucide-react";
+import { RotateCcw, HelpCircle, ChevronDown, Settings2 } from "lucide-react";
 import { formatBRL, type DREInputs } from "@/lib/dre-calculator";
+import { cn } from "@/lib/utils";
 
 type DREInputPanelProps = {
   inputs: DREInputs;
@@ -100,7 +101,8 @@ export const DREInputPanel = memo(function DREInputPanel({
   onChange,
   onReset,
 }: DREInputPanelProps) {
-  // Derived values shown inline
+  const [isExpanded, setIsExpanded] = useState(false);
+
   const ticketMedio = useMemo(
     () => (inputs.numeroPedidos > 0 ? inputs.receitaMensal / inputs.numeroPedidos : 0),
     [inputs.receitaMensal, inputs.numeroPedidos]
@@ -111,165 +113,116 @@ export const DREInputPanel = memo(function DREInputPanel({
   );
 
   return (
-    <Card className="border border-border shadow-none rounded-lg p-4 sm:p-6 bg-card/80 backdrop-blur-sm">
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-base sm:text-lg font-semibold">Dados da Sua Operação</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Preencha com os valores reais do seu negócio para simular cenários
-            </p>
+    <Card className="border border-border shadow-none rounded-lg bg-card/80 backdrop-blur-sm overflow-hidden">
+      {/* Collapsed Summary - always visible */}
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full p-4 sm:p-5 flex items-center justify-between hover:bg-muted/30 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+            <Settings2 className="w-4 h-4 text-primary" />
           </div>
-          <Button variant="ghost" size="sm" onClick={onReset} className="text-muted-foreground">
-            <RotateCcw className="w-4 h-4 mr-1.5" />
-            Restaurar
-          </Button>
-        </div>
-
-        {/* Receita & Pedidos */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground/70">
-              Receita & Pedidos
-            </p>
-            {ticketMedio > 0 && (
-              <Badge variant="secondary" className="text-[10px] font-medium">
-                Ticket Médio: {formatBRL(ticketMedio)}
-              </Badge>
-            )}
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-            <InputField
-              label="Receita Mensal"
-              field="receitaMensal"
-              value={inputs.receitaMensal}
-              onChange={onChange}
-              prefix="R$"
-              step={1000}
-              help="Faturamento bruto total do mês"
-            />
-            <InputField
-              label="Número de Pedidos"
-              field="numeroPedidos"
-              value={inputs.numeroPedidos}
-              onChange={onChange}
-              step={1}
-              help="Quantidade total de pedidos realizados no período"
-            />
-            <InputField
-              label="% Pedidos Aprovados"
-              field="percentualAprovados"
-              value={inputs.percentualAprovados}
-              onChange={onChange}
-              suffix="%"
-              step={1}
-              min={1}
-              max={100}
-              help="Percentual de pedidos que são efetivamente aprovados (pagamento confirmado)"
-            />
-            <InputField
-              label="% Devoluções"
-              field="percentualDevolucoes"
-              value={inputs.percentualDevolucoes}
-              onChange={onChange}
-              suffix="%"
-              step={0.5}
-              min={0}
-              max={100}
-              help={`Percentual de pedidos devolvidos (≈ ${numDevolucoes} devoluções)`}
-            />
+          <div className="text-left">
+            <p className="text-sm font-semibold text-foreground">Dados da Operação</p>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5">
+              <span className="text-xs text-muted-foreground">
+                Receita <span className="font-medium text-foreground">{formatBRL(inputs.receitaMensal, true)}</span>
+              </span>
+              <span className="text-xs text-muted-foreground">
+                Ticket <span className="font-medium text-foreground">{formatBRL(ticketMedio)}</span>
+              </span>
+              <span className="text-xs text-muted-foreground">
+                CPA <span className="font-medium text-foreground">{formatBRL(inputs.cpaAlvo)}</span>
+              </span>
+              <span className="text-xs text-muted-foreground">
+                CMV <span className="font-medium text-foreground">{formatBRL(inputs.cmvUnitario)}</span>
+              </span>
+            </div>
           </div>
         </div>
-
-        <Separator />
-
-        {/* Custos & Taxas */}
-        <div className="space-y-3">
-          <p className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground/70">
-            Custos & Taxas por Venda
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-            <InputField
-              label="Custo do Produto"
-              field="cmvUnitario"
-              value={inputs.cmvUnitario}
-              onChange={onChange}
-              prefix="R$"
-              step={1}
-              help="Quanto custa produzir ou comprar cada unidade vendida (CMV)"
-            />
-            <InputField
-              label="Taxa do Gateway"
-              field="taxaGateway"
-              value={inputs.taxaGateway}
-              onChange={onChange}
-              suffix="%"
-              step={0.1}
-              min={0}
-              max={100}
-              help="Taxa cobrada pelo meio de pagamento (ex: Pagar.me, Mercado Pago)"
-            />
-            <InputField
-              label="Impostos sobre Receita"
-              field="taxaImpostos"
-              value={inputs.taxaImpostos}
-              onChange={onChange}
-              suffix="%"
-              step={0.1}
-              min={0}
-              max={100}
-              help="Percentual de impostos incidentes sobre o faturamento"
-            />
-            <InputField
-              label="Frete por Pedido"
-              field="freteUnitario"
-              value={inputs.freteUnitario}
-              onChange={onChange}
-              prefix="R$"
-              step={1}
-              help="Custo médio de frete por pedido enviado"
-            />
-          </div>
+        <div className="flex items-center gap-2">
+          {isExpanded && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => { e.stopPropagation(); onReset(); }}
+              className="text-muted-foreground hidden sm:flex"
+            >
+              <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
+              Restaurar
+            </Button>
+          )}
+          <ChevronDown className={cn(
+            "w-5 h-5 text-muted-foreground transition-transform duration-200",
+            isExpanded && "rotate-180"
+          )} />
         </div>
+      </button>
 
-        <Separator />
+      {/* Expandable Content */}
+      <div className={cn(
+        "grid transition-all duration-300 ease-in-out",
+        isExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+      )}>
+        <div className="overflow-hidden">
+          <div className="px-4 pb-5 sm:px-6 sm:pb-6 space-y-5">
+            <Separator />
 
-        {/* Investimento */}
-        <div className="space-y-3">
-          <p className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground/70">
-            Investimento em Tráfego Pago
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-            <InputField
-              label="Investimento em Anúncios"
-              field="budgetAnuncios"
-              value={inputs.budgetAnuncios}
-              onChange={onChange}
-              prefix="R$"
-              step={500}
-              help="Valor total investido em anúncios (Meta Ads, Google Ads, etc.)"
-            />
-            <InputField
-              label="Custo por Venda (CPA)"
-              field="cpaAlvo"
-              value={inputs.cpaAlvo}
-              onChange={onChange}
-              prefix="R$"
-              step={1}
-              help="Quanto você paga em média para conquistar cada venda via anúncios"
-            />
-            <InputField
-              label="Imposto Meta Ads"
-              field="impostoMetaAds"
-              value={inputs.impostoMetaAds}
-              onChange={onChange}
-              suffix="%"
-              step={0.5}
-              min={0}
-              max={100}
-              help="Percentual de imposto pago sobre o investimento em Meta Ads (ex: IOF, ISS)"
-            />
+            {/* Receita & Pedidos */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground/70">
+                  Receita & Pedidos
+                </p>
+                {ticketMedio > 0 && (
+                  <Badge variant="secondary" className="text-[10px] font-medium">
+                    Ticket Médio: {formatBRL(ticketMedio)}
+                  </Badge>
+                )}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                <InputField label="Receita Mensal" field="receitaMensal" value={inputs.receitaMensal} onChange={onChange} prefix="R$" step={1000} help="Faturamento bruto total do mês" />
+                <InputField label="Número de Pedidos" field="numeroPedidos" value={inputs.numeroPedidos} onChange={onChange} step={1} help="Quantidade total de pedidos realizados no período" />
+                <InputField label="% Pedidos Aprovados" field="percentualAprovados" value={inputs.percentualAprovados} onChange={onChange} suffix="%" step={1} min={1} max={100} help="Percentual de pedidos que são efetivamente aprovados" />
+                <InputField label="% Devoluções" field="percentualDevolucoes" value={inputs.percentualDevolucoes} onChange={onChange} suffix="%" step={0.5} min={0} max={100} help={`Percentual de pedidos devolvidos (${numDevolucoes} devoluções)`} />
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Custos & Taxas + Investimento side by side on desktop */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              <div className="space-y-3">
+                <p className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground/70">
+                  Custos & Taxas por Venda
+                </p>
+                <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                  <InputField label="Custo do Produto" field="cmvUnitario" value={inputs.cmvUnitario} onChange={onChange} prefix="R$" step={1} help="Quanto custa produzir ou comprar cada unidade (CMV)" />
+                  <InputField label="Taxa do Gateway" field="taxaGateway" value={inputs.taxaGateway} onChange={onChange} suffix="%" step={0.1} min={0} max={100} help="Taxa cobrada pelo meio de pagamento" />
+                  <InputField label="Impostos sobre Receita" field="taxaImpostos" value={inputs.taxaImpostos} onChange={onChange} suffix="%" step={0.1} min={0} max={100} help="Percentual de impostos incidentes" />
+                  <InputField label="Frete por Pedido" field="freteUnitario" value={inputs.freteUnitario} onChange={onChange} prefix="R$" step={1} help="Custo médio de frete por pedido" />
+                </div>
+              </div>
+              <div className="space-y-3">
+                <p className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground/70">
+                  Investimento em Tráfego Pago
+                </p>
+                <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                  <InputField label="Investimento em Anúncios" field="budgetAnuncios" value={inputs.budgetAnuncios} onChange={onChange} prefix="R$" step={500} help="Valor total investido em anúncios" />
+                  <InputField label="Custo por Venda (CPA)" field="cpaAlvo" value={inputs.cpaAlvo} onChange={onChange} prefix="R$" step={1} help="Quanto você paga para conquistar cada venda" />
+                  <InputField label="Imposto Meta Ads" field="impostoMetaAds" value={inputs.impostoMetaAds} onChange={onChange} suffix="%" step={0.5} min={0} max={100} help="Imposto pago sobre o investimento em Meta Ads (IOF, ISS)" />
+                </div>
+              </div>
+            </div>
+
+            {/* Mobile reset button */}
+            <div className="sm:hidden">
+              <Button variant="ghost" size="sm" onClick={onReset} className="text-muted-foreground w-full">
+                <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
+                Restaurar valores padrão
+              </Button>
+            </div>
           </div>
         </div>
       </div>

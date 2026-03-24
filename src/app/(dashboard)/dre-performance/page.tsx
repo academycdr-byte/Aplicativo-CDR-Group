@@ -206,72 +206,45 @@ export default function DREPerformancePage() {
         </div>
       </Card>
 
-      {/* KPI Grid - Primary */}
-      <div>
-        <p className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground/70 mb-3">
-          Indicadores Principais
-        </p>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          <KPICard
-            title="Margem Bruta"
-            value={formatPct(metrics.margemBrutaPct)}
-            valueClass={metrics.margemBrutaPct >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600"}
-            subText={`${formatBRL(metrics.margemBrutaUnit)} por venda (antes do custo de aquisição)`}
-          />
-          <KPICard
-            title="Margem de Contribuição"
-            value={formatPct(metrics.mcPct)}
-            valueClass={metrics.mcPct >= 0 ? "text-blue-600 dark:text-blue-400" : "text-red-600"}
-            subText={`${formatBRL(metrics.margemContribUnit)} por venda (já descontando aquisição)`}
-          />
-          <KPICard
-            title="ROAS Mínimo"
-            value={`${metrics.breakevenRoas.toFixed(2)}x`}
-            subText="Abaixo desse ROAS, a operação dá prejuízo"
-          />
-          <KPICard
-            title="Lucro Bruto Mensal"
-            value={formatBRL(metrics.lucroBruto, true)}
-            className={
-              metrics.lucroBruto >= 0
-                ? "border-emerald-500/20 bg-emerald-500/5"
-                : "border-red-500/20 bg-red-500/5"
-            }
-            valueClass={
-              metrics.lucroBruto >= 0
-                ? "text-emerald-600 dark:text-emerald-400"
-                : "text-red-600 dark:text-red-400"
-            }
-            subText={`${metrics.pedidosAprovadosCount} pedidos aprovados de ${inputs.numeroPedidos} totais`}
-          />
-        </div>
-      </div>
-
-      {/* KPI Grid - Secondary */}
-      <div>
-        <p className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground/70 mb-3">
-          Métricas Complementares
-        </p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
-          <KPICard
-            title="ROAS Realizado"
-            value={`${metrics.roasRealizado.toFixed(2)}x`}
-            subText={inputs.impostoMetaAds > 0 || inputs.percentualAprovados < 100
-              ? `Ajustado: ${formatBRL(metrics.receitaEfetiva, true)} receita ÷ ${formatBRL(metrics.budgetEfetivo, true)} custo real`
-              : "Receita total dividida pelo investimento em anúncios"}
-          />
-          <KPICard
-            title="Markup"
-            value={`${metrics.markup.toFixed(2)}x`}
-            subText="Quantas vezes o preço de venda é maior que o custo do produto"
-          />
-          <KPICard
-            title="Ticket Médio"
-            value={formatBRL(metrics.ticketMedio)}
-            subText={`${metrics.pedidosAprovadosCount} aprovados, ${metrics.numeroDevolucoes} devoluções`}
-            className="col-span-2 sm:col-span-1"
-          />
-        </div>
+      {/* KPI Grid - Unified */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+        <KPICard
+          title="Lucro Bruto Mensal"
+          value={formatBRL(metrics.lucroBruto, true)}
+          className={
+            metrics.lucroBruto >= 0
+              ? "border-emerald-500/20 bg-emerald-500/5"
+              : "border-red-500/20 bg-red-500/5"
+          }
+          valueClass={
+            metrics.lucroBruto >= 0
+              ? "text-emerald-600 dark:text-emerald-400"
+              : "text-red-600 dark:text-red-400"
+          }
+          subText={`${metrics.pedidosAprovadosCount} pedidos aprovados`}
+        />
+        <KPICard
+          title="Margem Bruta"
+          value={formatPct(metrics.margemBrutaPct)}
+          valueClass={metrics.margemBrutaPct >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600"}
+          subText={`${formatBRL(metrics.margemBrutaUnit)} / venda`}
+        />
+        <KPICard
+          title="Margem de Contribuição"
+          value={formatPct(metrics.mcPct)}
+          valueClass={metrics.mcPct >= 0 ? "text-blue-600 dark:text-blue-400" : "text-red-600"}
+          subText={`${formatBRL(metrics.margemContribUnit)} / venda`}
+        />
+        <KPICard
+          title="ROAS Mínimo"
+          value={`${metrics.breakevenRoas.toFixed(2)}x`}
+          subText="Breakeven da operação"
+        />
+        <KPICard
+          title="ROAS Realizado"
+          value={`${metrics.roasRealizado.toFixed(2)}x`}
+          subText={`Ticket ${formatBRL(metrics.ticketMedio)} | Markup ${metrics.markup.toFixed(1)}x`}
+        />
       </div>
 
       {/* Charts Row */}

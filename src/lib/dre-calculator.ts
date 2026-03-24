@@ -293,14 +293,14 @@ export function calculateRecompra(
   };
 }
 
-// Budget levels para a matriz (escala geometrica ~25% de crescimento)
+// Budget levels para a matriz (6 niveis, escala ~50% de crescimento)
 export const DEFAULT_BUDGET_LEVELS = [
-  50547, 63183, 78979, 98724, 123405, 154256, 192820, 241025, 301281, 376601,
+  50547, 75000, 100000, 150000, 200000, 300000,
 ];
 
-// ROAS levels para a matriz
+// ROAS levels para a matriz (9 niveis focados no range util)
 export const DEFAULT_ROAS_LEVELS = [
-  1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10, 10.5, 11, 11.5, 12,
+  1, 2, 3, 4, 5, 6, 7, 8, 10,
 ];
 
 // ROAS levels para sensitivity (inteiros de 1 a 13)
