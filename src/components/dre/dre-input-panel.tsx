@@ -101,7 +101,7 @@ export const DREInputPanel = memo(function DREInputPanel({
   onChange,
   onReset,
 }: DREInputPanelProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
 
   const ticketMedio = useMemo(
     () => (inputs.numeroPedidos > 0 ? inputs.receitaMensal / inputs.numeroPedidos : 0),
