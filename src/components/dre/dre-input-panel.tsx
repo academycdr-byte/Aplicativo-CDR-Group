@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useMemo, useState } from "react";
+import { memo, useMemo, useState, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -112,6 +112,13 @@ export const DREInputPanel = memo(function DREInputPanel({
     [inputs.numeroPedidos, inputs.percentualDevolucoes]
   );
 
+  // Handler for Ticket Médio: when ticket changes, recalculate numeroPedidos
+  const handleTicketChange = useCallback((_field: keyof DREInputs, value: number) => {
+    if (value > 0) {
+      onChange("numeroPedidos", Math.round(inputs.receitaMensal / value));
+    }
+  }, [onChange, inputs.receitaMensal]);
+
   return (
     <Card className="border border-border shadow-none rounded-lg bg-card/80 backdrop-blur-sm overflow-hidden">
       {/* Collapsed Summary - always visible */}
@@ -133,10 +140,10 @@ export const DREInputPanel = memo(function DREInputPanel({
                 Ticket <span className="font-medium text-foreground">{formatBRL(ticketMedio)}</span>
               </span>
               <span className="text-xs text-muted-foreground">
-                CPA <span className="font-medium text-foreground">{formatBRL(inputs.cpaAlvo)}</span>
+                CMV <span className="font-medium text-foreground">{formatBRL(inputs.cmvUnitario)}</span>
               </span>
               <span className="text-xs text-muted-foreground">
-                CMV <span className="font-medium text-foreground">{formatBRL(inputs.cmvUnitario)}</span>
+                CPA <span className="font-medium text-foreground">{formatBRL(inputs.cpaAlvo)}</span>
               </span>
             </div>
           </div>
@@ -175,15 +182,15 @@ export const DREInputPanel = memo(function DREInputPanel({
                 <p className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground/70">
                   Receita & Pedidos
                 </p>
-                {ticketMedio > 0 && (
+                {inputs.numeroPedidos > 0 && (
                   <Badge variant="secondary" className="text-[10px] font-medium">
-                    Ticket Médio: {formatBRL(ticketMedio)}
+                    {Math.round(inputs.numeroPedidos)} pedidos | {numDevolucoes} devoluções
                   </Badge>
                 )}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                 <InputField label="Receita Mensal" field="receitaMensal" value={inputs.receitaMensal} onChange={onChange} prefix="R$" step={1000} help="Faturamento bruto total do mês" />
-                <InputField label="Número de Pedidos" field="numeroPedidos" value={inputs.numeroPedidos} onChange={onChange} step={1} help="Quantidade total de pedidos realizados no período" />
+                <InputField label="Ticket Médio" field="numeroPedidos" value={Math.round(ticketMedio)} onChange={handleTicketChange} prefix="R$" step={5} help="Valor médio de cada pedido (altera o número de pedidos automaticamente)" />
                 <InputField label="% Pedidos Aprovados" field="percentualAprovados" value={inputs.percentualAprovados} onChange={onChange} suffix="%" step={1} min={1} max={100} help="Percentual de pedidos que são efetivamente aprovados" />
                 <InputField label="% Devoluções" field="percentualDevolucoes" value={inputs.percentualDevolucoes} onChange={onChange} suffix="%" step={0.5} min={0} max={100} help={`Percentual de pedidos devolvidos (${numDevolucoes} devoluções)`} />
               </div>
