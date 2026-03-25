@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import Image from "next/image";
 import {
   Card,
   CardContent,
@@ -13,14 +14,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   Trophy,
   FlaskConical,
   Recycle,
@@ -32,9 +25,12 @@ import {
   DollarSign,
   ShoppingCart,
   ImageIcon,
-  ArrowRight,
   Loader2,
   Save,
+  Eye,
+  MousePointer,
+  ArrowRight,
+  Clock,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -44,52 +40,69 @@ import {
   runClassification,
 } from "@/actions/creative-pipeline";
 import type { CreativeStatus } from "@prisma/client";
-import Image from "next/image";
 
 // ─── STATUS CONFIG ────────────────────────────────
 
 const STATUS_CONFIG: Record<
   CreativeStatus,
-  { label: string; icon: typeof Trophy; color: string; bg: string; border: string }
+  {
+    label: string;
+    icon: typeof Trophy;
+    color: string;
+    bg: string;
+    border: string;
+    headerBg: string;
+    dot: string;
+  }
 > = {
   CAMPEOES_ATIVOS: {
     label: "Campeões Ativos",
     icon: Trophy,
     color: "text-amber-400",
     bg: "bg-amber-400/10",
-    border: "border-amber-400/20",
+    border: "border-amber-400/30",
+    headerBg: "bg-amber-400/8",
+    dot: "bg-amber-400",
   },
   EM_TESTE: {
     label: "Em Teste",
     icon: FlaskConical,
     color: "text-blue-400",
     bg: "bg-blue-400/10",
-    border: "border-blue-400/20",
+    border: "border-blue-400/30",
+    headerBg: "bg-blue-400/8",
+    dot: "bg-blue-400",
   },
   RECICLAGEM: {
     label: "Reciclagem",
     icon: Recycle,
     color: "text-orange-400",
     bg: "bg-orange-400/10",
-    border: "border-orange-400/20",
-  },
-  DESATIVADOS: {
-    label: "Desativados",
-    icon: XCircle,
-    color: "text-red-400",
-    bg: "bg-red-400/10",
-    border: "border-red-400/20",
+    border: "border-orange-400/30",
+    headerBg: "bg-orange-400/8",
+    dot: "bg-orange-400",
   },
   CAMPEOES_INATIVOS: {
     label: "Campeões Inativos",
     icon: PauseCircle,
     color: "text-purple-400",
     bg: "bg-purple-400/10",
-    border: "border-purple-400/20",
+    border: "border-purple-400/30",
+    headerBg: "bg-purple-400/8",
+    dot: "bg-purple-400",
+  },
+  DESATIVADOS: {
+    label: "Desativados",
+    icon: XCircle,
+    color: "text-red-400",
+    bg: "bg-red-400/10",
+    border: "border-red-400/30",
+    headerBg: "bg-red-400/8",
+    dot: "bg-red-400",
   },
 };
 
-const STATUS_ORDER: CreativeStatus[] = [
+const KANBAN_ORDER: CreativeStatus[] = [
   "CAMPEOES_ATIVOS",
   "EM_TESTE",
   "RECICLAGEM",
@@ -99,22 +112,251 @@ const STATUS_ORDER: CreativeStatus[] = [
 
 // ─── FORMATTERS ───────────────────────────────────
 
-function formatCurrency(value: number) {
-  return value.toLocaleString("pt-BR", {
+function fmt(value: number) {
+  return new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
     minimumFractionDigits: 2,
-  });
+  }).format(value);
 }
 
-function formatRoas(value: number) {
-  return value.toFixed(2) + "x";
+function fmtNum(n: number) {
+  return new Intl.NumberFormat("pt-BR").format(n);
 }
 
-// ─── MAIN PAGE ────────────────────────────────────
+function timeAgo(date: Date) {
+  const now = new Date();
+  const diff = now.getTime() - new Date(date).getTime();
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  if (hours < 1) return "agora";
+  if (hours < 24) return `${hours}h atrás`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "ontem";
+  return `${days}d atrás`;
+}
+
+// ─── TYPES ────────────────────────────────────────
+
+type ClassifiedCreative = {
+  id: string;
+  creativeName: string;
+  status: CreativeStatus;
+  previousStatus: CreativeStatus | null;
+  roas: number;
+  purchases: number;
+  spend: number;
+  revenue: number;
+  impressions: number;
+  clicks: number;
+  thumbnailUrl: string | null;
+  lastClassifiedAt: Date;
+};
 
 type PipelineData = Awaited<ReturnType<typeof getCreativePipeline>>;
 type BenchmarkData = Awaited<ReturnType<typeof getBenchmarkConfig>>;
+
+// ─── CREATIVE CARD ────────────────────────────────
+
+function CreativeCard({
+  creative,
+  benchmark,
+}: {
+  creative: ClassifiedCreative;
+  benchmark: BenchmarkData;
+}) {
+  const sc = STATUS_CONFIG[creative.status];
+  const ctr =
+    creative.impressions > 0
+      ? (creative.clicks / creative.impressions) * 100
+      : 0;
+
+  const roasIdeal = benchmark?.roasIdeal ?? 2.5;
+  const roasBreakeven = benchmark?.roasBreakeven ?? 1.5;
+
+  const borderColor =
+    creative.roas >= roasIdeal
+      ? "border-l-emerald-500"
+      : creative.roas >= roasBreakeven
+      ? "border-l-amber-500"
+      : "border-l-red-500";
+
+  return (
+    <Card
+      className={`group overflow-hidden transition-colors duration-300 border border-border/40 hover:border-border/60 shadow-none rounded-xl border-l-4 ${borderColor}`}
+    >
+      {/* Thumbnail */}
+      <div className="relative aspect-video bg-muted flex items-center justify-center overflow-hidden">
+        {creative.thumbnailUrl ? (
+          <Image
+            src={creative.thumbnailUrl}
+            alt={creative.creativeName}
+            fill
+            className="object-cover transition-transform group-hover:scale-105"
+            sizes="(max-width: 640px) 100vw, 280px"
+            unoptimized
+          />
+        ) : (
+          <ImageIcon className="w-8 h-8 text-muted-foreground/30" />
+        )}
+
+        {/* Status badge on thumbnail */}
+        <div className="absolute top-2 right-2">
+          <Badge
+            variant="secondary"
+            className={`backdrop-blur-md border-none text-[10px] h-5 gap-1 ${sc.bg} ${sc.color}`}
+          >
+            <sc.icon className="w-3 h-3" />
+            {sc.label}
+          </Badge>
+        </div>
+
+        {/* Previous status transition */}
+        {creative.previousStatus &&
+          creative.previousStatus !== creative.status && (
+            <div className="absolute bottom-2 left-2">
+              <Badge
+                variant="secondary"
+                className="backdrop-blur-md bg-black/40 text-white border-none text-[9px] h-4 gap-1"
+              >
+                {STATUS_CONFIG[creative.previousStatus].label}
+                <ArrowRight className="w-2.5 h-2.5" />
+                {sc.label}
+              </Badge>
+            </div>
+          )}
+      </div>
+
+      <CardContent className="p-3 space-y-2.5">
+        {/* Name */}
+        <div className="min-w-0">
+          <p
+            className="font-semibold text-sm truncate"
+            title={creative.creativeName}
+          >
+            {creative.creativeName}
+          </p>
+          <div className="flex items-center gap-1 mt-0.5">
+            <Clock className="w-3 h-3 text-muted-foreground/50" />
+            <span className="text-[10px] text-muted-foreground">
+              {timeAgo(creative.lastClassifiedAt)}
+            </span>
+          </div>
+        </div>
+
+        {/* Primary Metrics: Gasto + ROAS */}
+        <div className="flex items-end justify-between border-b border-border/50 pb-2">
+          <div className="min-w-0">
+            <p className="text-[10px] text-muted-foreground uppercase">Gasto</p>
+            <p className="font-semibold text-sm truncate">{fmt(creative.spend)}</p>
+          </div>
+          <div className="text-right shrink-0 ml-2">
+            <p className="text-[10px] text-muted-foreground uppercase">ROAS</p>
+            <p
+              className={`font-bold text-lg ${
+                creative.roas >= roasIdeal
+                  ? "text-emerald-500"
+                  : creative.roas >= roasBreakeven
+                  ? "text-amber-500"
+                  : "text-red-500"
+              }`}
+            >
+              {creative.roas.toFixed(2)}x
+            </p>
+          </div>
+        </div>
+
+        {/* Secondary Metrics Grid */}
+        <div className="grid grid-cols-3 gap-y-1.5 text-xs">
+          <div className="min-w-0">
+            <p className="text-muted-foreground">Impr.</p>
+            <p className="font-medium truncate">{fmtNum(creative.impressions)}</p>
+          </div>
+          <div className="min-w-0">
+            <p className="text-muted-foreground">Cliques</p>
+            <p className="font-medium truncate">{fmtNum(creative.clicks)}</p>
+          </div>
+          <div className="text-right min-w-0">
+            <p className="text-muted-foreground">CTR</p>
+            <p className="font-medium">{ctr.toFixed(2)}%</p>
+          </div>
+
+          <div className="col-span-3 pt-1.5 flex justify-between border-t border-border/50 mt-1">
+            <span className="text-muted-foreground text-[11px]">
+              Receita:{" "}
+              <span className="text-foreground font-medium">
+                {fmt(creative.revenue)}
+              </span>
+            </span>
+            <span className="text-muted-foreground text-[11px]">
+              Compras:{" "}
+              <span className="text-foreground font-medium">
+                {creative.purchases}
+              </span>
+            </span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── KANBAN COLUMN ────────────────────────────────
+
+function KanbanColumn({
+  status,
+  creatives,
+  benchmark,
+}: {
+  status: CreativeStatus;
+  creatives: ClassifiedCreative[];
+  benchmark: BenchmarkData;
+}) {
+  const sc = STATUS_CONFIG[status];
+  const Icon = sc.icon;
+
+  return (
+    <div className="flex flex-col min-w-[300px] max-w-[320px] flex-shrink-0">
+      {/* Column Header */}
+      <div
+        className={`flex items-center gap-2 px-3 py-2.5 rounded-t-xl ${sc.headerBg} border ${sc.border} border-b-0`}
+      >
+        <div className={`w-2 h-2 rounded-full ${sc.dot}`} />
+        <Icon className={`w-4 h-4 ${sc.color}`} />
+        <span className="text-sm font-semibold flex-1">{sc.label}</span>
+        <Badge
+          variant="outline"
+          className={`${sc.border} ${sc.color} text-[11px] h-5 font-mono`}
+        >
+          {creatives.length}
+        </Badge>
+      </div>
+
+      {/* Cards Container */}
+      <div
+        className={`flex-1 overflow-y-auto space-y-3 p-3 border ${sc.border} border-t-0 rounded-b-xl bg-card/30 min-h-[200px] max-h-[calc(100vh-260px)]`}
+      >
+        {creatives.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 text-center opacity-50">
+            <Icon className="w-8 h-8 text-muted-foreground/30 mb-2" />
+            <p className="text-xs text-muted-foreground">
+              Nenhum criativo
+            </p>
+          </div>
+        ) : (
+          creatives.map((creative) => (
+            <CreativeCard
+              key={creative.id}
+              creative={creative}
+              benchmark={benchmark}
+            />
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── MAIN PAGE ────────────────────────────────────
 
 export default function EsteiraPage() {
   const [data, setData] = useState<PipelineData>(null);
@@ -123,10 +365,7 @@ export default function EsteiraPage() {
   const [classifying, setClassifying] = useState(false);
   const [savingConfig, setSavingConfig] = useState(false);
   const [showConfig, setShowConfig] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<CreativeStatus | "ALL">("ALL");
-  const [transitions, setTransitions] = useState<
-    { name: string; from: string | null; to: string }[]
-  >([]);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Config form state
   const [configForm, setConfigForm] = useState({
@@ -166,15 +405,6 @@ export default function EsteiraPage() {
         toast.success(
           `Classificação concluída: ${result.classified} criativos analisados`
         );
-        if (result.transitions && result.transitions.length > 0) {
-          setTransitions(
-            result.transitions.map((t) => ({
-              name: t.name,
-              from: t.from ? STATUS_CONFIG[t.from].label : null,
-              to: STATUS_CONFIG[t.to].label,
-            }))
-          );
-        }
         await loadData();
       } else {
         toast.error(result.error || "Erro ao classificar");
@@ -204,10 +434,34 @@ export default function EsteiraPage() {
     }
   };
 
-  const filteredCreatives =
-    data?.creatives.filter(
-      (c) => activeFilter === "ALL" || c.status === activeFilter
-    ) ?? [];
+  // Group creatives by status for Kanban
+  const creativesByStatus = useMemo(() => {
+    const groups: Record<CreativeStatus, ClassifiedCreative[]> = {
+      CAMPEOES_ATIVOS: [],
+      EM_TESTE: [],
+      RECICLAGEM: [],
+      CAMPEOES_INATIVOS: [],
+      DESATIVADOS: [],
+    };
+
+    if (!data?.creatives) return groups;
+
+    const query = searchQuery.toLowerCase().trim();
+
+    for (const c of data.creatives) {
+      if (query && !c.creativeName.toLowerCase().includes(query)) continue;
+      groups[c.status].push(c);
+    }
+
+    // Sort each group by revenue desc
+    for (const status of KANBAN_ORDER) {
+      groups[status].sort((a, b) => b.revenue - a.revenue);
+    }
+
+    return groups;
+  }, [data, searchQuery]);
+
+  const totalCreatives = data?.summary.total ?? 0;
 
   if (loading) {
     return (
@@ -218,7 +472,7 @@ export default function EsteiraPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -226,7 +480,9 @@ export default function EsteiraPage() {
             Esteira de Criativos
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Classificação automática de criativos por performance
+            {totalCreatives > 0
+              ? `${totalCreatives} criativos classificados`
+              : "Classificação automática por performance"}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -238,11 +494,7 @@ export default function EsteiraPage() {
             <Settings2 className="w-4 h-4 mr-2" />
             Benchmarks
           </Button>
-          <Button
-            size="sm"
-            onClick={handleClassify}
-            disabled={classifying}
-          >
+          <Button size="sm" onClick={handleClassify} disabled={classifying}>
             {classifying ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
             ) : (
@@ -341,7 +593,11 @@ export default function EsteiraPage() {
               </div>
             </div>
             <div className="flex justify-end mt-4">
-              <Button size="sm" onClick={handleSaveConfig} disabled={savingConfig}>
+              <Button
+                size="sm"
+                onClick={handleSaveConfig}
+                disabled={savingConfig}
+              >
                 {savingConfig ? (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 ) : (
@@ -354,70 +610,46 @@ export default function EsteiraPage() {
         </Card>
       )}
 
-      {/* Status Summary Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        {STATUS_ORDER.map((status) => {
-          const config = STATUS_CONFIG[status];
-          const count = data?.summary.byStatus[status] ?? 0;
-          const Icon = config.icon;
-          const isActive = activeFilter === status;
-          const pct =
-            data && data.summary.total > 0
-              ? Math.round((count / data.summary.total) * 100)
-              : 0;
+      {/* Summary Row */}
+      {totalCreatives > 0 && (
+        <div className="flex items-center gap-4 overflow-x-auto pb-1">
+          {KANBAN_ORDER.map((status) => {
+            const sc = STATUS_CONFIG[status];
+            const count = data?.summary.byStatus[status] ?? 0;
+            const pct =
+              totalCreatives > 0
+                ? Math.round((count / totalCreatives) * 100)
+                : 0;
+            return (
+              <div
+                key={status}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${sc.bg} ${sc.border} border shrink-0`}
+              >
+                <div className={`w-2 h-2 rounded-full ${sc.dot}`} />
+                <span className={`text-xs font-medium ${sc.color}`}>
+                  {count} {sc.label}
+                </span>
+                <span className="text-[10px] text-muted-foreground">
+                  ({pct}%)
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
-          return (
-            <Card
-              key={status}
-              className={`cursor-pointer transition-all duration-200 hover:scale-[1.02] ${
-                isActive ? `ring-2 ring-offset-2 ring-offset-background ${config.border.replace("border", "ring")}` : ""
-              } ${config.border} border`}
-              onClick={() =>
-                setActiveFilter(isActive ? "ALL" : status)
-              }
-            >
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <Icon className={`w-5 h-5 ${config.color}`} />
-                  <span className="text-2xl font-bold">{count}</span>
-                </div>
-                <p className="text-xs font-medium text-muted-foreground">
-                  {config.label}
-                </p>
-                <p className={`text-[11px] ${config.color} font-medium mt-0.5`}>
-                  {pct}% do total
-                </p>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      {/* Transitions Alert */}
-      {transitions.length > 0 && (
-        <Card className="border-primary/20 bg-primary/5">
-          <CardContent className="p-4">
-            <p className="text-sm font-semibold mb-2">Mudanças de Status</p>
-            <div className="space-y-1">
-              {transitions.map((t, i) => (
-                <div key={i} className="flex items-center gap-2 text-sm">
-                  <span className="font-medium truncate max-w-[200px]">
-                    {t.name}
-                  </span>
-                  <span className="text-muted-foreground">
-                    {t.from ?? "Novo"}
-                  </span>
-                  <ArrowRight className="w-3 h-3 text-muted-foreground" />
-                  <span className="font-medium">{t.to}</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+      {/* Search */}
+      {totalCreatives > 0 && (
+        <Input
+          placeholder="Buscar criativo por nome..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="max-w-sm"
+        />
       )}
 
       {/* Empty State */}
-      {(!data || data.creatives.length === 0) && (
+      {totalCreatives === 0 && (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16 text-center">
             <FlaskConical className="w-12 h-12 text-muted-foreground/40 mb-4" />
@@ -440,120 +672,23 @@ export default function EsteiraPage() {
         </Card>
       )}
 
-      {/* Creatives Table */}
-      {filteredCreatives.length > 0 && (
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base">
-                {activeFilter === "ALL"
-                  ? "Todos os Criativos"
-                  : STATUS_CONFIG[activeFilter].label}
-              </CardTitle>
-              <Badge variant="secondary" className="font-mono">
-                {filteredCreatives.length} criativos
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[280px]">Criativo</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">ROAS</TableHead>
-                    <TableHead className="text-right">Compras</TableHead>
-                    <TableHead className="text-right">Investimento</TableHead>
-                    <TableHead className="text-right">Receita</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredCreatives.map((creative) => {
-                    const sc = STATUS_CONFIG[creative.status];
-                    const Icon = sc.icon;
-
-                    return (
-                      <TableRow key={creative.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-muted flex-shrink-0">
-                              {creative.thumbnailUrl ? (
-                                <Image
-                                  src={creative.thumbnailUrl}
-                                  alt={creative.creativeName}
-                                  fill
-                                  className="object-cover"
-                                  sizes="40px"
-                                />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center">
-                                  <ImageIcon className="w-4 h-4 text-muted-foreground/40" />
-                                </div>
-                              )}
-                            </div>
-                            <span className="font-medium text-sm truncate max-w-[200px]">
-                              {creative.creativeName}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="outline"
-                            className={`${sc.bg} ${sc.border} ${sc.color} border gap-1`}
-                          >
-                            <Icon className="w-3 h-3" />
-                            {sc.label}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <TrendingUp className="w-3.5 h-3.5 text-muted-foreground" />
-                            <span className={`font-mono font-medium ${
-                              creative.roas >= (benchmark?.roasIdeal ?? 2.5)
-                                ? "text-emerald-400"
-                                : creative.roas >= (benchmark?.roasBreakeven ?? 1.5)
-                                ? "text-orange-400"
-                                : "text-red-400"
-                            }`}>
-                              {formatRoas(creative.roas)}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <ShoppingCart className="w-3.5 h-3.5 text-muted-foreground" />
-                            <span className="font-mono">
-                              {creative.purchases}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <span className="font-mono text-sm text-muted-foreground">
-                            {formatCurrency(creative.spend)}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <DollarSign className="w-3.5 h-3.5 text-emerald-400/60" />
-                            <span className="font-mono font-medium">
-                              {formatCurrency(creative.revenue)}
-                            </span>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Kanban Board */}
+      {totalCreatives > 0 && (
+        <div className="flex gap-4 overflow-x-auto pb-4 -mx-2 px-2">
+          {KANBAN_ORDER.map((status) => (
+            <KanbanColumn
+              key={status}
+              status={status}
+              creatives={creativesByStatus[status]}
+              benchmark={benchmark}
+            />
+          ))}
+        </div>
       )}
 
-      {/* Benchmark Info */}
-      {benchmark && (
-        <div className="text-xs text-muted-foreground text-center">
+      {/* Benchmark Info Footer */}
+      {benchmark && totalCreatives > 0 && (
+        <div className="text-xs text-muted-foreground text-center pb-4">
           Benchmarks: ROAS Breakeven {benchmark.roasBreakeven}x | ROAS Ideal{" "}
           {benchmark.roasIdeal}x | Min. Compras {benchmark.minPurchases} |
           Período {benchmark.lookbackDays} dias
