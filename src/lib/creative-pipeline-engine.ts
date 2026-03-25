@@ -150,6 +150,62 @@ export async function classifyCreativesForOrg(orgId: string) {
 
   await Promise.all(upserts);
 
+  // ─── STALE CREATIVE HANDLING ─────────────────────
+  // Creatives that exist in the DB but have NO metrics in the lookback window
+  // are likely paused/campaign killed. Reclassify them to appropriate inactive status.
+  const activeNames = new Set(Object.keys(aggregated));
+  const allClassifications = await prisma.creativeClassification.findMany({
+    where: { organizationId: orgId },
+    select: { id: true, creativeName: true, status: true, roas: true, purchases: true, spend: true, lastClassifiedAt: true },
+  });
+
+  const staleUpdates = [];
+  for (const c of allClassifications) {
+    // Skip creatives that were just classified (active in lookback)
+    if (activeNames.has(c.creativeName)) continue;
+
+    // Skip creatives already in a final inactive state
+    if (c.status === "RECICLAGEM" || c.status === "CAMPEOES_INATIVOS" || c.status === "DESATIVADOS") continue;
+
+    // Creative is stale (no recent metrics) and in an active state
+    let newStatus: CreativeStatus;
+
+    if (c.status === "CAMPEOES_ATIVOS") {
+      // Was champion but no longer running → Campeões Inativos
+      newStatus = CreativeStatus.CAMPEOES_INATIVOS;
+    } else if (c.status === "EM_TESTE") {
+      // Was being tested but paused/killed → evaluate with stored metrics
+      const storedRoas = Number(c.roas);
+      if (c.purchases >= minPurchases && storedRoas >= roasIdeal) {
+        newStatus = CreativeStatus.CAMPEOES_INATIVOS;
+      } else if (c.purchases >= minPurchases && storedRoas >= roasBreakeven) {
+        newStatus = CreativeStatus.RECICLAGEM;
+      } else if (Number(c.spend) > 0) {
+        // Spent money but didn't perform → Desativados
+        newStatus = CreativeStatus.DESATIVADOS;
+      } else {
+        continue; // No spend yet, keep EM_TESTE
+      }
+    } else {
+      continue;
+    }
+
+    transitions.push({ name: c.creativeName, from: c.status, to: newStatus });
+    staleUpdates.push(
+      prisma.creativeClassification.update({
+        where: { id: c.id },
+        data: {
+          previousStatus: c.status,
+          status: newStatus,
+        },
+      })
+    );
+  }
+
+  if (staleUpdates.length > 0) {
+    await Promise.all(staleUpdates);
+  }
+
   return {
     classified: Object.keys(aggregated).length,
     transitions: transitions.length,
