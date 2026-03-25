@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
     const orgId = membership.organizationId;
 
     try {
-        let body: { startPhase?: number; accountIndex?: number; syncLogId?: string; forceFullSync?: boolean } = {};
+        let body: { startPhase?: number; accountIndex?: number; startDay?: number; syncLogId?: string; forceFullSync?: boolean } = {};
         try {
             body = await request.json();
         } catch {
@@ -119,6 +119,7 @@ export async function POST(request: NextRequest) {
             // When forcing full sync, explicitly start from phase 1 to avoid reading stale cursor
             startPhase: body.forceFullSync ? 1 : body.startPhase,
             accountIndex: body.forceFullSync ? undefined : body.accountIndex,
+            startDay: body.forceFullSync ? undefined : body.startDay,
             syncLogId: body.forceFullSync ? undefined : body.syncLogId,
             timeBudgetMs: 50_000,
         });
@@ -130,6 +131,7 @@ export async function POST(request: NextRequest) {
             hasMore: result.hasMore,
             nextPhase: result.nextPhase,
             accountIndex: result.accountIndex,
+            startDay: result.startDay,
             syncLogId: result.syncLogId,
         });
     } catch (error: unknown) {

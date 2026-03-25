@@ -145,7 +145,7 @@ function IntegrationsContent() {
       toast.error(`Configuração Shopify incorreta${detail ? `: ${detail}` : ""}`, { duration: 10000 });
     } else if (success === "facebook") {
       toast.success("Facebook Ads conectado com sucesso! Sincronizando metricas...");
-      syncFacebookWithContinuation();
+      syncFacebookWithContinuation(true);
     } else if (error === "facebook_oauth_failed") {
       toast.error(`Erro ao conectar Facebook Ads${detail ? `: ${detail}` : ""}`, { duration: 10000 });
     } else if (success === "google_analytics") {
@@ -437,10 +437,11 @@ function IntegrationsContent() {
     return totalSynced;
   }
 
-  async function syncFacebookWithContinuation() {
+  async function syncFacebookWithContinuation(forceFullOnFirst = false) {
     let hasMore = true;
     let nextPhase: number | undefined;
     let accountIndex: number | undefined;
+    let startDayParam: number | undefined;
     let syncLogId: string | undefined;
     let totalSynced = 0;
     let iteration = 0;
@@ -458,8 +459,9 @@ function IntegrationsContent() {
           body: JSON.stringify({
             ...(nextPhase ? { startPhase: nextPhase } : {}),
             ...(accountIndex !== undefined ? { accountIndex } : {}),
+            ...(startDayParam !== undefined ? { startDay: startDayParam } : {}),
             ...(syncLogId ? { syncLogId } : {}),
-            ...(isFirstCall ? { forceFullSync: true } : {}),
+            ...(isFirstCall && forceFullOnFirst ? { forceFullSync: true } : {}),
           }),
         });
 
@@ -486,6 +488,7 @@ function IntegrationsContent() {
         hasMore = data.hasMore === true;
         nextPhase = data.nextPhase;
         accountIndex = data.accountIndex;
+        startDayParam = data.startDay;
         syncLogId = data.syncLogId;
 
         if (hasMore) {
@@ -595,7 +598,7 @@ function IntegrationsContent() {
         setFbAccountDialog(false);
         toast.success(`${result.count} conta(s) conectada(s)! Sincronizando metricas...`);
         loadIntegrations();
-        syncFacebookWithContinuation();
+        syncFacebookWithContinuation(true);
       }
     } else if (selectedFbAccount) {
       const result = await selectFacebookAdAccount(selectedFbAccount);
@@ -605,7 +608,7 @@ function IntegrationsContent() {
         setFbAccountDialog(false);
         toast.success(`Conta "${result.accountName}" conectada! Sincronizando metricas...`);
         loadIntegrations();
-        syncFacebookWithContinuation();
+        syncFacebookWithContinuation(true);
       }
     }
     setLoading(false);
@@ -662,7 +665,7 @@ function IntegrationsContent() {
       toast.success(`${accounts.length} contas encontradas! Selecione as contas para conectar.`);
     } else {
       toast.success("Facebook Ads conectado com sucesso! Sincronizando métricas...");
-      syncFacebookWithContinuation();
+      syncFacebookWithContinuation(true);
     }
     setLoading(false);
   }
