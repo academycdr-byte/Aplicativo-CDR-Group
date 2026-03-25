@@ -33,7 +33,9 @@ import {
   getBenchmarkConfig,
   saveBenchmarkConfig,
   runClassification,
+  getCreativeAdId,
 } from "@/actions/creative-pipeline";
+import { VideoModal } from "@/components/ads/video-modal";
 import type { CreativeStatus } from "@prisma/client";
 
 // ─── STATUS CONFIG ────────────────────────────────
@@ -155,9 +157,11 @@ type BenchmarkData = Awaited<ReturnType<typeof getBenchmarkConfig>>;
 function CreativeCard({
   creative,
   benchmark,
+  onClick,
 }: {
   creative: ClassifiedCreative;
   benchmark: BenchmarkData;
+  onClick?: () => void;
 }) {
   const sc = STATUS_CONFIG[creative.status];
   const ctr =
@@ -177,7 +181,16 @@ function CreativeCard({
 
   return (
     <Card
-      className={`group overflow-hidden transition-colors duration-300 border border-border/40 hover:border-border/60 shadow-none rounded-xl border-l-4 ${borderColor}`}
+      className={`group overflow-hidden transition-colors duration-300 border border-border/40 hover:border-border/60 shadow-none rounded-xl border-l-4 cursor-pointer ${borderColor}`}
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if ((e.key === "Enter" || e.key === " ") && onClick) {
+          e.preventDefault();
+          onClick();
+        }
+      }}
     >
       {/* Thumbnail */}
       <div className="relative aspect-video bg-muted flex items-center justify-center overflow-hidden">
@@ -301,10 +314,12 @@ function KanbanColumn({
   status,
   creatives,
   benchmark,
+  onCreativeClick,
 }: {
   status: CreativeStatus;
   creatives: ClassifiedCreative[];
   benchmark: BenchmarkData;
+  onCreativeClick?: (creative: ClassifiedCreative) => void;
 }) {
   const sc = STATUS_CONFIG[status];
   const Icon = sc.icon;
@@ -343,6 +358,7 @@ function KanbanColumn({
               key={creative.id}
               creative={creative}
               benchmark={benchmark}
+              onClick={() => onCreativeClick?.(creative)}
             />
           ))
         )}
@@ -361,6 +377,12 @@ export default function EsteiraPage() {
   const [savingConfig, setSavingConfig] = useState(false);
   const [showConfig, setShowConfig] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Modal state
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [selectedCreative, setSelectedCreative] = useState<any>(null);
+  const [loadingCreative, setLoadingCreative] = useState(false);
 
   // Config form state
   const [configForm, setConfigForm] = useState({
@@ -423,6 +445,43 @@ export default function EsteiraPage() {
       toast.error("Erro ao executar classificação");
     } finally {
       setClassifying(false);
+    }
+  };
+
+  const handleCreativeClick = async (creative: ClassifiedCreative) => {
+    setLoadingCreative(true);
+    try {
+      const adInfo = await getCreativeAdId(creative.creativeName);
+      if (!adInfo) {
+        toast.error("Não foi possível encontrar o anúncio correspondente");
+        return;
+      }
+      const ctr = creative.impressions > 0 ? (creative.clicks / creative.impressions) * 100 : 0;
+      const cpc = creative.clicks > 0 ? creative.spend / creative.clicks : 0;
+      const cpm = creative.impressions > 0 ? (creative.spend / creative.impressions) * 1000 : 0;
+
+      setSelectedCreative({
+        adId: adInfo.adId,
+        adName: creative.creativeName,
+        platform: "FACEBOOK_ADS",
+        thumbnailUrl: creative.thumbnailUrl,
+        videoUrl: null,
+        impressions: creative.impressions,
+        clicks: creative.clicks,
+        spend: creative.spend,
+        conversions: creative.purchases,
+        revenue: creative.revenue,
+        ctr,
+        roas: creative.roas,
+        cpc,
+        cpm,
+        campaignName: adInfo.campaignName,
+      });
+      setIsModalOpen(true);
+    } catch {
+      toast.error("Erro ao carregar criativo");
+    } finally {
+      setLoadingCreative(false);
     }
   };
 
@@ -691,6 +750,7 @@ export default function EsteiraPage() {
               status={status}
               creatives={creativesByStatus[status]}
               benchmark={benchmark}
+              onCreativeClick={handleCreativeClick}
             />
           ))}
         </div>
@@ -704,6 +764,25 @@ export default function EsteiraPage() {
           Período {benchmark.lookbackDays} dias
           {benchmark.isDefault && " (padrão)"}
         </div>
+      )}
+
+      {/* Loading overlay for creative click */}
+      {loadingCreative && (
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 flex items-center justify-center">
+          <div className="bg-card rounded-xl p-6 flex items-center gap-3 shadow-lg">
+            <Loader2 className="w-5 h-5 animate-spin text-primary" />
+            <span className="text-sm">Carregando criativo...</span>
+          </div>
+        </div>
+      )}
+
+      {/* Creative Detail Modal */}
+      {isModalOpen && selectedCreative && (
+        <VideoModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          creative={selectedCreative}
+        />
       )}
     </div>
   );

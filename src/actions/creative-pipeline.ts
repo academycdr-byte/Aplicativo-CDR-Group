@@ -110,6 +110,35 @@ export async function runClassification() {
   }
 }
 
+// ─── CREATIVE DETAIL LOOKUP ──────────────────────
+
+export async function getCreativeAdId(creativeName: string) {
+  const ctx = await getSessionWithOrg();
+  if (!ctx) return null;
+
+  // Find the most representative ad (highest spend) matching this creative name
+  const metric = await prisma.adMetric.findFirst({
+    where: {
+      organizationId: ctx.organization.id,
+      platform: "FACEBOOK_ADS",
+      adName: { not: null },
+      OR: [
+        { adName: creativeName },
+        { adName: { startsWith: creativeName } },
+      ],
+    },
+    orderBy: { spend: "desc" },
+    select: {
+      adId: true,
+      adName: true,
+      thumbnailUrl: true,
+      campaignName: true,
+    },
+  });
+
+  return metric;
+}
+
 // ─── DATA LOADERS ─────────────────────────────────
 
 export async function getCreativePipeline(): Promise<{
