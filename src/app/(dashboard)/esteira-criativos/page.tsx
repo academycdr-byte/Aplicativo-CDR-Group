@@ -389,7 +389,22 @@ export default function EsteiraPage() {
   }, []);
 
   useEffect(() => {
-    loadData();
+    const initPage = async () => {
+      await loadData();
+      // Auto-classificar ao entrar na página
+      setClassifying(true);
+      try {
+        const result = await runClassification();
+        if (result.success) {
+          await loadData();
+        }
+      } catch {
+        // Silencioso — dados existentes já foram carregados acima
+      } finally {
+        setClassifying(false);
+      }
+    };
+    initPage();
   }, [loadData]);
 
   const handleClassify = async () => {
