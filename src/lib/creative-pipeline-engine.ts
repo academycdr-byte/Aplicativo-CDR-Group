@@ -197,6 +197,7 @@ export async function classifyCreativesForOrg(orgId: string) {
         data: {
           previousStatus: c.status,
           status: newStatus,
+          lastClassifiedAt: now,
         },
       })
     );

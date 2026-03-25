@@ -531,9 +531,13 @@ export default function EsteiraPage() {
 
     if (!creative || !targetStatus || creative.status === targetStatus) return;
 
-    // Optimistic update
+    // Optimistic update (creatives + summary counts)
+    const oldStatus = creative.status;
     setData((prev) => {
       if (!prev) return prev;
+      const updatedSummary = { ...prev.summary, byStatus: { ...prev.summary.byStatus } };
+      updatedSummary.byStatus[oldStatus] = Math.max(0, updatedSummary.byStatus[oldStatus] - 1);
+      updatedSummary.byStatus[targetStatus] = (updatedSummary.byStatus[targetStatus] || 0) + 1;
       return {
         ...prev,
         creatives: prev.creatives.map((c) =>
@@ -541,6 +545,7 @@ export default function EsteiraPage() {
             ? { ...c, previousStatus: c.status, status: targetStatus }
             : c
         ),
+        summary: updatedSummary,
       };
     });
 

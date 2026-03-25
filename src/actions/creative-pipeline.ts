@@ -69,6 +69,12 @@ export async function saveBenchmarkConfig(data: {
     return { success: false, error: "Sem permissão" };
   }
 
+  // Validação dos valores
+  if (data.roasBreakeven <= 0) return { success: false, error: "ROAS Breakeven deve ser maior que 0" };
+  if (data.roasIdeal <= data.roasBreakeven) return { success: false, error: "ROAS Ideal deve ser maior que o Breakeven" };
+  if (data.minPurchases < 1) return { success: false, error: "Compras mínimas deve ser pelo menos 1" };
+  if (data.lookbackDays < 1 || data.lookbackDays > 90) return { success: false, error: "Período deve ser entre 1 e 90 dias" };
+
   await prisma.creativeBenchmark.upsert({
     where: { organizationId: ctx.organization.id },
     create: {
