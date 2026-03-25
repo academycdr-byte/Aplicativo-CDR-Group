@@ -54,7 +54,7 @@ async function fetchAdThumbnails(
   if (adIds.length === 0) return thumbnails;
 
   // Batch fetch (max 50 per request)
-  // Fetch image_url (full res for image ads) + thumbnail_url as fallback
+  // Request image_url (full res) + thumbnail_url with 720px width for hi-res thumbnails
   const batches = [];
   for (let i = 0; i < adIds.length; i += 50) {
     batches.push(adIds.slice(i, i + 50));
@@ -64,7 +64,7 @@ async function fetchAdThumbnails(
     const ids = batch.join(",");
     try {
       const response = await fetch(
-        `https://graph.facebook.com/${FB_GRAPH_VERSION}/?ids=${ids}&fields=creative{thumbnail_url,image_url}&access_token=${accessToken}`
+        `https://graph.facebook.com/${FB_GRAPH_VERSION}/?ids=${ids}&fields=creative{thumbnail_url,image_url}&thumbnail_width=720&access_token=${accessToken}`
       );
       if (response.ok) {
         const data = await response.json();
