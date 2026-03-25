@@ -685,7 +685,7 @@ export async function syncFacebookAdsMetrics(
             );
             if (result.tokenExpired) return abortTokenExpired();
             totalSynced += result.synced;
-            if (result.timedOut) return saveCursorAndReturn(1, ai, d + 1);
+            if (result.timedOut) return saveCursorAndReturn(1, ai, d);
           } catch (err) {
             accountErrors.push(`Phase1 act_${accountIds[ai]} day-${d}: ${err instanceof Error ? err.message : "Unknown"}`);
           }
@@ -698,8 +698,8 @@ export async function syncFacebookAdsMetrics(
     }
 
     // PHASE 2: Days 8-30 for ALL accounts (day-by-day with cursor)
-    // Previously fetched as one big range which caused timeout loops on large accounts.
-    // Now fetches day-by-day like Phase 1, ensuring steady progress.
+    // Fetches day-by-day ensuring steady progress. When pagination times out
+    // mid-day, retries the SAME day (not d+1) to capture remaining pages.
     if (currentPhase <= 2) {
       const startIdx = (currentPhase === 2 && startAccountIndex !== undefined) ? startAccountIndex : 0;
       for (let ai = startIdx; ai < accountIds.length; ai++) {
@@ -715,7 +715,8 @@ export async function syncFacebookAdsMetrics(
             );
             if (result.tokenExpired) return abortTokenExpired();
             totalSynced += result.synced;
-            if (result.timedOut) return saveCursorAndReturn(2, ai, d + 1);
+            // Retry same day on timeout (pages already saved are upserted, remaining pages fetched)
+            if (result.timedOut) return saveCursorAndReturn(2, ai, d);
           } catch (err) {
             accountErrors.push(`Phase2 act_${accountIds[ai]} day-${d}: ${err instanceof Error ? err.message : "Unknown"}`);
           }
@@ -742,7 +743,7 @@ export async function syncFacebookAdsMetrics(
             );
             if (result.tokenExpired) return abortTokenExpired();
             totalSynced += result.synced;
-            if (result.timedOut) return saveCursorAndReturn(3, ai, d + 1);
+            if (result.timedOut) return saveCursorAndReturn(3, ai, d);
           } catch (err) {
             accountErrors.push(`Phase3 act_${accountIds[ai]} day-${d}: ${err instanceof Error ? err.message : "Unknown"}`);
           }
