@@ -569,8 +569,9 @@ export async function syncFacebookAdsMetrics(
     // This keeps Phase 0 lightweight so Phase 1 can run within the time budget.
     // OPTIMIZATION: Skip Phase 0 when resuming mid-Phase 1 (startDay > 1 or accountIndex > 0)
     // to maximize time for completing the stuck phase.
-    const isResumingMidPhase1 = currentPhase === 1 && (startAccountIndex !== undefined && (startAccountIndex > 0 || (startDay && startDay > 1)));
-    if (currentPhase <= 1 && !isResumingMidPhase1) {
+    // Skip Phase 0 freshness when resuming mid-phase to maximize time for completing the stuck phase
+    const isResuming = (startAccountIndex !== undefined && startAccountIndex > 0) || (startDay !== undefined && startDay > 1);
+    if (currentPhase <= 1 && !isResuming) {
       console.log(`[Facebook Ads] Phase 0: Fetching today's data for freshness`);
 
       let tokenExpiredDetected = false;
@@ -696,43 +697,57 @@ export async function syncFacebookAdsMetrics(
       if (!hasTimeLeft()) return saveCursorAndReturn(2);
     }
 
-    // PHASE 2: Days 8-30 for ALL accounts
+    // PHASE 2: Days 8-30 for ALL accounts (day-by-day with cursor)
+    // Previously fetched as one big range which caused timeout loops on large accounts.
+    // Now fetches day-by-day like Phase 1, ensuring steady progress.
     if (currentPhase <= 2) {
       const startIdx = (currentPhase === 2 && startAccountIndex !== undefined) ? startAccountIndex : 0;
       for (let ai = startIdx; ai < accountIds.length; ai++) {
         if (!hasTimeLeft()) return saveCursorAndReturn(2, ai);
-        try {
-          const result = await fetchAndSavePageByPage(
-            buildUrl(accountIds[ai], daysAgo(30), daysAgo(7)),
-            accountIds[ai],
-          );
-          if (result.tokenExpired) return abortTokenExpired();
-          totalSynced += result.synced;
-          if (result.timedOut) return saveCursorAndReturn(2, ai);
-        } catch (err) {
-          accountErrors.push(`Phase2 act_${accountIds[ai]}: ${err instanceof Error ? err.message : "Unknown"}`);
+        const resumeDay = (ai === startIdx && startDay) ? startDay : 8;
+        for (let d = resumeDay; d <= 30; d++) {
+          if (!hasTimeLeft()) return saveCursorAndReturn(2, ai, d);
+          try {
+            const dayStr = daysAgo(d);
+            const result = await fetchAndSavePageByPage(
+              buildUrl(accountIds[ai], dayStr, dayStr),
+              accountIds[ai],
+            );
+            if (result.tokenExpired) return abortTokenExpired();
+            totalSynced += result.synced;
+            if (result.timedOut) return saveCursorAndReturn(2, ai, d + 1);
+          } catch (err) {
+            accountErrors.push(`Phase2 act_${accountIds[ai]} day-${d}: ${err instanceof Error ? err.message : "Unknown"}`);
+          }
         }
+        startDay = undefined;
       }
       startAccountIndex = undefined;
       if (!hasTimeLeft()) return saveCursorAndReturn(3);
     }
 
-    // PHASE 3: Days 31-90 for ALL accounts
+    // PHASE 3: Days 31-90 for ALL accounts (day-by-day with cursor)
     if (currentPhase <= 3) {
       const startIdx = (currentPhase === 3 && startAccountIndex !== undefined) ? startAccountIndex : 0;
       for (let ai = startIdx; ai < accountIds.length; ai++) {
         if (!hasTimeLeft()) return saveCursorAndReturn(3, ai);
-        try {
-          const result = await fetchAndSavePageByPage(
-            buildUrl(accountIds[ai], daysAgo(90), daysAgo(30)),
-            accountIds[ai],
-          );
-          if (result.tokenExpired) return abortTokenExpired();
-          totalSynced += result.synced;
-          if (result.timedOut) return saveCursorAndReturn(3, ai);
-        } catch (err) {
-          accountErrors.push(`Phase3 act_${accountIds[ai]}: ${err instanceof Error ? err.message : "Unknown"}`);
+        const resumeDay = (ai === startIdx && startDay) ? startDay : 31;
+        for (let d = resumeDay; d <= 90; d++) {
+          if (!hasTimeLeft()) return saveCursorAndReturn(3, ai, d);
+          try {
+            const dayStr = daysAgo(d);
+            const result = await fetchAndSavePageByPage(
+              buildUrl(accountIds[ai], dayStr, dayStr),
+              accountIds[ai],
+            );
+            if (result.tokenExpired) return abortTokenExpired();
+            totalSynced += result.synced;
+            if (result.timedOut) return saveCursorAndReturn(3, ai, d + 1);
+          } catch (err) {
+            accountErrors.push(`Phase3 act_${accountIds[ai]} day-${d}: ${err instanceof Error ? err.message : "Unknown"}`);
+          }
         }
+        startDay = undefined;
       }
       startAccountIndex = undefined;
       if (!hasTimeLeft()) return saveCursorAndReturn(4);
