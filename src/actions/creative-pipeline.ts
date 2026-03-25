@@ -110,6 +110,32 @@ export async function runClassification() {
   }
 }
 
+// ─── MANUAL STATUS UPDATE ────────────────────────
+
+export async function updateCreativeStatus(
+  creativeId: string,
+  newStatus: CreativeStatus
+) {
+  const ctx = await getSessionWithOrg();
+  if (!ctx) return { success: false, error: "Não autenticado" };
+
+  const creative = await prisma.creativeClassification.findFirst({
+    where: { id: creativeId, organizationId: ctx.organization.id },
+  });
+
+  if (!creative) return { success: false, error: "Criativo não encontrado" };
+
+  await prisma.creativeClassification.update({
+    where: { id: creativeId },
+    data: {
+      previousStatus: creative.status,
+      status: newStatus,
+    },
+  });
+
+  return { success: true };
+}
+
 // ─── CREATIVE DETAIL LOOKUP ──────────────────────
 
 export async function getCreativeAdId(creativeName: string) {

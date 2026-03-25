@@ -26,6 +26,7 @@ import {
   Save,
   ArrowRight,
   Clock,
+  GripVertical,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -34,9 +35,21 @@ import {
   saveBenchmarkConfig,
   runClassification,
   getCreativeAdId,
+  updateCreativeStatus,
 } from "@/actions/creative-pipeline";
 import { VideoModal } from "@/components/ads/video-modal";
 import type { CreativeStatus } from "@prisma/client";
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  useDroppable,
+  useDraggable,
+  type DragStartEvent,
+  type DragEndEvent,
+} from "@dnd-kit/core";
 
 // ─── STATUS CONFIG ────────────────────────────────
 
@@ -152,16 +165,16 @@ type ClassifiedCreative = {
 type PipelineData = Awaited<ReturnType<typeof getCreativePipeline>>;
 type BenchmarkData = Awaited<ReturnType<typeof getBenchmarkConfig>>;
 
-// ─── CREATIVE CARD ────────────────────────────────
+// ─── CREATIVE CARD (static, used for DragOverlay) ─
 
-function CreativeCard({
+function CreativeCardContent({
   creative,
   benchmark,
-  onClick,
+  isDragging,
 }: {
   creative: ClassifiedCreative;
   benchmark: BenchmarkData;
-  onClick?: () => void;
+  isDragging?: boolean;
 }) {
   const sc = STATUS_CONFIG[creative.status];
   const ctr =
@@ -181,16 +194,7 @@ function CreativeCard({
 
   return (
     <Card
-      className={`group overflow-hidden transition-colors duration-300 border border-border/40 hover:border-border/60 shadow-none rounded-xl border-l-4 cursor-pointer ${borderColor}`}
-      onClick={onClick}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if ((e.key === "Enter" || e.key === " ") && onClick) {
-          e.preventDefault();
-          onClick();
-        }
-      }}
+      className={`group overflow-hidden transition-colors duration-300 border border-border/40 hover:border-border/60 shadow-none rounded-xl border-l-4 cursor-pointer ${borderColor} ${isDragging ? "shadow-xl ring-2 ring-primary/40 rotate-2 scale-105" : ""}`}
     >
       {/* Thumbnail */}
       <div className="relative aspect-video bg-muted flex items-center justify-center overflow-hidden">
@@ -206,6 +210,13 @@ function CreativeCard({
         ) : (
           <ImageIcon className="w-8 h-8 text-muted-foreground/30" />
         )}
+
+        {/* Drag handle indicator */}
+        <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="bg-black/50 backdrop-blur-sm rounded p-0.5">
+            <GripVertical className="w-3.5 h-3.5 text-white" />
+          </div>
+        </div>
 
         {/* Status badge on thumbnail */}
         <div className="absolute top-2 right-2">
@@ -308,7 +319,36 @@ function CreativeCard({
   );
 }
 
-// ─── KANBAN COLUMN ────────────────────────────────
+// ─── DRAGGABLE CREATIVE CARD ─────────────────────
+
+function DraggableCreativeCard({
+  creative,
+  benchmark,
+  onClick,
+}: {
+  creative: ClassifiedCreative;
+  benchmark: BenchmarkData;
+  onClick?: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: creative.id,
+    data: { creative },
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      onClick={onClick}
+      style={{ opacity: isDragging ? 0.3 : 1 }}
+    >
+      <CreativeCardContent creative={creative} benchmark={benchmark} />
+    </div>
+  );
+}
+
+// ─── DROPPABLE KANBAN COLUMN ─────────────────────
 
 function KanbanColumn({
   status,
@@ -321,6 +361,10 @@ function KanbanColumn({
   benchmark: BenchmarkData;
   onCreativeClick?: (creative: ClassifiedCreative) => void;
 }) {
+  const { isOver, setNodeRef } = useDroppable({
+    id: `column-${status}`,
+    data: { status },
+  });
   const sc = STATUS_CONFIG[status];
   const Icon = sc.icon;
 
@@ -341,20 +385,25 @@ function KanbanColumn({
         </Badge>
       </div>
 
-      {/* Cards Container */}
+      {/* Cards Container (droppable) */}
       <div
-        className={`flex-1 overflow-y-auto space-y-3 p-3 border ${sc.border} border-t-0 rounded-b-xl bg-card/30 min-h-[200px] max-h-[calc(100vh-260px)]`}
+        ref={setNodeRef}
+        className={`flex-1 overflow-y-auto space-y-3 p-3 border ${sc.border} border-t-0 rounded-b-xl min-h-[200px] max-h-[calc(100vh-260px)] transition-colors duration-200 ${
+          isOver
+            ? `${sc.bg} ring-2 ${sc.border}`
+            : "bg-card/30"
+        }`}
       >
         {creatives.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-center opacity-50">
             <Icon className="w-8 h-8 text-muted-foreground/30 mb-2" />
             <p className="text-xs text-muted-foreground">
-              Nenhum criativo
+              {isOver ? "Solte aqui" : "Nenhum criativo"}
             </p>
           </div>
         ) : (
           creatives.map((creative) => (
-            <CreativeCard
+            <DraggableCreativeCard
               key={creative.id}
               creative={creative}
               benchmark={benchmark}
@@ -383,6 +432,16 @@ export default function EsteiraPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [selectedCreative, setSelectedCreative] = useState<any>(null);
   const [loadingCreative, setLoadingCreative] = useState(false);
+
+  // Drag state
+  const [activeDragCreative, setActiveDragCreative] = useState<ClassifiedCreative | null>(null);
+
+  // Require 8px movement to start drag (so clicks still work)
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    })
+  );
 
   // Config form state
   const [configForm, setConfigForm] = useState({
@@ -482,6 +541,46 @@ export default function EsteiraPage() {
       toast.error("Erro ao carregar criativo");
     } finally {
       setLoadingCreative(false);
+    }
+  };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const creative = event.active.data.current?.creative as ClassifiedCreative;
+    setActiveDragCreative(creative ?? null);
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    setActiveDragCreative(null);
+
+    const { active, over } = event;
+    if (!over) return;
+
+    const creative = active.data.current?.creative as ClassifiedCreative;
+    const targetStatus = over.data.current?.status as CreativeStatus;
+
+    if (!creative || !targetStatus || creative.status === targetStatus) return;
+
+    // Optimistic update
+    setData((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        creatives: prev.creatives.map((c) =>
+          c.id === creative.id
+            ? { ...c, previousStatus: c.status, status: targetStatus }
+            : c
+        ),
+      };
+    });
+
+    const result = await updateCreativeStatus(creative.id, targetStatus);
+    if (result.success) {
+      toast.success(
+        `"${creative.creativeName}" movido para ${STATUS_CONFIG[targetStatus].label}`
+      );
+    } else {
+      toast.error(result.error || "Erro ao mover criativo");
+      await loadData(); // Revert on error
     }
   };
 
@@ -741,19 +840,38 @@ export default function EsteiraPage() {
         </Card>
       )}
 
-      {/* Kanban Board */}
+      {/* Kanban Board with Drag & Drop */}
       {totalCreatives > 0 && (
-        <div className="flex gap-4 overflow-x-auto pb-4 -mx-2 px-2">
-          {KANBAN_ORDER.map((status) => (
-            <KanbanColumn
-              key={status}
-              status={status}
-              creatives={creativesByStatus[status]}
-              benchmark={benchmark}
-              onCreativeClick={handleCreativeClick}
-            />
-          ))}
-        </div>
+        <DndContext
+          sensors={sensors}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="flex gap-4 overflow-x-auto pb-4 -mx-2 px-2">
+            {KANBAN_ORDER.map((status) => (
+              <KanbanColumn
+                key={status}
+                status={status}
+                creatives={creativesByStatus[status]}
+                benchmark={benchmark}
+                onCreativeClick={handleCreativeClick}
+              />
+            ))}
+          </div>
+
+          {/* Drag Overlay — ghost card that follows cursor */}
+          <DragOverlay dropAnimation={null}>
+            {activeDragCreative ? (
+              <div className="w-[300px]">
+                <CreativeCardContent
+                  creative={activeDragCreative}
+                  benchmark={benchmark}
+                  isDragging
+                />
+              </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
       )}
 
       {/* Benchmark Info Footer */}
