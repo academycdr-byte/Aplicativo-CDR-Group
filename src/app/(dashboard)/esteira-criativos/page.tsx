@@ -177,27 +177,30 @@ function CreativeCardContent({
   isDragging?: boolean;
 }) {
   const sc = STATUS_CONFIG[creative.status];
-  const ctr =
-    creative.impressions > 0
-      ? (creative.clicks / creative.impressions) * 100
-      : 0;
 
   const roasIdeal = benchmark?.roasIdeal ?? 2.5;
   const roasBreakeven = benchmark?.roasBreakeven ?? 1.5;
 
-  const borderColor =
+  const roasColor =
     creative.roas >= roasIdeal
-      ? "border-l-emerald-500"
+      ? "text-emerald-500"
       : creative.roas >= roasBreakeven
-      ? "border-l-amber-500"
-      : "border-l-red-500";
+      ? "text-amber-500"
+      : "text-red-500";
+
+  const roasBg =
+    creative.roas >= roasIdeal
+      ? "bg-emerald-500/10"
+      : creative.roas >= roasBreakeven
+      ? "bg-amber-500/10"
+      : "bg-red-500/10";
 
   return (
     <Card
-      className={`group overflow-hidden transition-colors duration-300 border border-border/40 hover:border-border/60 shadow-none rounded-xl border-l-4 cursor-pointer ${borderColor} ${isDragging ? "shadow-xl ring-2 ring-primary/40 rotate-2 scale-105" : ""}`}
+      className={`group overflow-hidden transition-all duration-300 border border-border/40 hover:border-border/60 shadow-none rounded-xl cursor-pointer ${isDragging ? "shadow-xl ring-2 ring-primary/40 rotate-2 scale-105" : ""}`}
     >
       {/* Thumbnail */}
-      <div className="relative aspect-video bg-muted flex items-center justify-center overflow-hidden">
+      <div className="relative aspect-[4/3] bg-muted flex items-center justify-center overflow-hidden">
         {creative.thumbnailUrl ? (
           <Image
             src={creative.thumbnailUrl}
@@ -218,7 +221,7 @@ function CreativeCardContent({
           </div>
         </div>
 
-        {/* Status badge on thumbnail */}
+        {/* Status badge */}
         <div className="absolute top-2 right-2">
           <Badge
             variant="secondary"
@@ -243,75 +246,43 @@ function CreativeCardContent({
               </Badge>
             </div>
           )}
+
+        {/* ROAS overlay badge — bottom right */}
+        <div className="absolute bottom-2 right-2">
+          <div className={`${roasBg} backdrop-blur-md rounded-lg px-2.5 py-1`}>
+            <span className={`font-bold text-base ${roasColor}`}>
+              {creative.roas.toFixed(2)}x
+            </span>
+          </div>
+        </div>
       </div>
 
-      <CardContent className="p-3 space-y-2.5">
+      <CardContent className="p-3 space-y-2">
         {/* Name */}
-        <div className="min-w-0">
-          <p
-            className="font-semibold text-sm truncate"
-            title={creative.creativeName}
-          >
-            {creative.creativeName}
-          </p>
-          <div className="flex items-center gap-1 mt-0.5">
-            <Clock className="w-3 h-3 text-muted-foreground/50" />
-            <span className="text-[10px] text-muted-foreground">
-              {timeAgo(creative.lastClassifiedAt)}
-            </span>
-          </div>
-        </div>
+        <p
+          className="font-semibold text-[13px] truncate leading-tight"
+          title={creative.creativeName}
+        >
+          {creative.creativeName}
+        </p>
 
-        {/* Primary Metrics: Gasto + ROAS */}
-        <div className="flex items-end justify-between border-b border-border/50 pb-2">
-          <div className="min-w-0">
-            <p className="text-[10px] text-muted-foreground uppercase">Gasto</p>
-            <p className="font-semibold text-sm truncate">{fmt(creative.spend)}</p>
+        {/* Metrics — 2x2 grid, clean and focused */}
+        <div className="grid grid-cols-2 gap-2">
+          <div className="bg-muted/50 rounded-lg px-2.5 py-2">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Gasto</p>
+            <p className="font-semibold text-sm mt-0.5">{fmt(creative.spend)}</p>
           </div>
-          <div className="text-right shrink-0 ml-2">
-            <p className="text-[10px] text-muted-foreground uppercase">ROAS</p>
-            <p
-              className={`font-bold text-lg ${
-                creative.roas >= roasIdeal
-                  ? "text-emerald-500"
-                  : creative.roas >= roasBreakeven
-                  ? "text-amber-500"
-                  : "text-red-500"
-              }`}
-            >
-              {creative.roas.toFixed(2)}x
-            </p>
+          <div className="bg-muted/50 rounded-lg px-2.5 py-2">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Receita</p>
+            <p className="font-semibold text-sm mt-0.5 text-emerald-500">{fmt(creative.revenue)}</p>
           </div>
-        </div>
-
-        {/* Secondary Metrics Grid */}
-        <div className="grid grid-cols-3 gap-y-1.5 text-xs">
-          <div className="min-w-0">
-            <p className="text-muted-foreground">Impr.</p>
-            <p className="font-medium truncate">{fmtNum(creative.impressions)}</p>
+          <div className={`${roasBg} rounded-lg px-2.5 py-2`}>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">ROAS</p>
+            <p className={`font-bold text-sm mt-0.5 ${roasColor}`}>{creative.roas.toFixed(2)}x</p>
           </div>
-          <div className="min-w-0">
-            <p className="text-muted-foreground">Cliques</p>
-            <p className="font-medium truncate">{fmtNum(creative.clicks)}</p>
-          </div>
-          <div className="text-right min-w-0">
-            <p className="text-muted-foreground">CTR</p>
-            <p className="font-medium">{ctr.toFixed(2)}%</p>
-          </div>
-
-          <div className="col-span-3 pt-1.5 flex justify-between border-t border-border/50 mt-1">
-            <span className="text-muted-foreground text-[11px]">
-              Receita:{" "}
-              <span className="text-foreground font-medium">
-                {fmt(creative.revenue)}
-              </span>
-            </span>
-            <span className="text-muted-foreground text-[11px]">
-              Compras:{" "}
-              <span className="text-foreground font-medium">
-                {creative.purchases}
-              </span>
-            </span>
+          <div className="bg-muted/50 rounded-lg px-2.5 py-2">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Compras</p>
+            <p className="font-semibold text-sm mt-0.5">{creative.purchases}</p>
           </div>
         </div>
       </CardContent>
