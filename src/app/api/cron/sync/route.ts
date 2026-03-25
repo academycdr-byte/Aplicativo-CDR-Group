@@ -23,6 +23,38 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    // ONE-TIME FIX: Reset stale Facebook Ads cursors that completed with the old buggy code.
+    // Old code skipped pages during Phase 2 (big range fetch), marking phases as "complete"
+    // when data was actually incomplete. This resets those cursors to Phase 1 so the new
+    // day-by-day code re-fetches all 30 days correctly.
+    // Safe to run multiple times — only resets cursors at Phase 3+ (already "past" Phase 2).
+    const staleIntegrations = await prisma.integration.findMany({
+      where: { platform: "FACEBOOK_ADS", status: "CONNECTED" },
+      select: { id: true, metadata: true },
+    });
+
+    let resetCount = 0;
+    for (const integration of staleIntegrations) {
+      const meta = (integration.metadata as Record<string, unknown>) || {};
+      const cursor = meta.fbSyncCursor as { nextPhase?: number } | undefined;
+      // Reset if cursor is at Phase 3+ (meaning Phase 2 "completed" with old buggy code)
+      if (cursor && cursor.nextPhase && cursor.nextPhase >= 3) {
+        const { fbSyncCursor: _, ...rest } = meta;
+        await prisma.integration.update({
+          where: { id: integration.id },
+          data: {
+            metadata: rest as Record<string, string | number | boolean | null>,
+            syncStatus: "IDLE",
+            errorMessage: null,
+          },
+        });
+        resetCount++;
+      }
+    }
+    if (resetCount > 0) {
+      console.log(`[cron] Reset ${resetCount} stale Facebook Ads cursors to Phase 1`);
+    }
+
     const organizations = await prisma.organization.findMany({
       where: {
         integrations: {
@@ -56,6 +88,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       organizations: results.length,
+      cursorsReset: resetCount,
       results,
     });
   } catch (error) {
