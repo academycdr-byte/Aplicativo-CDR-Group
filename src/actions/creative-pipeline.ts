@@ -176,6 +176,7 @@ export async function getCreativeAdId(creativeName: string) {
 export async function getCreativePipeline(): Promise<{
   creatives: ClassifiedCreative[];
   summary: PipelineSummary;
+  lastUpdatedAt: Date | null;
 } | null> {
   const ctx = await getSessionWithOrg();
   if (!ctx) return null;
@@ -211,11 +212,17 @@ export async function getCreativePipeline(): Promise<{
     };
   });
 
+  // Find the most recent classification timestamp
+  const lastUpdatedAt = creatives.length > 0
+    ? new Date(Math.max(...creatives.map((c) => c.lastClassifiedAt.getTime())))
+    : null;
+
   return {
     creatives: mapped,
     summary: {
       total: mapped.length,
       byStatus,
     },
+    lastUpdatedAt,
   };
 }

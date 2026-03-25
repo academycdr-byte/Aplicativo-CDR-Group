@@ -627,6 +627,11 @@ export default function EsteiraPage() {
             {totalCreatives > 0
               ? `${totalCreatives} criativos classificados`
               : "Classificação automática por performance"}
+            {data?.lastUpdatedAt && (
+              <span className="ml-2 text-xs text-muted-foreground/70">
+                · Última atualização: {new Date(data.lastUpdatedAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+              </span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2">
