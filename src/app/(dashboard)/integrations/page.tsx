@@ -446,7 +446,7 @@ function IntegrationsContent() {
     let totalSynced = 0;
     let iteration = 0;
     let consecutiveErrors = 0;
-    const MAX_ITERATIONS = 20;
+    const MAX_ITERATIONS = 50;
     const MAX_CONSECUTIVE_ERRORS = 3;
 
     while (hasMore && iteration < MAX_ITERATIONS && consecutiveErrors < MAX_CONSECUTIVE_ERRORS) {
