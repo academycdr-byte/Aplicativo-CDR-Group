@@ -127,6 +127,10 @@ model Organization {
   supplierPayments SupplierPayment[]
   financialEntries FinancialEntry[]
 
+  // Creative Pipeline
+  creativeBenchmark        CreativeBenchmark?
+  creativeClassifications  CreativeClassification[]
+
   @@map("organizations")
 }
 
@@ -508,4 +512,52 @@ model ReportLog {
   client    ReportClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@map("report_logs")
+}
+
+// ─── CREATIVE PIPELINE (ESTEIRA DE CRIATIVOS) ────
+
+enum CreativeStatus {
+  EM_TESTE
+  CAMPEOES_ATIVOS
+  RECICLAGEM
+  DESATIVADOS
+  CAMPEOES_INATIVOS
+}
+
+model CreativeBenchmark {
+  id             String       @id @default(cuid())
+  organizationId String       @unique
+  roasBreakeven  Decimal      @db.Decimal(5, 2) @default(1.5)
+  roasIdeal      Decimal      @db.Decimal(5, 2) @default(2.5)
+  minPurchases   Int          @default(5)
+  lookbackDays   Int          @default(7)
+  updatedAt      DateTime     @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("creative_benchmarks")
+}
+
+model CreativeClassification {
+  id               String          @id @default(cuid())
+  organizationId   String
+  creativeName     String
+  status           CreativeStatus
+  previousStatus   CreativeStatus?
+  roas             Decimal         @db.Decimal(10, 2) @default(0)
+  purchases        Int             @default(0)
+  spend            Decimal         @db.Decimal(10, 2) @default(0)
+  revenue          Decimal         @db.Decimal(10, 2) @default(0)
+  impressions      Int             @default(0)
+  clicks           Int             @default(0)
+  thumbnailUrl     String?
+  lastClassifiedAt DateTime        @default(now())
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  organization     Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, creativeName])
+  @@index([organizationId, status])
+  @@map("creative_classifications")
 }

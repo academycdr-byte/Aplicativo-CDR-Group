@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { syncAllPlatforms } from "@/lib/integrations/sync";
+import { classifyCreativesForOrg } from "@/lib/creative-pipeline-engine";
 
 export const maxDuration = 60;
 
@@ -35,10 +36,20 @@ export async function GET(request: NextRequest) {
 
     for (const org of organizations) {
       const orgResults = await syncAllPlatforms(org.id);
+
+      // Auto-classify creatives after sync
+      let pipelineResult = null;
+      try {
+        pipelineResult = await classifyCreativesForOrg(org.id);
+      } catch (e) {
+        console.error(`[cron] Creative pipeline error for ${org.name}:`, e);
+      }
+
       results.push({
         organizationId: org.id,
         name: org.name,
         synced: orgResults,
+        creativePipeline: pipelineResult,
       });
     }
 
