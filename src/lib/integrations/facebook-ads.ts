@@ -327,6 +327,7 @@ async function saveInsightsToDB(
 interface FbSyncOptions {
   startPhase?: number;
   accountIndex?: number;
+  startDay?: number;
   syncLogId?: string;
   timeBudgetMs?: number;
   freshnessOnly?: boolean;
@@ -339,6 +340,7 @@ interface FbSyncResult {
   hasMore: boolean;
   nextPhase?: number;
   accountIndex?: number;
+  startDay?: number;
   syncLogId?: string;
 }
 
@@ -361,11 +363,14 @@ export async function syncFacebookAdsMetrics(
   let startAccountIndex = options.accountIndex;
   const meta = (integration.metadata as Record<string, unknown>) || {};
 
+  let startDay = options.startDay;
+
   if (!options.startPhase && !options.syncLogId) {
-    const cursor = meta.fbSyncCursor as { nextPhase?: number; accountIndex?: number; syncLogId?: string } | undefined;
+    const cursor = meta.fbSyncCursor as { nextPhase?: number; accountIndex?: number; startDay?: number; syncLogId?: string } | undefined;
     if (cursor?.nextPhase) {
       currentPhase = cursor.nextPhase;
       startAccountIndex = cursor.accountIndex;
+      startDay = cursor.startDay;
       options.syncLogId = cursor.syncLogId;
     }
   }
@@ -439,11 +444,11 @@ export async function syncFacebookAdsMetrics(
       `https://graph.facebook.com/${FB_GRAPH_VERSION}/act_${adAccountId}/insights?fields=${fields}&level=ad&time_range=${encodeURIComponent(JSON.stringify({ since, until }))}&time_increment=1&limit=500&action_attribution_windows=${encodeURIComponent(JSON.stringify(["7d_click", "1d_view"]))}&access_token=${accessToken}`;
 
     // Helper: save phase cursor and return hasMore
-    const saveCursorAndReturn = async (nextPhase: number, accountIdx?: number): Promise<FbSyncResult> => {
+    const saveCursorAndReturn = async (nextPhase: number, accountIdx?: number, dayIdx?: number): Promise<FbSyncResult> => {
       await prisma.integration.update({
         where: { id: integration.id },
         data: {
-          metadata: { ...latestMeta, fbSyncCursor: { nextPhase, accountIndex: accountIdx, syncLogId: logId } } as unknown as Record<string, string | number | boolean | null>,
+          metadata: { ...latestMeta, fbSyncCursor: { nextPhase, accountIndex: accountIdx, startDay: dayIdx, syncLogId: logId } } as unknown as Record<string, string | number | boolean | null>,
         },
       });
       if (logId) {
@@ -458,6 +463,7 @@ export async function syncFacebookAdsMetrics(
         hasMore: true,
         nextPhase,
         accountIndex: accountIdx,
+        startDay: dayIdx,
         syncLogId: logId,
       };
     };
@@ -561,7 +567,10 @@ export async function syncFacebookAdsMetrics(
     // PHASE 0: MANDATORY FRESHNESS (Today only — fast)
     // Only fetch today for speed. Phase 1 re-syncs last 7 days (including yesterday).
     // This keeps Phase 0 lightweight so Phase 1 can run within the time budget.
-    if (currentPhase <= 1) {
+    // OPTIMIZATION: Skip Phase 0 when resuming mid-Phase 1 (startDay > 1 or accountIndex > 0)
+    // to maximize time for completing the stuck phase.
+    const isResumingMidPhase1 = currentPhase === 1 && (startAccountIndex !== undefined && (startAccountIndex > 0 || (startDay && startDay > 1)));
+    if (currentPhase <= 1 && !isResumingMidPhase1) {
       console.log(`[Facebook Ads] Phase 0: Fetching today's data for freshness`);
 
       let tokenExpiredDetected = false;
@@ -656,13 +665,17 @@ export async function syncFacebookAdsMetrics(
     // Fetch DAY-BY-DAY instead of 7-day range to ensure each day completes
     // independently. Meta API returns results in non-deterministic order within
     // a multi-day range, so incomplete pagination causes random days to be missing.
+    // FIX: Resume from saved day index (startDay) so large accounts don't restart
+    // from day 1 each time, which caused infinite loops on accounts with many ads.
     if (currentPhase <= 1) {
       const startIdx = (currentPhase === 1 && startAccountIndex !== undefined) ? startAccountIndex : 0;
       for (let ai = startIdx; ai < accountIds.length; ai++) {
         if (!hasTimeLeft()) return saveCursorAndReturn(1, ai);
+        // Resume from saved day if this is the account we were working on
+        const resumeDay = (ai === startIdx && startDay) ? startDay : 1;
         // Fetch each day separately: yesterday (1) back to 7 days ago
-        for (let d = 1; d <= 7; d++) {
-          if (!hasTimeLeft()) return saveCursorAndReturn(1, ai);
+        for (let d = resumeDay; d <= 7; d++) {
+          if (!hasTimeLeft()) return saveCursorAndReturn(1, ai, d);
           try {
             const dayStr = daysAgo(d);
             const result = await fetchAndSavePageByPage(
@@ -671,11 +684,13 @@ export async function syncFacebookAdsMetrics(
             );
             if (result.tokenExpired) return abortTokenExpired();
             totalSynced += result.synced;
-            if (result.timedOut) return saveCursorAndReturn(1, ai);
+            if (result.timedOut) return saveCursorAndReturn(1, ai, d + 1);
           } catch (err) {
             accountErrors.push(`Phase1 act_${accountIds[ai]} day-${d}: ${err instanceof Error ? err.message : "Unknown"}`);
           }
         }
+        // Reset startDay when moving to next account
+        startDay = undefined;
       }
       startAccountIndex = undefined;
       if (!hasTimeLeft()) return saveCursorAndReturn(2);
