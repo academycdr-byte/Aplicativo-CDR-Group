@@ -896,6 +896,69 @@ async function fetchAllPages(startUrl: string): Promise<FbAdAccount[]> {
   return results;
 }
 
+/**
+ * Exchange a short-lived token for a long-lived one (60 days).
+ * If the token is already long-lived, the API returns it unchanged.
+ */
+export async function exchangeForLongLivedToken(shortLivedToken: string): Promise<string> {
+  const clientId = process.env.FACEBOOK_APP_ID?.trim();
+  const clientSecret = process.env.FACEBOOK_APP_SECRET?.trim();
+
+  if (!clientId || !clientSecret) {
+    throw new Error("FACEBOOK_APP_ID ou FACEBOOK_APP_SECRET não configurado");
+  }
+
+  const response = await fetch(
+    `https://graph.facebook.com/${FB_GRAPH_VERSION}/oauth/access_token?grant_type=fb_exchange_token&client_id=${clientId}&client_secret=${clientSecret}&fb_exchange_token=${shortLivedToken}`
+  );
+
+  if (!response.ok) {
+    // If exchange fails, return the original token (might already be long-lived)
+    console.warn("[Facebook Ads] Long-lived token exchange failed, using original token");
+    return shortLivedToken;
+  }
+
+  const data = await response.json();
+  return data.access_token || shortLivedToken;
+}
+
+/**
+ * Validate a Facebook token by making a simple API call.
+ * Returns the token's expiration info.
+ */
+export async function validateFacebookToken(token: string): Promise<{ valid: boolean; expiresAt?: Date; error?: string }> {
+  try {
+    const response = await fetch(
+      `https://graph.facebook.com/${FB_GRAPH_VERSION}/me?fields=id,name&access_token=${token}`
+    );
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      return { valid: false, error: err?.error?.message || `HTTP ${response.status}` };
+    }
+
+    // Check token debug info for expiration
+    const clientId = process.env.FACEBOOK_APP_ID?.trim();
+    const clientSecret = process.env.FACEBOOK_APP_SECRET?.trim();
+    let expiresAt: Date | undefined;
+
+    if (clientId && clientSecret) {
+      const debugResp = await fetch(
+        `https://graph.facebook.com/${FB_GRAPH_VERSION}/debug_token?input_token=${token}&access_token=${clientId}|${clientSecret}`
+      );
+      if (debugResp.ok) {
+        const debugData = await debugResp.json();
+        if (debugData.data?.expires_at) {
+          expiresAt = new Date(debugData.data.expires_at * 1000);
+        }
+      }
+    }
+
+    return { valid: true, expiresAt };
+  } catch {
+    return { valid: false, error: "Erro de rede ao validar token" };
+  }
+}
+
 export async function getFacebookAdAccounts(accessToken: string) {
   const accountMap = new Map<string, FbAdAccount>();
 

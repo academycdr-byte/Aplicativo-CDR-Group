@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Link2, Unlink, RefreshCw, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
-import { getIntegrations, connectApiKeyIntegration, saveShopifyCredentials, disconnectIntegration, selectFacebookAdAccount, selectMultipleFacebookAdAccounts, selectGoogleAnalyticsProperty } from "@/actions/integrations";
+import { getIntegrations, connectApiKeyIntegration, saveShopifyCredentials, disconnectIntegration, selectFacebookAdAccount, selectMultipleFacebookAdAccounts, selectGoogleAnalyticsProperty, connectFacebookManualToken } from "@/actions/integrations";
 import { syncPlatform } from "@/actions/sync";
 import { Platform } from "@prisma/client";
 
@@ -123,6 +123,9 @@ function IntegrationsContent() {
   const [gaProperties, setGaProperties] = useState<GA4Property[]>([]);
   const [selectedGaProperty, setSelectedGaProperty] = useState<string>("");
   const [gaSearch, setGaSearch] = useState("");
+  const [fbManualTokenDialog, setFbManualTokenDialog] = useState(false);
+  const [fbManualToken, setFbManualToken] = useState("");
+  const [fbManualTokenMsg, setFbManualTokenMsg] = useState("");
   const searchParams = useSearchParams();
 
   useEffect(() => {
@@ -631,6 +634,39 @@ function IntegrationsContent() {
     setLoading(false);
   }
 
+  async function handleFbManualConnect(e: React.FormEvent) {
+    e.preventDefault();
+    if (!fbManualToken.trim()) return;
+    setLoading(true);
+    setFbManualTokenMsg("");
+
+    const result = await connectFacebookManualToken(fbManualToken);
+
+    if (result.error) {
+      setFbManualTokenMsg(result.error);
+      setLoading(false);
+      return;
+    }
+
+    setFbManualTokenDialog(false);
+    setFbManualToken("");
+    loadIntegrations();
+
+    if (result.needsSelection && result.accounts) {
+      // Show account selection dialog
+      const accounts = result.accounts as FacebookAdAccount[];
+      setFbAccounts(accounts);
+      setSelectedFbAccount(accounts[0]?.id || "");
+      setSelectedFbAccounts([]);
+      setFbAccountDialog(true);
+      toast.success(`${accounts.length} contas encontradas! Selecione as contas para conectar.`);
+    } else {
+      toast.success("Facebook Ads conectado com sucesso! Sincronizando métricas...");
+      syncFacebookWithContinuation();
+    }
+    setLoading(false);
+  }
+
   async function handleDisconnect(platform: Platform) {
     if (!confirm("Tem certeza que deseja desconectar esta integração?")) return;
     const result = await disconnectIntegration(platform);
@@ -734,6 +770,16 @@ function IntegrationsContent() {
                       <Link2 className="w-4 h-4 mr-1" />
                       {platform.platform === "FACEBOOK_ADS" ? "Selecionar Conta" : "Selecionar Propriedade"}
                     </Button>
+                  ) : platform.platform === "FACEBOOK_ADS" ? (
+                    <div className="flex gap-1.5">
+                      <Button size="sm" onClick={() => openConnect(platform)}>
+                        <Link2 className="w-4 h-4 mr-1" />
+                        Conectar
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => { setFbManualToken(""); setFbManualTokenMsg(""); setFbManualTokenDialog(true); }}>
+                        Token
+                      </Button>
+                    </div>
                   ) : (
                     <Button size="sm" onClick={() => openConnect(platform)}>
                       <Link2 className="w-4 h-4 mr-1" />
@@ -810,6 +856,59 @@ function IntegrationsContent() {
               </Button>
               <Button type="submit" disabled={loading}>
                 {loading ? "Conectando..." : "Conectar Shopify"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Facebook Manual Token Dialog */}
+      <Dialog open={fbManualTokenDialog} onOpenChange={(open) => { setFbManualTokenDialog(open); if (!open) { setFbManualToken(""); setFbManualTokenMsg(""); } }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Conectar Facebook Ads com Token</DialogTitle>
+            <DialogDescription>
+              Cole um Access Token do Facebook. Pode ser de curta ou longa duração — será convertido automaticamente para token de 60 dias.
+            </DialogDescription>
+          </DialogHeader>
+
+          {fbManualTokenMsg && (
+            <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-lg p-3">
+              {fbManualTokenMsg}
+            </div>
+          )}
+
+          <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-200 text-sm rounded-lg p-3 space-y-2">
+            <div className="flex gap-2">
+              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+              <span className="text-xs font-semibold">Como obter o token:</span>
+            </div>
+            <ol className="text-xs space-y-1 ml-6 list-decimal">
+              <li>Acesse <strong>developers.facebook.com/tools/explorer</strong></li>
+              <li>Selecione o app <strong>CDR Group</strong></li>
+              <li>Em permissões, adicione: <strong>ads_read</strong>, <strong>ads_management</strong>, <strong>business_management</strong></li>
+              <li>Clique em <strong>Gerar Token de Acesso</strong></li>
+              <li>Cole o token abaixo</li>
+            </ol>
+          </div>
+
+          <form onSubmit={handleFbManualConnect} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Access Token do Facebook</Label>
+              <Input
+                value={fbManualToken}
+                onChange={(e) => setFbManualToken(e.target.value)}
+                placeholder="EAAxxxxxxxxxxxxxxxxxxxxxxx..."
+                required
+                type="password"
+              />
+            </div>
+            <div className="flex justify-end gap-3">
+              <Button type="button" variant="outline" onClick={() => setFbManualTokenDialog(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={loading || !fbManualToken.trim()}>
+                {loading ? "Conectando..." : "Conectar com Token"}
               </Button>
             </div>
           </form>

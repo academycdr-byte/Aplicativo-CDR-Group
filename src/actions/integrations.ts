@@ -382,6 +382,109 @@ export async function getSelectedFacebookAccounts() {
   return [];
 }
 
+/**
+ * Connect Facebook Ads using a manually provided access token.
+ * Bypasses OAuth flow (useful when Facebook App login is unavailable).
+ * Accepts short-lived or long-lived tokens — will auto-exchange for long-lived.
+ */
+export async function connectFacebookManualToken(token: string) {
+  const ctx = await getSessionWithOrg();
+  if (!ctx) return { error: "Não autenticado." };
+
+  if (ctx.role !== "OWNER" && ctx.role !== "ADMIN") {
+    return { error: "Você não tem permissão para gerenciar integrações." };
+  }
+
+  const cleanToken = token.trim();
+  if (!cleanToken) {
+    return { error: "Token é obrigatório." };
+  }
+
+  try {
+    // Dynamic import to avoid circular deps
+    const { validateFacebookToken, exchangeForLongLivedToken, getFacebookAdAccounts } = await import("@/lib/integrations/facebook-ads");
+
+    // 1. Validate the token
+    const validation = await validateFacebookToken(cleanToken);
+    if (!validation.valid) {
+      return { error: `Token inválido: ${validation.error}` };
+    }
+
+    // 2. Exchange for long-lived token (60 days)
+    const longLivedToken = await exchangeForLongLivedToken(cleanToken);
+
+    // 3. Get token expiration
+    const longLivedValidation = await validateFacebookToken(longLivedToken);
+
+    // 4. Fetch all ad accounts
+    const adAccounts = await getFacebookAdAccounts(longLivedToken);
+
+    if (adAccounts.length === 0) {
+      return { error: "Nenhuma conta de anúncio encontrada. Verifique as permissões do token." };
+    }
+
+    const hasMultipleAccounts = adAccounts.length > 1;
+    const firstAccount = adAccounts[0];
+
+    // 5. Preserve existing selectedAccounts if reconnecting
+    const existing = await prisma.integration.findUnique({
+      where: { organizationId_platform: { organizationId: ctx.organization.id, platform: "FACEBOOK_ADS" } },
+      select: { metadata: true },
+    });
+    const prev = (existing?.metadata as Record<string, unknown>) || {};
+
+    // 6. Upsert integration
+    await prisma.integration.upsert({
+      where: {
+        organizationId_platform: { organizationId: ctx.organization.id, platform: "FACEBOOK_ADS" },
+      },
+      create: {
+        organizationId: ctx.organization.id,
+        platform: "FACEBOOK_ADS",
+        status: hasMultipleAccounts ? "PENDING" : "CONNECTED",
+        accessToken: encrypt(longLivedToken),
+        externalAccountId: hasMultipleAccounts ? "" : (firstAccount?.id?.replace("act_", "") || ""),
+        tokenExpiresAt: longLivedValidation.expiresAt || null,
+        metadata: {
+          adAccounts: adAccounts.map((a: { id: string; name: string; account_status: number }) => ({
+            id: a.id,
+            name: a.name,
+            account_status: a.account_status,
+          })),
+        },
+      },
+      update: {
+        status: hasMultipleAccounts ? "PENDING" : "CONNECTED",
+        accessToken: encrypt(longLivedToken),
+        externalAccountId: hasMultipleAccounts ? "" : (firstAccount?.id?.replace("act_", "") || ""),
+        tokenExpiresAt: longLivedValidation.expiresAt || null,
+        metadata: {
+          ...prev,
+          adAccounts: adAccounts.map((a: { id: string; name: string; account_status: number }) => ({
+            id: a.id,
+            name: a.name,
+            account_status: a.account_status,
+          })),
+          // Clear stale sync cursor since token changed
+          fbSyncCursor: undefined,
+        },
+        errorMessage: null,
+        syncStatus: "IDLE",
+      },
+    });
+
+    return {
+      success: true,
+      accounts: adAccounts.map((a: { id: string; name: string }) => ({ id: a.id, name: a.name })),
+      needsSelection: hasMultipleAccounts,
+    };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Erro desconhecido";
+    console.error("[connectFacebookManualToken] Error:", msg);
+    return { error: `Erro ao conectar: ${msg}` };
+  }
+}
+
 export async function selectGoogleAnalyticsProperty(propertyId: string) {
   const ctx = await getSessionWithOrg();
   if (!ctx) return { error: "Não autenticado." };
