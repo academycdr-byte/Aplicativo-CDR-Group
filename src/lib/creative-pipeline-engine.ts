@@ -111,6 +111,10 @@ export async function classifyCreativesForOrg(orgId: string) {
       transitions.push({ name, from: prevStatus, to: newStatus });
     }
 
+    // Only update previousStatus when the status actually changes
+    // to preserve meaningful transition history
+    const statusChanged = prevStatus !== null && prevStatus !== newStatus;
+
     return prisma.creativeClassification.upsert({
       where: {
         organizationId_creativeName: { organizationId: orgId, creativeName: name },
@@ -131,7 +135,7 @@ export async function classifyCreativesForOrg(orgId: string) {
       },
       update: {
         status: newStatus,
-        previousStatus: prevStatus,
+        ...(statusChanged ? { previousStatus: prevStatus } : {}),
         roas,
         purchases: data.purchases,
         spend: data.spend,
