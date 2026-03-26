@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { getSessionWithOrg } from "@/lib/session";
 import { getDateRange, getPreviousDateRange, buildDateFilter, buildDateOnlyFilter, toDateKeyBrasilia, toDateKeyDateOnly } from "@/lib/date-utils";
+import { unstable_cache } from "next/cache";
 
 export async function getDashboardData(days: number = 30, from?: string, to?: string, orgId?: string) {
   if (!orgId) {
@@ -12,67 +13,58 @@ export async function getDashboardData(days: number = 30, from?: string, to?: st
   }
 
   const range = getDateRange(days, from, to);
-  const dateFilter = buildDateFilter(range);
-  const dateOnlyFilter = buildDateOnlyFilter(range);
   const prevRange = getPreviousDateRange(days, from, to);
-  const prevDateFilter = buildDateFilter(prevRange);
+  const dateOnlyFilter = buildDateOnlyFilter(range);
   const prevDateOnlyFilter = buildDateOnlyFilter(prevRange);
 
-  const [
-    totalOrders,
-    prevTotalOrders,
-    revenue,
-    prevRevenue,
-    generatedRev,
-    prevGeneratedRev,
-    adSpend,
-    prevAdSpend,
-    adRevenue,
-  ] = await prisma.$transaction([
-    prisma.order.count({
-      where: { organizationId: orgId, orderDate: dateFilter, status: { in: ["paid", "partially_refunded"] } },
-    }),
-    prisma.order.count({
-      where: { organizationId: orgId, orderDate: prevDateFilter, status: { in: ["paid", "partially_refunded"] } },
-    }),
-    prisma.order.aggregate({
-      where: { organizationId: orgId, orderDate: dateFilter, status: { in: ["paid", "partially_refunded"] } },
-      _sum: { totalAmount: true },
-    }),
-    prisma.order.aggregate({
-      where: { organizationId: orgId, orderDate: prevDateFilter, status: { in: ["paid", "partially_refunded"] } },
-      _sum: { totalAmount: true },
-    }),
-    // Faturamento Gerado: all orders from the store except refunded/cancelled
-    prisma.order.aggregate({
-      where: { organizationId: orgId, orderDate: dateFilter, status: { notIn: ["refunded", "cancelled"] } },
-      _sum: { totalAmount: true },
-    }),
-    prisma.order.aggregate({
-      where: { organizationId: orgId, orderDate: prevDateFilter, status: { notIn: ["refunded", "cancelled"] } },
-      _sum: { totalAmount: true },
-    }),
-    prisma.adMetric.aggregate({
-      where: { organizationId: orgId, date: dateOnlyFilter },
-      _sum: { spend: true },
-    }),
-    prisma.adMetric.aggregate({
-      where: { organizationId: orgId, date: prevDateOnlyFilter },
-      _sum: { spend: true },
-    }),
-    prisma.adMetric.aggregate({
-      where: { organizationId: orgId, date: dateOnlyFilter },
-      _sum: { revenue: true },
-    }),
+  // Consolidate 9 Prisma queries into 2 raw SQL queries (1 for orders, 1 for ads)
+  type OrderKPIs = {
+    paid_count: bigint; paid_revenue: number;
+    prev_paid_count: bigint; prev_paid_revenue: number;
+    generated_revenue: number; prev_generated_revenue: number;
+  };
+  type AdKPIs = {
+    spend: number; prev_spend: number; revenue: number;
+  };
+
+  const [orderKPIs, adKPIs] = await Promise.all([
+    prisma.$queryRaw<OrderKPIs[]>`
+      SELECT
+        COUNT(*) FILTER (WHERE "orderDate" >= ${range.since} AND "orderDate" <= ${range.until} AND status IN ('paid','partially_refunded')) as paid_count,
+        COALESCE(SUM("totalAmount") FILTER (WHERE "orderDate" >= ${range.since} AND "orderDate" <= ${range.until} AND status IN ('paid','partially_refunded')), 0) as paid_revenue,
+        COUNT(*) FILTER (WHERE "orderDate" >= ${prevRange.since} AND "orderDate" <= ${prevRange.until} AND status IN ('paid','partially_refunded')) as prev_paid_count,
+        COALESCE(SUM("totalAmount") FILTER (WHERE "orderDate" >= ${prevRange.since} AND "orderDate" <= ${prevRange.until} AND status IN ('paid','partially_refunded')), 0) as prev_paid_revenue,
+        COALESCE(SUM("totalAmount") FILTER (WHERE "orderDate" >= ${range.since} AND "orderDate" <= ${range.until} AND status NOT IN ('refunded','cancelled')), 0) as generated_revenue,
+        COALESCE(SUM("totalAmount") FILTER (WHERE "orderDate" >= ${prevRange.since} AND "orderDate" <= ${prevRange.until} AND status NOT IN ('refunded','cancelled')), 0) as prev_generated_revenue
+      FROM orders
+      WHERE "organizationId" = ${orgId}
+        AND "orderDate" >= ${prevRange.since}
+        AND "orderDate" <= ${range.until}
+    `,
+    prisma.$queryRaw<AdKPIs[]>`
+      SELECT
+        COALESCE(SUM(spend) FILTER (WHERE date >= ${dateOnlyFilter.gte} AND date <= ${dateOnlyFilter.lte}), 0) as spend,
+        COALESCE(SUM(spend) FILTER (WHERE date >= ${prevDateOnlyFilter.gte} AND date <= ${prevDateOnlyFilter.lte}), 0) as prev_spend,
+        COALESCE(SUM(revenue) FILTER (WHERE date >= ${dateOnlyFilter.gte} AND date <= ${dateOnlyFilter.lte}), 0) as revenue
+      FROM ad_metrics
+      WHERE "organizationId" = ${orgId}
+        AND date >= ${prevDateOnlyFilter.gte}
+        AND date <= ${dateOnlyFilter.lte}
+    `,
   ]);
 
-  const currentRevenue = Number(revenue._sum.totalAmount || 0);
-  const previousRevenue = Number(prevRevenue._sum.totalAmount || 0);
-  const currentGeneratedRevenue = Number(generatedRev._sum.totalAmount || 0);
-  const previousGeneratedRevenue = Number(prevGeneratedRev._sum.totalAmount || 0);
-  const currentAdSpend = Number(adSpend._sum.spend || 0);
-  const previousAdSpend = Number(prevAdSpend._sum.spend || 0);
-  const currentAdRevenue = Number(adRevenue._sum.revenue || 0);
+  const o = orderKPIs[0];
+  const a = adKPIs[0];
+
+  const totalOrders = Number(o?.paid_count || 0);
+  const prevTotalOrders = Number(o?.prev_paid_count || 0);
+  const currentRevenue = Number(o?.paid_revenue || 0);
+  const previousRevenue = Number(o?.prev_paid_revenue || 0);
+  const currentGeneratedRevenue = Number(o?.generated_revenue || 0);
+  const previousGeneratedRevenue = Number(o?.prev_generated_revenue || 0);
+  const currentAdSpend = Number(a?.spend || 0);
+  const previousAdSpend = Number(a?.prev_spend || 0);
+  const currentAdRevenue = Number(a?.revenue || 0);
 
   function calcChange(current: number, previous: number): string {
     if (previous === 0) return current > 0 ? "+100%" : "0%";
@@ -160,12 +152,22 @@ export async function getMetricsAnalysis(days: number = 30, from?: string, to?: 
   const dateFilter = buildDateFilter(range);
   const dateOnlyFilter = buildDateOnlyFilter(range);
 
-  const [orders, adMetrics] = await prisma.$transaction([
-    prisma.order.findMany({
-      where: { organizationId: orgId, orderDate: dateFilter },
-      select: { orderDate: true, totalAmount: true, status: true },
-      orderBy: { orderDate: "asc" },
-    }),
+  // Use raw SQL to aggregate orders by day IN the database (instead of fetching all rows)
+  type OrderDayAgg = { day: string; total_amount: number; order_count: bigint };
+  const [ordersByDay, adMetrics] = await Promise.all([
+    prisma.$queryRaw<OrderDayAgg[]>`
+      SELECT
+        TO_CHAR("orderDate" AT TIME ZONE 'America/Sao_Paulo', 'YYYY-MM-DD') as day,
+        COALESCE(SUM("totalAmount"), 0) as total_amount,
+        COUNT(*) as order_count
+      FROM orders
+      WHERE "organizationId" = ${orgId}
+        AND "orderDate" >= ${range.since}
+        AND "orderDate" <= ${range.until}
+        AND status IN ('paid', 'partially_refunded')
+      GROUP BY day
+      ORDER BY day ASC
+    `,
     prisma.adMetric.groupBy({
       by: ["date"],
       where: { organizationId: orgId, date: dateOnlyFilter },
@@ -182,18 +184,13 @@ export async function getMetricsAnalysis(days: number = 30, from?: string, to?: 
     ticketMedio: number;
     cpa: number;
     roas: number;
-    // Facebook Ads attribution data (for accurate CPA/ROAS)
     fbConversions: number;
     fbRevenue: number;
   }> = {};
 
-  for (const o of orders) {
-    const key = toDateKeyBrasilia(o.orderDate);
-    if (!grouped[key]) grouped[key] = { date: key, faturamento: 0, investimento: 0, compras: 0, ticketMedio: 0, cpa: 0, roas: 0, fbConversions: 0, fbRevenue: 0 };
-    if (o.status === "paid" || o.status === "partially_refunded") {
-      grouped[key].faturamento += Number(o.totalAmount);
-      grouped[key].compras += 1;
-    }
+  for (const o of ordersByDay) {
+    const key = o.day;
+    grouped[key] = { date: key, faturamento: Number(o.total_amount), investimento: 0, compras: Number(o.order_count), ticketMedio: 0, cpa: 0, roas: 0, fbConversions: 0, fbRevenue: 0 };
   }
 
   for (const m of adMetrics) {
@@ -205,7 +202,6 @@ export async function getMetricsAnalysis(days: number = 30, from?: string, to?: 
   }
 
   // Compute derived metrics
-  // CPA and ROAS use Facebook Ads attribution data (conversions + revenue from FB)
   for (const d of Object.values(grouped)) {
     d.ticketMedio = d.compras > 0 ? d.faturamento / d.compras : 0;
     d.cpa = d.fbConversions > 0 ? d.investimento / d.fbConversions : 0;
@@ -274,23 +270,29 @@ export async function getPaidAndRepurchaseRates(days: number = 30, from?: string
   const dateFilter = buildDateFilter(range);
   const dateOnlyFilter = buildDateOnlyFilter(range);
 
-  // Run core queries + storeFunnel in PARALLEL (2 concurrent Neon round-trips max)
-  const [txResult, funnelData] = await Promise.all([
-    prisma.$transaction([
-      prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter } }),
-      prisma.order.count({ where: { organizationId: orgId, orderDate: dateFilter, status: "paid" } }),
-      prisma.order.findMany({
-        where: { organizationId: orgId, orderDate: dateFilter, customerEmail: { not: null } },
-        select: { customerEmail: true },
-      }),
-    ]),
+  // Run core queries + storeFunnel in PARALLEL
+  type CountResult = { cnt: bigint };
+  const [orderCounts, funnelData] = await Promise.all([
+    // Single raw SQL query instead of 3 separate Prisma queries
+    prisma.$queryRaw<{ total_orders: bigint; paid_orders: bigint; unique_emails: bigint }[]>`
+      SELECT
+        COUNT(*) as total_orders,
+        COUNT(*) FILTER (WHERE status = 'paid') as paid_orders,
+        COUNT(DISTINCT LOWER("customerEmail")) FILTER (WHERE "customerEmail" IS NOT NULL) as unique_emails
+      FROM orders
+      WHERE "organizationId" = ${orgId}
+        AND "orderDate" >= ${range.since}
+        AND "orderDate" <= ${range.until}
+    `,
     prisma.storeFunnel.findMany({
       where: { organizationId: orgId, platform: "SHOPIFY", date: dateOnlyFilter },
       select: { totalCustomers: true, returningCustomers: true },
     }).catch(() => [] as { totalCustomers: number; returningCustomers: number }[]),
   ]);
 
-  const [totalOrders, paidOrders, ordersInPeriod] = txResult;
+  const totalOrders = Number(orderCounts[0]?.total_orders || 0);
+  const paidOrders = Number(orderCounts[0]?.paid_orders || 0);
+  const uniqueEmailCount = Number(orderCounts[0]?.unique_emails || 0);
 
   let totalCustomersSum = 0;
   let returningCustomersSum = 0;
@@ -303,29 +305,31 @@ export async function getPaidAndRepurchaseRates(days: number = 30, from?: string
       returningCustomersSum += f.returningCustomers;
     }
   } else {
-    // Fallback: calculate from order data
-    const uniqueEmailsInPeriod = new Set<string>(ordersInPeriod.map((o) => o.customerEmail!.toLowerCase()));
-    totalCustomersSum = uniqueEmailsInPeriod.size;
+    // Fallback: count returning customers via SQL (much faster than fetching all emails)
+    totalCustomersSum = uniqueEmailCount;
 
-    if (uniqueEmailsInPeriod.size > 0) {
-      const emailCounts = await prisma.order.groupBy({
-        by: ["customerEmail"],
-        where: {
-          organizationId: orgId,
-          customerEmail: { in: Array.from(uniqueEmailsInPeriod) },
-        },
-        _count: { _all: true },
-      });
-
-      for (const ec of emailCounts) {
-        if (ec._count._all > 1) {
-          returningCustomersSum++;
-        }
-      }
+    if (uniqueEmailCount > 0) {
+      const repeaters = await prisma.$queryRaw<CountResult[]>`
+        SELECT COUNT(*) as cnt FROM (
+          SELECT LOWER("customerEmail") as email
+          FROM orders
+          WHERE "organizationId" = ${orgId}
+            AND "customerEmail" IS NOT NULL
+            AND LOWER("customerEmail") IN (
+              SELECT DISTINCT LOWER("customerEmail")
+              FROM orders
+              WHERE "organizationId" = ${orgId}
+                AND "orderDate" >= ${range.since}
+                AND "orderDate" <= ${range.until}
+                AND "customerEmail" IS NOT NULL
+            )
+          GROUP BY LOWER("customerEmail")
+          HAVING COUNT(*) > 1
+        ) as repeaters
+      `;
+      returningCustomersSum = Number(repeaters[0]?.cnt || 0);
     }
   }
-
-  const uniqueEmails = new Set<string>(ordersInPeriod.map((o) => o.customerEmail!.toLowerCase()));
 
   return {
     paidRate: totalOrders > 0 ? (paidOrders / totalOrders) * 100 : 0,
@@ -334,7 +338,7 @@ export async function getPaidAndRepurchaseRates(days: number = 30, from?: string
     repurchaseRate: totalCustomersSum > 0 ? (returningCustomersSum / totalCustomersSum) * 100 : 0,
     repeatCustomers: returningCustomersSum,
     totalCustomersInDays: totalCustomersSum,
-    uniqueCustomers: uniqueEmails.size,
+    uniqueCustomers: uniqueEmailCount,
   };
 }
 
@@ -452,36 +456,8 @@ export async function getDailyProfit(days: number = 30, from?: string, to?: stri
   const dateFilter = buildDateFilter(range);
   const dateOnlyFilter = buildDateOnlyFilter(range);
 
-  // Run ALL queries in parallel (config + core data + cost data)
-  // Previously costMap/supplierPayments ran sequentially AFTER config loaded.
-  // Now they run in parallel — unused results are discarded based on cmvMethod.
-  const [configResult, txResult, allProductCosts, allSupplierPayments] = await Promise.all([
-    prisma.financialConfig.findUnique({ where: { organizationId: orgId } }),
-    prisma.$transaction([
-      prisma.order.findMany({
-        where: { organizationId: orgId, orderDate: dateFilter, status: { in: ["paid", "partially_refunded"] } },
-        select: { orderDate: true, totalAmount: true, rawData: true },
-        orderBy: { orderDate: "asc" },
-      }),
-      prisma.adMetric.groupBy({
-        by: ["date"],
-        where: { organizationId: orgId, date: dateOnlyFilter },
-        _sum: { spend: true },
-        orderBy: { date: "asc" },
-      }),
-      prisma.financialEntry.findMany({
-        where: { organizationId: orgId, entryDate: dateFilter },
-        select: { entryDate: true, type: true, amount: true },
-      }),
-    ]),
-    prisma.productCost.findMany({ where: { organizationId: orgId } }),
-    prisma.supplierPayment.findMany({
-      where: { organizationId: orgId, paymentDate: dateFilter },
-      select: { paymentDate: true, amount: true },
-    }),
-  ]);
-
-  const [orders, adMetrics, financialEntries] = txResult;
+  // Fetch config FIRST to decide CMV method (determines whether we need rawData)
+  const configResult = await prisma.financialConfig.findUnique({ where: { organizationId: orgId } });
 
   const config = configResult || {
     defaultTaxRate: 0, fixedTransactionFee: 0, gatewayRate: 0,
@@ -497,6 +473,48 @@ export async function getDailyProfit(days: number = 30, from?: string, to?: stri
   const monthlyFixedCosts = Number(config.fixedCosts);
   const cbRate = Number(config.chargebackRate) / 100;
   const cmvMethod = String(config.cmvMethod || "sku");
+
+  const needsRawData = cmvMethod === "sku";
+
+  // Run remaining queries in parallel — only fetch rawData when SKU method is active
+  type OrderDayAgg = { day: string; total_amount: number; order_count: bigint };
+  const [ordersByDayAgg, ordersWithRawData, adMetrics, financialEntries, allProductCosts, allSupplierPayments] = await Promise.all([
+    // Aggregated order data (always needed — fast)
+    !needsRawData ? prisma.$queryRaw<OrderDayAgg[]>`
+      SELECT
+        TO_CHAR("orderDate" AT TIME ZONE 'America/Sao_Paulo', 'YYYY-MM-DD') as day,
+        COALESCE(SUM("totalAmount"), 0) as total_amount,
+        COUNT(*) as order_count
+      FROM orders
+      WHERE "organizationId" = ${orgId}
+        AND "orderDate" >= ${range.since}
+        AND "orderDate" <= ${range.until}
+        AND status IN ('paid', 'partially_refunded')
+      GROUP BY day
+      ORDER BY day ASC
+    ` : Promise.resolve([] as OrderDayAgg[]),
+    // Individual orders with rawData (only when SKU-based CMV)
+    needsRawData ? prisma.order.findMany({
+      where: { organizationId: orgId, orderDate: dateFilter, status: { in: ["paid", "partially_refunded"] } },
+      select: { orderDate: true, totalAmount: true, rawData: true },
+      orderBy: { orderDate: "asc" },
+    }) : Promise.resolve([]),
+    prisma.adMetric.groupBy({
+      by: ["date"],
+      where: { organizationId: orgId, date: dateOnlyFilter },
+      _sum: { spend: true },
+      orderBy: { date: "asc" },
+    }),
+    prisma.financialEntry.findMany({
+      where: { organizationId: orgId, entryDate: dateFilter },
+      select: { entryDate: true, type: true, amount: true },
+    }),
+    needsRawData ? prisma.productCost.findMany({ where: { organizationId: orgId } }) : Promise.resolve([]),
+    cmvMethod === "supplier_payments" ? prisma.supplierPayment.findMany({
+      where: { organizationId: orgId, paymentDate: dateFilter },
+      select: { paymentDate: true, amount: true },
+    }) : Promise.resolve([]),
+  ]);
 
   // Build cost map from pre-fetched data (no extra round-trip)
   const costMap = new Map<string, number>();
@@ -528,15 +546,15 @@ export async function getDailyProfit(days: number = 30, from?: string, to?: stri
   // Group orders by day
   const dailyData: Record<string, { revenue: number; orderCount: number; cogs: number; adSpend: number }> = {};
 
-  for (const order of orders) {
-    const key = toDateKeyBrasilia(order.orderDate);
-    if (!dailyData[key]) dailyData[key] = { revenue: 0, orderCount: 0, cogs: 0, adSpend: 0 };
-    const amount = Number(order.totalAmount);
-    dailyData[key].revenue += amount;
-    dailyData[key].orderCount += 1;
+  if (needsRawData) {
+    // SKU method: need individual orders with rawData for line item matching
+    for (const order of ordersWithRawData) {
+      const key = toDateKeyBrasilia(order.orderDate);
+      if (!dailyData[key]) dailyData[key] = { revenue: 0, orderCount: 0, cogs: 0, adSpend: 0 };
+      const amount = Number(order.totalAmount);
+      dailyData[key].revenue += amount;
+      dailyData[key].orderCount += 1;
 
-    // SKU-based COGS
-    if (cmvMethod === "sku") {
       const data = order.rawData as Record<string, unknown> | null;
       let items: Record<string, unknown>[] = [];
       if (data) {
@@ -550,6 +568,11 @@ export async function getDailyProfit(days: number = 30, from?: string, to?: stri
         const cost = costMap.get(sku);
         if (cost !== undefined) dailyData[key].cogs += cost * qty;
       }
+    }
+  } else {
+    // Non-SKU methods: use pre-aggregated data (much faster — no rawData transfer)
+    for (const o of ordersByDayAgg) {
+      dailyData[o.day] = { revenue: Number(o.total_amount), orderCount: Number(o.order_count), cogs: 0, adSpend: 0 };
     }
   }
 
@@ -612,23 +635,10 @@ export async function getDailyProfit(days: number = 30, from?: string, to?: stri
 }
 
 /**
- * Consolidated dashboard data loader.
- * Makes a SINGLE server action call (1 HTTP round-trip) instead of multiple.
- * Auth is checked once, orgId is passed directly to avoid redundant session lookups.
- * Only fetches data that the dashboard page actually renders (5 queries, not 8).
+ * Internal fetcher — runs the 5 parallel queries.
+ * Separated so it can be wrapped with unstable_cache.
  */
-export async function loadAllDashboardData(days: number = 30, from?: string, to?: string) {
-  let ctx;
-  try {
-    ctx = await getSessionWithOrg();
-  } catch (error) {
-    console.error("[loadAllDashboardData] Session error:", error);
-    return null;
-  }
-  if (!ctx) return null;
-
-  const orgId = ctx.organization.id;
-
+async function _fetchDashboardData(orgId: string, days: number, from?: string, to?: string) {
   const results = await Promise.allSettled([
     getDashboardData(days, from, to, orgId),
     getMetricsAnalysis(days, from, to, orgId),
@@ -653,4 +663,31 @@ export async function loadAllDashboardData(days: number = 30, from?: string, to?
     profitData: results[4].status === "fulfilled" ? results[4].value : { dailyProfits: [], totalProfit: 0 },
     failedCount: results.filter((r) => r.status === "rejected").length,
   };
+}
+
+/**
+ * Consolidated dashboard data loader with server-side caching.
+ * Cache: 15s revalidation — instant response on period switch within window.
+ * Auth is checked once, orgId is passed directly to avoid redundant session lookups.
+ */
+export async function loadAllDashboardData(days: number = 30, from?: string, to?: string) {
+  let ctx;
+  try {
+    ctx = await getSessionWithOrg();
+  } catch (error) {
+    console.error("[loadAllDashboardData] Session error:", error);
+    return null;
+  }
+  if (!ctx) return null;
+
+  const orgId = ctx.organization.id;
+  const cacheKey = `dashboard-${orgId}-${days}-${from || "x"}-${to || "x"}`;
+
+  const cachedFetch = unstable_cache(
+    () => _fetchDashboardData(orgId, days, from, to),
+    [cacheKey],
+    { revalidate: 15 }
+  );
+
+  return cachedFetch();
 }
