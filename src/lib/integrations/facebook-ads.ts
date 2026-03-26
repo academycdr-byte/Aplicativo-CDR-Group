@@ -229,9 +229,11 @@ async function saveInsightsToDB(
   thumbnails: Record<string, string>,
   videoUrls: Record<string, string>,
   accountId?: string,
+  currencyRate: number = 1,
 ): Promise<number> {
   if (insights.length === 0) return 0;
 
+  const rate = currencyRate;
   let synced = 0;
 
   // Batch upserts using Promise.all in groups of 50 for speed
@@ -290,11 +292,11 @@ async function saveInsightsToDB(
             impressions: parseInt(insight.impressions || "0"),
             reach: parseInt(insight.reach || "0"),
             clicks: parseInt(insight.clicks || "0"),
-            spend: parseFloat(insight.spend || "0"),
+            spend: parseFloat(insight.spend || "0") * rate,
             conversions,
             addToCart,
             initiateCheckout,
-            revenue,
+            revenue: revenue * rate,
             currency: "BRL",
             rawData: insight as unknown as Prisma.InputJsonValue,
           },
@@ -308,11 +310,11 @@ async function saveInsightsToDB(
             impressions: parseInt(insight.impressions || "0"),
             reach: parseInt(insight.reach || "0"),
             clicks: parseInt(insight.clicks || "0"),
-            spend: parseFloat(insight.spend || "0"),
+            spend: parseFloat(insight.spend || "0") * rate,
             conversions,
             addToCart,
             initiateCheckout,
-            revenue,
+            revenue: revenue * rate,
             rawData: insight as unknown as Prisma.InputJsonValue,
           },
         });
@@ -406,7 +408,7 @@ export async function syncFacebookAdsMetrics(
 
     // Support multiple accounts from metadata
     const latestMeta = (integration.metadata as Record<string, unknown>) || {};
-    const selAccounts = (latestMeta as { selectedAccounts?: { id: string; name: string }[] }).selectedAccounts || [];
+    const selAccounts = (latestMeta as { selectedAccounts?: { id: string; name: string; currency?: string }[] }).selectedAccounts || [];
     const accountIds: string[] = (selAccounts.length > 0
       ? selAccounts.map((a) => a.id.replace("act_", ""))
       : integration.externalAccountId ? [integration.externalAccountId] : []
@@ -439,6 +441,51 @@ export async function syncFacebookAdsMetrics(
     };
 
     const hasTimeLeft = () => Date.now() - startTime < timeBudgetMs;
+
+    // ── Currency conversion: detect non-BRL accounts and fetch exchange rates ──
+    const accountCurrencyMap = new Map<string, string>();
+    for (const acc of selAccounts) {
+      if (acc.currency) {
+        accountCurrencyMap.set(acc.id.replace("act_", ""), acc.currency);
+      }
+    }
+    // For accounts missing currency in metadata, fetch from Meta API
+    const missingCurrencyIds = accountIds.filter(id => !accountCurrencyMap.has(id));
+    if (missingCurrencyIds.length > 0) {
+      await Promise.all(missingCurrencyIds.map(async (accId) => {
+        try {
+          const resp = await fetch(`https://graph.facebook.com/${FB_GRAPH_VERSION}/act_${accId}?fields=currency&access_token=${accessToken}`);
+          if (resp.ok) {
+            const data = await resp.json();
+            if (data.currency) accountCurrencyMap.set(accId, data.currency);
+          }
+        } catch { /* default to BRL */ }
+      }));
+    }
+    // Fetch exchange rates if any account uses non-BRL currency
+    const hasNonBRL = [...accountCurrencyMap.values()].some(c => c !== "BRL");
+    let exchangeRates: Record<string, number> | null = null;
+    if (hasNonBRL) {
+      try {
+        const ratesResp = await fetch("https://api.exchangerate-api.com/v4/latest/BRL");
+        if (ratesResp.ok) {
+          const ratesData = await ratesResp.json();
+          exchangeRates = ratesData.rates;
+        }
+      } catch {
+        console.warn("[Facebook Ads] Could not fetch exchange rates, using 1:1 for non-BRL accounts");
+      }
+    }
+    // Convert amount from account currency to BRL
+    const getBRLRate = (accountId: string): number => {
+      const currency = accountCurrencyMap.get(accountId) || "BRL";
+      if (currency === "BRL" || !exchangeRates || !exchangeRates[currency]) return 1;
+      return 1 / exchangeRates[currency]; // e.g. 1 EUR = 1/0.16 ≈ 6.25 BRL
+    };
+    if (hasNonBRL) {
+      const currencies = [...new Set(accountCurrencyMap.values())].filter(c => c !== "BRL");
+      console.log(`[Facebook Ads] Non-BRL accounts detected: ${currencies.join(", ")}. Exchange rates ${exchangeRates ? "loaded" : "UNAVAILABLE"}`);
+    }
 
     const buildUrl = (adAccountId: string, since: string, until: string) =>
       `https://graph.facebook.com/${FB_GRAPH_VERSION}/act_${adAccountId}/insights?fields=${fields}&level=ad&time_range=${encodeURIComponent(JSON.stringify({ since, until }))}&time_increment=1&limit=500&action_attribution_windows=${encodeURIComponent(JSON.stringify(["7d_click", "1d_view"]))}&access_token=${accessToken}`;
@@ -477,6 +524,7 @@ export async function syncFacebookAdsMetrics(
     const fetchAndSavePageByPage = async (
       url: string,
       adAccountId: string,
+      brlRate: number = 1,
     ): Promise<{ synced: number; timedOut: boolean; tokenExpired?: boolean }> => {
       let synced = 0;
       let pageUrl: string | null = url;
@@ -550,7 +598,7 @@ export async function syncFacebookAdsMetrics(
         }
 
         if (data.data && data.data.length > 0) {
-          synced += await saveInsightsToDB(data.data, organizationId, noMedia, noMedia, adAccountId);
+          synced += await saveInsightsToDB(data.data, organizationId, noMedia, noMedia, adAccountId, brlRate);
         }
 
         pageUrl = data.paging?.next || null;
@@ -581,6 +629,7 @@ export async function syncFacebookAdsMetrics(
           const result = await fetchAndSavePageByPage(
             buildUrl(accountId, daysAgo(0), daysAgo(0)),
             accountId,
+            getBRLRate(accountId),
           );
           if (result.tokenExpired) { tokenExpiredDetected = true; return; }
           totalSynced += result.synced;
@@ -682,6 +731,7 @@ export async function syncFacebookAdsMetrics(
             const result = await fetchAndSavePageByPage(
               buildUrl(accountIds[ai], dayStr, dayStr),
               accountIds[ai],
+              getBRLRate(accountIds[ai]),
             );
             if (result.tokenExpired) return abortTokenExpired();
             totalSynced += result.synced;
@@ -712,6 +762,7 @@ export async function syncFacebookAdsMetrics(
             const result = await fetchAndSavePageByPage(
               buildUrl(accountIds[ai], dayStr, dayStr),
               accountIds[ai],
+              getBRLRate(accountIds[ai]),
             );
             if (result.tokenExpired) return abortTokenExpired();
             totalSynced += result.synced;
@@ -740,6 +791,7 @@ export async function syncFacebookAdsMetrics(
             const result = await fetchAndSavePageByPage(
               buildUrl(accountIds[ai], dayStr, dayStr),
               accountIds[ai],
+              getBRLRate(accountIds[ai]),
             );
             if (result.tokenExpired) return abortTokenExpired();
             totalSynced += result.synced;
@@ -816,6 +868,7 @@ export async function syncFacebookAdsMetrics(
             const result = await fetchAndSavePageByPage(
               buildUrl(accountIds[ai], chunk.since, chunk.until),
               accountIds[ai],
+              getBRLRate(accountIds[ai]),
             );
             totalSynced += result.synced;
             if (result.timedOut) return saveCursorAndReturn(5, ai);
@@ -906,7 +959,7 @@ export async function exchangeFacebookToken(code: string) {
   return longLivedResponse.json();
 }
 
-type FbAdAccount = { id: string; name: string; account_status: number };
+type FbAdAccount = { id: string; name: string; account_status: number; currency?: string };
 type FbPaginatedResponse = { data?: FbAdAccount[]; paging?: { next?: string } };
 
 async function fetchAllPages(startUrl: string): Promise<FbAdAccount[]> {
@@ -995,7 +1048,7 @@ export async function getFacebookAdAccounts(accessToken: string) {
 
   // 1. Fetch ad accounts directly on the user profile
   const directAccounts = await fetchAllPages(
-    `https://graph.facebook.com/${FB_GRAPH_VERSION}/me/adaccounts?fields=id,name,account_status&limit=100&access_token=${accessToken}`
+    `https://graph.facebook.com/${FB_GRAPH_VERSION}/me/adaccounts?fields=id,name,account_status,currency&limit=100&access_token=${accessToken}`
   );
   for (const acc of directAccounts) {
     accountMap.set(acc.id, acc);
@@ -1014,14 +1067,14 @@ export async function getFacebookAdAccounts(accessToken: string) {
       // 3. For each BM, fetch owned + client ad accounts
       for (const biz of businesses) {
         const owned = await fetchAllPages(
-          `https://graph.facebook.com/${FB_GRAPH_VERSION}/${biz.id}/owned_ad_accounts?fields=id,name,account_status&limit=100&access_token=${accessToken}`
+          `https://graph.facebook.com/${FB_GRAPH_VERSION}/${biz.id}/owned_ad_accounts?fields=id,name,account_status,currency&limit=100&access_token=${accessToken}`
         );
         for (const acc of owned) {
           accountMap.set(acc.id, acc);
         }
 
         const client = await fetchAllPages(
-          `https://graph.facebook.com/${FB_GRAPH_VERSION}/${biz.id}/client_ad_accounts?fields=id,name,account_status&limit=100&access_token=${accessToken}`
+          `https://graph.facebook.com/${FB_GRAPH_VERSION}/${biz.id}/client_ad_accounts?fields=id,name,account_status,currency&limit=100&access_token=${accessToken}`
         );
         for (const acc of client) {
           accountMap.set(acc.id, acc);

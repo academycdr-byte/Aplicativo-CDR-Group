@@ -275,7 +275,7 @@ export async function selectFacebookAdAccount(accountId: string) {
   }
 
   // Validate that the accountId is in the list of available accounts
-  const metadata = integration.metadata as { adAccounts?: { id: string; name: string }[]; selectedAccounts?: { id: string; name: string }[] } | null;
+  const metadata = integration.metadata as { adAccounts?: { id: string; name: string; currency?: string }[]; selectedAccounts?: { id: string; name: string; currency?: string }[] } | null;
   const accounts = metadata?.adAccounts || [];
   const selected = accounts.find((a) => a.id === accountId);
 
@@ -292,7 +292,7 @@ export async function selectFacebookAdAccount(accountId: string) {
       errorMessage: null,
       metadata: {
         ...(metadata || {}),
-        selectedAccounts: [{ id: selected.id, name: selected.name }],
+        selectedAccounts: [{ id: selected.id, name: selected.name, currency: selected.currency || "BRL" }],
       },
     },
   });
@@ -320,12 +320,12 @@ export async function selectMultipleFacebookAdAccounts(accountIds: string[]) {
     return { error: "Facebook Ads não conectado. Faça login novamente." };
   }
 
-  const metadata = integration.metadata as { adAccounts?: { id: string; name: string }[]; selectedAccounts?: { id: string; name: string }[] } | null;
+  const metadata = integration.metadata as { adAccounts?: { id: string; name: string; currency?: string }[]; selectedAccounts?: { id: string; name: string; currency?: string }[] } | null;
   const allAccounts = metadata?.adAccounts || [];
 
   const selectedAccounts = accountIds
     .map((id) => allAccounts.find((a) => a.id === id))
-    .filter((a): a is { id: string; name: string } => a !== undefined);
+    .filter((a): a is { id: string; name: string; currency?: string } => a !== undefined);
 
   if (selectedAccounts.length === 0) {
     return { error: "Nenhuma conta válida selecionada." };
@@ -369,7 +369,7 @@ export async function getSelectedFacebookAccounts() {
 
   if (!integration) return [];
 
-  const metadata = integration.metadata as { selectedAccounts?: { id: string; name: string }[] } | null;
+  const metadata = integration.metadata as { selectedAccounts?: { id: string; name: string; currency?: string }[] } | null;
   if (metadata?.selectedAccounts && metadata.selectedAccounts.length > 0) {
     return metadata.selectedAccounts;
   }
@@ -446,10 +446,11 @@ export async function connectFacebookManualToken(token: string) {
         externalAccountId: hasMultipleAccounts ? "" : (firstAccount?.id?.replace("act_", "") || ""),
         tokenExpiresAt: longLivedValidation.expiresAt || null,
         metadata: {
-          adAccounts: adAccounts.map((a: { id: string; name: string; account_status: number }) => ({
+          adAccounts: adAccounts.map((a: { id: string; name: string; account_status: number; currency?: string }) => ({
             id: a.id,
             name: a.name,
             account_status: a.account_status,
+            currency: a.currency || "BRL",
           })),
         },
       },
@@ -460,10 +461,11 @@ export async function connectFacebookManualToken(token: string) {
         tokenExpiresAt: longLivedValidation.expiresAt || null,
         metadata: {
           ...prev,
-          adAccounts: adAccounts.map((a: { id: string; name: string; account_status: number }) => ({
+          adAccounts: adAccounts.map((a: { id: string; name: string; account_status: number; currency?: string }) => ({
             id: a.id,
             name: a.name,
             account_status: a.account_status,
+            currency: a.currency || "BRL",
           })),
           // Clear stale sync cursor since token changed
           fbSyncCursor: undefined,
