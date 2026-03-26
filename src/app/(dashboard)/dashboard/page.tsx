@@ -351,13 +351,16 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 relative">
+    <div className="animate-in fade-in duration-500 relative">
       {refreshing && (
-        <div className="fixed top-4 right-4 z-50 flex items-center gap-2 bg-card/90 backdrop-blur-md border border-border/50 rounded-full px-3.5 py-1.5 shadow-lg animate-in fade-in slide-in-from-top-2 duration-300">
-          <div className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          <span className="text-xs text-muted-foreground font-medium">Atualizando...</span>
+        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+          <div className="flex items-center gap-3 bg-card/95 backdrop-blur-xl border border-border/60 rounded-2xl px-5 py-3 shadow-2xl animate-in fade-in zoom-in-95 duration-300 pointer-events-auto">
+            <div className="w-5 h-5 border-[2.5px] border-primary border-t-transparent rounded-full animate-spin" />
+            <span className="text-sm text-foreground font-medium">Atualizando métricas...</span>
+          </div>
         </div>
       )}
+      <div className={cn("space-y-8 transition-opacity duration-300", refreshing && "opacity-50")}>
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
@@ -699,6 +702,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      </div>{/* end opacity wrapper */}
     </div>
   );
 }
