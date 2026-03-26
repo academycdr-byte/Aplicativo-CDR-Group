@@ -15,7 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Link2, Unlink, RefreshCw, AlertCircle } from "lucide-react";
+import { Link2, Unlink, RefreshCw, AlertCircle, Settings2 } from "lucide-react";
 import { toast } from "sonner";
 import { getIntegrations, connectApiKeyIntegration, saveShopifyCredentials, disconnectIntegration, selectFacebookAdAccount, selectMultipleFacebookAdAccounts, selectGoogleAnalyticsProperty, connectFacebookManualToken } from "@/actions/integrations";
 import { syncPlatform } from "@/actions/sync";
@@ -88,6 +88,7 @@ type FacebookAdAccount = {
   id: string;
   name: string;
   account_status?: number;
+  currency?: string;
 };
 
 type GA4Property = {
@@ -720,16 +721,46 @@ function IntegrationsContent() {
                 </p>
 
                 <div className="flex items-center justify-between">
-                  <Badge variant={isConnected ? "default" : "secondary"} className="gap-1.5">
-                    <span
-                      className={`w-2 h-2 rounded-full ${isConnected ? "bg-green-400" : status === "PENDING" ? "bg-amber-400" : "bg-muted-foreground"
-                        }`}
-                    />
-                    {isConnected ? "Conectado" : status === "PENDING" ? "Pendente" : "Desconectado"}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={isConnected ? "default" : "secondary"} className="gap-1.5">
+                      <span
+                        className={`w-2 h-2 rounded-full ${isConnected ? "bg-green-400" : status === "PENDING" ? "bg-amber-400" : "bg-muted-foreground"
+                          }`}
+                      />
+                      {isConnected ? "Conectado" : status === "PENDING" ? "Pendente" : "Desconectado"}
+                    </Badge>
+                    {isConnected && platform.platform === "FACEBOOK_ADS" && (() => {
+                      const fbInt = integrations.find((i) => i.platform === "FACEBOOK_ADS");
+                      const count = (fbInt?.metadata as { selectedAccounts?: unknown[] })?.selectedAccounts?.length || 0;
+                      return count > 0 ? (
+                        <span className="text-xs text-muted-foreground">{count} conta{count !== 1 ? "s" : ""}</span>
+                      ) : null;
+                    })()}
+                  </div>
 
                   {isConnected ? (
                     <div className="flex gap-1.5">
+                      {platform.platform === "FACEBOOK_ADS" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const fbIntegration = integrations.find((i) => i.platform === "FACEBOOK_ADS");
+                            const accounts = (fbIntegration?.metadata as { adAccounts?: FacebookAdAccount[] })?.adAccounts || [];
+                            const existing = (fbIntegration?.metadata as { selectedAccounts?: { id: string }[] })?.selectedAccounts || [];
+                            if (accounts.length > 0) {
+                              setFbAccounts(accounts);
+                              setSelectedFbAccounts(existing.map((a) => a.id));
+                              setFbAccountDialog(true);
+                            } else {
+                              toast.error("Nenhuma conta disponível. Reconecte o Facebook Ads.");
+                            }
+                          }}
+                        >
+                          <Settings2 className="w-4 h-4 mr-1" />
+                          Contas
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
                         size="sm"
@@ -982,6 +1013,11 @@ function IntegrationsContent() {
                       <p className="font-medium text-sm truncate">{account.name || account.id}</p>
                       <p className="text-xs text-muted-foreground">{account.id}</p>
                     </div>
+                    {account.currency && account.currency !== "BRL" && (
+                      <Badge variant="outline" className="shrink-0 text-xs font-mono">
+                        {account.currency}
+                      </Badge>
+                    )}
                     {isActive !== undefined && (
                       <Badge variant={isActive ? "default" : "secondary"} className="shrink-0 text-xs">
                         {isActive ? "Ativa" : "Inativa"}
