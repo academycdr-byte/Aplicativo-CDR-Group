@@ -496,8 +496,9 @@ export default function DashboardPage() {
                     tickMargin={10}
                     interval="preserveStartEnd"
                     tickFormatter={(v) => {
-                      const d = new Date(v + "T00:00:00");
-                      return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+                      // Parse YYYY-MM-DD directly to avoid timezone-related off-by-one
+                      const parts = String(v).split("-");
+                      return `${parts[2]}/${parts[1]}`;
                     }}
                   />
                   <YAxis
@@ -520,7 +521,8 @@ export default function DashboardPage() {
                     cursor={{ stroke: "var(--muted-foreground)", strokeWidth: 1, strokeDasharray: "4 4", opacity: 0.3 }}
                     content={({ active, payload, label }) => {
                       if (!active || !payload?.length) return null;
-                      const d = new Date(label + "T00:00:00");
+                      // Use T12:00 (noon) to avoid timezone-related off-by-one
+                      const d = new Date(label + "T12:00:00");
                       return (
                         <div className="bg-card/95 backdrop-blur-xl border border-border/50 rounded-xl shadow-2xl p-3.5 sm:p-4 min-w-[200px] sm:min-w-[220px]">
                           <p className="font-semibold text-xs sm:text-sm mb-3 text-foreground border-b border-border/30 pb-2">

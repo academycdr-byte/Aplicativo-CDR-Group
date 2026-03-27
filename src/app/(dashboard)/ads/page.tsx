@@ -678,8 +678,8 @@ export default function AdsPage() {
                       tickLine={false}
                       axisLine={false}
                       tickFormatter={(v) => {
-                        const d = new Date(v + "T00:00:00");
-                        return `${d.getDate()}/${d.getMonth() + 1}`;
+                        const parts = String(v).split("-");
+                        return `${parseInt(parts[2])}/${parseInt(parts[1])}`;
                       }}
                       minTickGap={30}
                     />
@@ -697,7 +697,7 @@ export default function AdsPage() {
                     />
                     <Tooltip
                       contentStyle={{ backgroundColor: "var(--card)", borderColor: "var(--border)", borderRadius: "12px", fontSize: "13px" }}
-                      labelFormatter={(d) => new Date(d + "T00:00:00").toLocaleDateString("pt-BR")}
+                      labelFormatter={(d) => new Date(d + "T12:00:00").toLocaleDateString("pt-BR")}
                       formatter={(val, name) => {
                         const v = Number(val) || 0;
                         if (name === "Gasto") return [fmt(v), name];

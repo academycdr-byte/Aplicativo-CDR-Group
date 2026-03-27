@@ -29,7 +29,8 @@ export function EstimatedProfitCalendar({ data, totalProfit, currentMonthLabel, 
         const sorted = [...data].sort((a, b) => a.date.localeCompare(b.date));
 
         return sorted.map(day => {
-            const dateObj = new Date(day.date + "T00:00:00");
+            // Use T12:00 (noon) to avoid timezone-related off-by-one
+            const dateObj = new Date(day.date + "T12:00:00");
             return {
                 ...day,
                 dayOfMonth: dateObj.getDate(),
@@ -72,7 +73,7 @@ export function EstimatedProfitCalendar({ data, totalProfit, currentMonthLabel, 
             {selectedDay && (
                 <div className="mb-4 p-3 rounded-lg border border-border bg-muted/30 animate-in fade-in duration-200">
                     <p className="text-xs font-semibold text-muted-foreground mb-2">
-                        {new Date(selectedDay.date + "T00:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}
+                        {new Date(selectedDay.date + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}
                     </p>
                     <div className="grid grid-cols-3 gap-2">
                         <div>

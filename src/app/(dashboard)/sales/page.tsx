@@ -148,8 +148,8 @@ export default function SalesPage() {
                   tickLine={false}
                   axisLine={false}
                   tickFormatter={(v) => {
-                    const d = new Date(v + "T00:00:00");
-                    return `${d.getDate()}/${d.getMonth() + 1}`;
+                    const parts = String(v).split("-");
+                    return `${parseInt(parts[2])}/${parseInt(parts[1])}`;
                   }}
                 />
                 <YAxis
@@ -169,7 +169,7 @@ export default function SalesPage() {
                     name === "revenue" ? "Receita" : "Pedidos",
                   ]}
                   labelFormatter={(label) => {
-                    const d = new Date(label + "T00:00:00");
+                    const d = new Date(label + "T12:00:00");
                     return d.toLocaleDateString("pt-BR");
                   }}
                   cursor={{ stroke: "var(--primary)", strokeOpacity: 0.3 }}

@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { getSessionWithOrg } from "@/lib/session";
-import { getDateRange, getPreviousDateRange, buildDateFilter, buildDateOnlyFilter, toDateKeyBrasilia, toDateKeyDateOnly } from "@/lib/date-utils";
+import { getDateRange, getPreviousDateRange, buildDateFilter, buildDateOnlyFilter, toDateKeyBrasilia, toDateKeyDateOnly, getBrazilToday } from "@/lib/date-utils";
 import { unstable_cache } from "next/cache";
 
 export async function getDashboardData(days: number = 30, from?: string, to?: string, orgId?: string) {
@@ -108,7 +108,10 @@ export async function getRevenueByDay(days: number = 30, from?: string, to?: str
     grouped[dateKey] = (grouped[dateKey] || 0) + Number(order.totalAmount);
   }
 
+  // Filter out future dates (defense-in-depth)
+  const todayStrRev = getBrazilToday();
   return Object.entries(grouped)
+    .filter(([date]) => date <= todayStrRev)
     .map(([date, value]) => ({ date, revenue: value }))
     .sort((a, b) => a.date.localeCompare(b.date));
 }
@@ -208,8 +211,10 @@ export async function getMetricsAnalysis(days: number = 30, from?: string, to?: 
     d.roas = d.investimento > 0 ? d.fbRevenue / d.investimento : 0;
   }
 
-  // Strip internal FB fields before returning
+  // Strip internal FB fields and filter out future dates (defense-in-depth)
+  const todayStr = getBrazilToday();
   return Object.values(grouped)
+    .filter((d) => d.date <= todayStr)
     .sort((a, b) => a.date.localeCompare(b.date))
     .map(({ fbConversions, fbRevenue, ...rest }) => rest);
 }
@@ -629,9 +634,13 @@ export async function getDailyProfit(days: number = 30, from?: string, to?: stri
     totalProfit += profit;
   }
 
-  dailyProfits.sort((a, b) => a.date.localeCompare(b.date));
+  // Filter out future dates (defense-in-depth against timezone edge cases)
+  const todayStrProfit = getBrazilToday();
+  const filteredProfits = dailyProfits.filter((d) => d.date <= todayStrProfit);
+  filteredProfits.sort((a, b) => a.date.localeCompare(b.date));
+  const filteredTotal = filteredProfits.reduce((sum, d) => sum + d.profit, 0);
 
-  return { dailyProfits, totalProfit };
+  return { dailyProfits: filteredProfits, totalProfit: filteredTotal };
 }
 
 /**
