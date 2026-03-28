@@ -411,7 +411,7 @@ function GapLeverSection({
               )}
 
               {/* Solutions (gaps only) */}
-              {showSolutions && (
+              {showSolutions && (editable || ((item as GapNode).solutions || []).filter(Boolean).length > 0) && (
                 <div className="mb-3">
                   <div className="flex items-center gap-2 mb-2">
                     <Lightbulb className="w-4 h-4 text-amber-400" />
