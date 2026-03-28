@@ -31,6 +31,15 @@ export type PlanMetrics = {
   ticketMedio: number;
   totalPedidos: number;
   totalConversoes: number;
+  /** % change vs previous period (same duration) — optional for backwards compat */
+  changes?: {
+    faturamento: number | null;
+    investido: number | null;
+    convertido: number | null;
+    roas: number | null;
+    cpa: number | null;
+    ticketMedio: number | null;
+  };
 };
 
 export type TopProduct = {
@@ -227,16 +236,66 @@ async function aggregateMetrics(
   const investido = Number(adAgg?.total_spend || 0);
   const convertido = Number(adAgg?.total_revenue || 0);
   const totalConversoes = Number(adAgg?.total_conversions || 0);
+  const roas = investido > 0 ? convertido / investido : 0;
+  const cpa = totalConversoes > 0 ? investido / totalConversoes : 0;
+  const ticketMedio = totalPedidos > 0 ? faturamento / totalPedidos : 0;
+
+  // ── Previous period (same duration, shifted back) ──
+  const durationMs = periodEnd.getTime() - periodStart.getTime();
+  const prevEnd = new Date(periodStart.getTime() - 1); // day before current start
+  const prevStart = new Date(prevEnd.getTime() - durationMs);
+  const prevStartDate = prevStart.toISOString().split("T")[0];
+  const prevEndDate = prevEnd.toISOString().split("T")[0];
+
+  const [prevOrderAgg] = await prisma.$queryRaw<OrderAgg[]>`
+    SELECT
+      COUNT(*) FILTER (WHERE status IN ('paid','partially_refunded')) as paid_count,
+      COALESCE(SUM("totalAmount") FILTER (WHERE status IN ('paid','partially_refunded')), 0) as paid_revenue
+    FROM orders
+    WHERE "organizationId" = ${orgId}
+      AND "orderDate" >= ${prevStart}
+      AND "orderDate" <= ${prevEnd}
+  `;
+  const [prevAdAgg] = await prisma.$queryRaw<AdAgg[]>`
+    SELECT
+      COALESCE(SUM(spend), 0) as total_spend,
+      COALESCE(SUM(revenue), 0) as total_revenue,
+      COALESCE(SUM(conversions), 0) as total_conversions
+    FROM ad_metrics
+    WHERE "organizationId" = ${orgId}
+      AND platform = 'FACEBOOK_ADS'
+      AND date >= ${prevStartDate}::date
+      AND date <= ${prevEndDate}::date
+  `;
+
+  const pFat = Number(prevOrderAgg?.paid_revenue || 0);
+  const pPed = Number(prevOrderAgg?.paid_count || 0);
+  const pInv = Number(prevAdAgg?.total_spend || 0);
+  const pConv = Number(prevAdAgg?.total_revenue || 0);
+  const pConvs = Number(prevAdAgg?.total_conversions || 0);
+  const pRoas = pInv > 0 ? pConv / pInv : 0;
+  const pCpa = pConvs > 0 ? pInv / pConvs : 0;
+  const pTkt = pPed > 0 ? pFat / pPed : 0;
+
+  const pct = (cur: number, prev: number) => prev > 0 ? ((cur - prev) / prev) * 100 : null;
 
   const metrics: PlanMetrics = {
     faturamento,
     investido,
     convertido,
-    roas: investido > 0 ? convertido / investido : 0,
-    cpa: totalConversoes > 0 ? investido / totalConversoes : 0,
-    ticketMedio: totalPedidos > 0 ? faturamento / totalPedidos : 0,
+    roas,
+    cpa,
+    ticketMedio,
     totalPedidos,
     totalConversoes,
+    changes: {
+      faturamento: pct(faturamento, pFat),
+      investido: pct(investido, pInv),
+      convertido: pct(convertido, pConv),
+      roas: pct(roas, pRoas),
+      cpa: pct(cpa, pCpa),
+      ticketMedio: pct(ticketMedio, pTkt),
+    },
   };
 
   // 3. Products: aggregate from orders, then enrich via platform API

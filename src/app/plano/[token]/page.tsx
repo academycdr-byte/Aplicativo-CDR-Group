@@ -219,16 +219,22 @@ export default async function PublicPlanPage({ params }: PageProps) {
                       label="Faturamento Pago"
                       value={fmt(m.faturamento)}
                       sub={`${m.totalPedidos} pedidos`}
+                      change={m.changes?.faturamento}
+                      icon="revenue"
                     />
                     <MC
                       label="Valor Investido"
                       value={fmt(m.investido)}
                       sub="Meta Ads"
+                      change={m.changes?.investido}
+                      icon="spend"
                     />
                     <MC
                       label="Valor Convertido"
                       value={fmt(m.convertido)}
                       sub="Meta Ads"
+                      change={m.changes?.convertido}
+                      icon="conversion"
                     />
                   </div>
                   <div className="grid md:grid-cols-3 gap-4 mt-4">
@@ -243,13 +249,23 @@ export default async function PublicPlanPage({ params }: PageProps) {
                             : "Atenção"
                       }
                       accent={m.roas >= 3}
+                      change={m.changes?.roas}
+                      icon="target"
                     />
                     <MC
                       label="CPA"
                       value={fmt(m.cpa)}
                       sub={`${m.totalConversoes} conversões`}
+                      change={m.changes?.cpa}
+                      icon="cpa"
+                      invertChange
                     />
-                    <MC label="Ticket Médio" value={fmt(m.ticketMedio)} />
+                    <MC
+                      label="Ticket Médio"
+                      value={fmt(m.ticketMedio)}
+                      change={m.changes?.ticketMedio}
+                      icon="ticket"
+                    />
                   </div>
                 </div>
               </section>
@@ -609,32 +625,74 @@ function SectionHead({ num, title }: { num: string; title: string }) {
   );
 }
 
+const METRIC_ICONS: Record<string, React.ReactNode> = {
+  revenue: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>,
+  spend: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>,
+  conversion: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>,
+  target: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>,
+  cpa: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+  ticket: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>,
+};
+
 function MC({
   label,
   value,
   sub,
   accent,
+  change,
+  icon,
+  invertChange,
 }: {
   label: string;
   value: string;
   sub?: string;
   accent?: boolean;
+  change?: number | null;
+  icon?: string;
+  invertChange?: boolean;
 }) {
+  const hasChange = change !== undefined && change !== null;
+  const isPositive = hasChange && (invertChange ? change < 0 : change > 0);
+  const isNegative = hasChange && (invertChange ? change > 0 : change < 0);
+
   return (
     <div className="plan-metric">
+      {/* Header: icon + label + change badge */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {icon && METRIC_ICONS[icon] && (
+            <span style={{ color: `${G}66` }}>{METRIC_ICONS[icon]}</span>
+          )}
+          <p
+            style={{
+              fontSize: "10px",
+              fontWeight: 700,
+              letterSpacing: "1px",
+              textTransform: "uppercase" as const,
+              color: `${MUTED}77`,
+            }}
+          >
+            {label}
+          </p>
+        </div>
+        {hasChange && (
+          <span
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full"
+            style={{
+              fontSize: "11px",
+              fontWeight: 600,
+              background: isPositive ? "rgba(74, 222, 128, 0.1)" : isNegative ? "rgba(248, 113, 113, 0.1)" : "rgba(255,255,255,0.05)",
+              color: isPositive ? "#4ade80" : isNegative ? "#f87171" : `${MUTED}66`,
+              border: `1px solid ${isPositive ? "rgba(74, 222, 128, 0.2)" : isNegative ? "rgba(248, 113, 113, 0.2)" : "rgba(255,255,255,0.06)"}`,
+            }}
+          >
+            {isPositive ? "↑" : isNegative ? "↓" : "–"}
+            {Math.abs(change).toFixed(1)}%
+          </span>
+        )}
+      </div>
       <p
-        style={{
-          fontSize: "10px",
-          fontWeight: 700,
-          letterSpacing: "1px",
-          textTransform: "uppercase" as const,
-          color: `${MUTED}55`,
-        }}
-      >
-        {label}
-      </p>
-      <p
-        className="mt-1"
+        className="mt-2"
         style={{
           fontFamily: CLASH,
           fontSize: "30px",
