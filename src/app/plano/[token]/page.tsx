@@ -130,7 +130,7 @@ export default async function PublicPlanPage({ params }: PageProps) {
                 color: `${G}99`,
               }}
             >
-              {plan.organization.name}
+              Plano de Ação {plan.organization.name}
             </span>
           </div>
 
