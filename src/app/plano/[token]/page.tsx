@@ -91,40 +91,7 @@ export default async function PublicPlanPage({ params }: PageProps) {
             className="opacity-90"
             unoptimized
           />
-          {(() => {
-            const avatarSrc = plan.organization.logo || plan.createdBy.image;
-            return avatarSrc ? (
-              <div
-                className="w-10 h-10 relative rounded-xl overflow-hidden"
-                style={{
-                  border: `1.5px solid ${G}44`,
-                  boxShadow: `0 0 16px ${G}15`,
-                }}
-              >
-                <Image
-                  src={avatarSrc}
-                  alt={plan.organization.name}
-                  fill
-                  className="object-cover"
-                  unoptimized
-                />
-              </div>
-            ) : (
-              <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center"
-                style={{
-                  background: `${G}15`,
-                  border: `1.5px solid ${G}33`,
-                  fontFamily: CLASH,
-                  fontSize: "14px",
-                  fontWeight: 700,
-                  color: G,
-                }}
-              >
-                {plan.organization.name.charAt(0)}
-              </div>
-            );
-          })()}
+          <div />
         </div>
 
         <div className="relative z-10 max-w-[960px] mx-auto px-6 text-center">
