@@ -451,7 +451,7 @@ function ImageUploadField({
   onChange: (url: string) => void;
 }) {
   const [uploading, setUploading] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const inputId = useRef(`img-upload-${Math.random().toString(36).slice(2, 8)}`).current;
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -468,18 +468,24 @@ function ImageUploadField({
       // silently fail
     } finally {
       setUploading(false);
-      if (fileRef.current) fileRef.current.value = "";
+      const el = document.getElementById(inputId) as HTMLInputElement | null;
+      if (el) el.value = "";
     }
+  };
+
+  const triggerPicker = () => {
+    const el = document.getElementById(inputId) as HTMLInputElement | null;
+    el?.click();
   };
 
   return (
     <div className="mb-3">
       <input
-        ref={fileRef}
+        id={inputId}
         type="file"
-        accept="image/*"
+        accept="image/jpeg,image/png,image/webp,image/gif"
         onChange={handleUpload}
-        className="hidden"
+        style={{ position: "absolute", width: 0, height: 0, opacity: 0, overflow: "hidden" }}
       />
       {value ? (
         <div className="relative rounded-lg overflow-hidden border border-border">
@@ -487,12 +493,14 @@ function ImageUploadField({
           <img src={value} alt="Referência" className="w-full max-h-48 object-cover" />
           <div className="absolute top-2 right-2 flex gap-1">
             <button
-              onClick={() => fileRef.current?.click()}
+              type="button"
+              onClick={triggerPicker}
               className="p-1.5 rounded-lg bg-background/80 backdrop-blur border border-border text-xs hover:bg-muted transition-colors"
             >
               Trocar
             </button>
             <button
+              type="button"
               onClick={() => onChange("")}
               className="p-1.5 rounded-lg bg-background/80 backdrop-blur border border-border text-xs text-red-400 hover:bg-red-500/10 transition-colors"
             >
@@ -502,7 +510,8 @@ function ImageUploadField({
         </div>
       ) : (
         <button
-          onClick={() => fileRef.current?.click()}
+          type="button"
+          onClick={triggerPicker}
           disabled={uploading}
           className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-dashed border-border text-sm text-muted-foreground hover:bg-muted/50 hover:border-muted-foreground/30 transition-colors disabled:opacity-50"
         >
