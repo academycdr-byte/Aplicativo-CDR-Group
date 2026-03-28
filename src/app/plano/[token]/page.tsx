@@ -585,7 +585,7 @@ export default async function PublicPlanPage({ params }: PageProps) {
 
 function SectionHead({ num, title }: { num: string; title: string }) {
   return (
-    <div className="flex items-baseline gap-4 mb-10">
+    <div className="flex items-center gap-5 mb-10">
       <span className="plan-section-num">{num}</span>
       <h2
         style={{
