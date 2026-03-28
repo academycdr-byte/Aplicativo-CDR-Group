@@ -153,7 +153,18 @@ export default async function PublicPlanPage({ params }: PageProps) {
           </h1>
 
           {/* Period — card com ícone de calendário */}
-          <div className="flex justify-center mt-6">
+          <div className="flex flex-col items-center mt-6 gap-2">
+            <span
+              style={{
+                fontSize: "10px",
+                fontWeight: 700,
+                letterSpacing: "1.5px",
+                textTransform: "uppercase" as const,
+                color: `${MUTED}55`,
+              }}
+            >
+              Período Analisado
+            </span>
             <div
               className="inline-flex items-center gap-3 px-5 py-3 rounded-xl"
               style={{
