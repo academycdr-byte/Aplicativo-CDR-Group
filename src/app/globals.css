@@ -728,87 +728,99 @@
 }
 
 /* ============================================================================
-   PLANO DE AÇÃO — Premium Presentation (Stripe-inspired)
-   Gradient mesh blobs + clean layout
+   PLANO DE AÇÃO — CDR Premium Presentation
+   Dark theme + Neon green (#c4ff00) + Grid pattern + Glow effects
    ============================================================================ */
 
-/* Animated gradient mesh blobs */
-.plan-blob {
+/* CDR Neon Green accent */
+.plan-accent { color: #c4ff00; }
+.plan-accent-bg { background-color: #c4ff00; }
+
+/* Hero green glow */
+.plan-hero-glow {
   position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  -webkit-filter: blur(80px);
-  pointer-events: none;
-  will-change: transform;
-}
-
-.plan-blob-1 {
-  width: 600px;
-  height: 600px;
-  background: rgba(16, 185, 129, 0.35);
-  top: -200px;
-  right: -100px;
-  animation: plan-drift-1 15s ease-in-out infinite;
-}
-
-.plan-blob-2 {
-  width: 500px;
+  bottom: -200px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 120%;
   height: 500px;
-  background: rgba(20, 184, 166, 0.25);
-  top: -100px;
-  right: 100px;
-  animation: plan-drift-2 18s ease-in-out infinite;
+  background: radial-gradient(ellipse at center, rgba(196, 255, 0, 0.15) 0%, rgba(196, 255, 0, 0.05) 40%, transparent 70%);
+  pointer-events: none;
+  animation: plan-glow-pulse 6s ease-in-out infinite;
 }
 
-.plan-blob-3 {
-  width: 700px;
-  height: 700px;
-  background: rgba(52, 211, 153, 0.18);
-  top: -300px;
-  right: -200px;
-  animation: plan-drift-3 20s ease-in-out infinite;
+@keyframes plan-glow-pulse {
+  0%, 100% { opacity: 0.7; transform: translateX(-50%) scale(1); }
+  50% { opacity: 1; transform: translateX(-50%) scale(1.05); }
 }
 
-.plan-blob-4 {
-  width: 400px;
-  height: 400px;
-  background: rgba(132, 204, 22, 0.12);
-  top: 0;
-  right: 300px;
-  animation: plan-drift-4 22s ease-in-out infinite;
+/* Subtle grid pattern overlay */
+.plan-grid-pattern {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(196, 255, 0, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(196, 255, 0, 0.03) 1px, transparent 1px);
+  background-size: 60px 60px;
+  pointer-events: none;
+  mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%);
+  -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%);
 }
 
-@keyframes plan-drift-1 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(-40px, 30px) scale(1.05); }
-  66% { transform: translate(30px, -20px) scale(0.95); }
+/* Metric card glow border (like CDR homepage) */
+.plan-glow-card {
+  border: 1px solid rgba(196, 255, 0, 0.2);
+  background: rgba(196, 255, 0, 0.03);
+  border-radius: 16px;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.plan-glow-card:hover {
+  border-color: rgba(196, 255, 0, 0.4);
+  box-shadow: 0 0 30px rgba(196, 255, 0, 0.08);
 }
 
-@keyframes plan-drift-2 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(50px, -40px) scale(1.08); }
-  66% { transform: translate(-30px, 50px) scale(0.92); }
+/* Animated number counter pulse */
+.plan-counter {
+  display: inline-block;
+  animation: plan-counter-in 1s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-@keyframes plan-drift-3 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(-60px, -30px) scale(1.03); }
-  66% { transform: translate(40px, 40px) scale(0.97); }
+@keyframes plan-counter-in {
+  from { opacity: 0; transform: translateY(20px) scale(0.95); filter: blur(4px); }
+  to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
 }
 
-@keyframes plan-drift-4 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(30px, 50px) scale(1.1); }
-  66% { transform: translate(-50px, -30px) scale(0.9); }
-}
-
-/* Section fade-in on load */
+/* Section reveal */
 .plan-section {
   opacity: 0;
-  transform: translateY(30px);
-  animation: plan-reveal 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform: translateY(40px);
+  animation: plan-reveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @keyframes plan-reveal {
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* Green divider line */
+.plan-divider-green {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(196, 255, 0, 0.3), transparent);
+}
+
+/* Floating data particles */
+.plan-particle {
+  position: absolute;
+  font-family: var(--font-mono, monospace);
+  font-weight: 600;
+  color: rgba(196, 255, 0, 0.6);
+  pointer-events: none;
+  user-select: none;
+  animation: plan-float linear infinite;
+}
+
+@keyframes plan-float {
+  0% { transform: translateY(100vh); opacity: 0; }
+  8% { opacity: 1; }
+  92% { opacity: 1; }
+  100% { transform: translateY(-50px); opacity: 0; }
 }
