@@ -278,6 +278,7 @@ export default async function PublicPlanPage({ params }: PageProps) {
                           <th className="w-14" />
                           <th className="text-left">Produto</th>
                           <th className="text-right">Qtd</th>
+                          <th className="text-right">Ticket Médio</th>
                           <th className="text-right">Faturamento</th>
                         </tr>
                       </thead>
@@ -335,6 +336,12 @@ export default async function PublicPlanPage({ params }: PageProps) {
                               style={{ color: `${MUTED}88` }}
                             >
                               {p.quantity}
+                            </td>
+                            <td
+                              className="text-right"
+                              style={{ color: `${MUTED}88` }}
+                            >
+                              {p.quantity > 0 ? fmt(p.revenue / p.quantity) : "—"}
                             </td>
                             <td
                               className="text-right"
