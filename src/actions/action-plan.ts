@@ -640,7 +640,7 @@ export async function getActionPlanByToken(token: string) {
         select: { name: true, logo: true },
       },
       createdBy: {
-        select: { name: true },
+        select: { name: true, image: true },
       },
     },
   });

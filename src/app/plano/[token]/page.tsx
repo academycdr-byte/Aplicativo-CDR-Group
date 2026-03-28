@@ -91,56 +91,66 @@ export default async function PublicPlanPage({ params }: PageProps) {
             className="opacity-90"
             unoptimized
           />
-          {plan.organization.logo ? (
-            <div
-              className="w-10 h-10 relative rounded-xl overflow-hidden"
-              style={{
-                border: `1.5px solid ${G}44`,
-                boxShadow: `0 0 16px ${G}15`,
-              }}
-            >
-              <Image
-                src={plan.organization.logo}
-                alt={plan.organization.name}
-                fill
-                className="object-cover"
-                unoptimized
-              />
-            </div>
-          ) : (
-            <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center"
-              style={{ background: G }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="7" y1="17" x2="17" y2="7" />
-                <polyline points="7 7 17 7 17 17" />
-              </svg>
-            </div>
-          )}
-        </div>
-
-        <div className="relative z-10 max-w-[960px] mx-auto px-6 text-center">
-          {/* Client Logo — grande e em destaque */}
-          {plan.organization.logo && (
-            <div className="flex justify-center mb-7">
+          {(() => {
+            const avatarSrc = plan.organization.logo || plan.createdBy.image;
+            return avatarSrc ? (
               <div
-                className="w-20 h-20 md:w-24 md:h-24 relative rounded-2xl overflow-hidden"
+                className="w-10 h-10 relative rounded-xl overflow-hidden"
                 style={{
-                  border: `2px solid ${G}33`,
-                  boxShadow: `0 0 40px ${G}15, 0 0 80px ${G}08`,
+                  border: `1.5px solid ${G}44`,
+                  boxShadow: `0 0 16px ${G}15`,
                 }}
               >
                 <Image
-                  src={plan.organization.logo}
+                  src={avatarSrc}
                   alt={plan.organization.name}
                   fill
                   className="object-cover"
                   unoptimized
                 />
               </div>
-            </div>
-          )}
+            ) : (
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center"
+                style={{
+                  background: `${G}15`,
+                  border: `1.5px solid ${G}33`,
+                  fontFamily: CLASH,
+                  fontSize: "14px",
+                  fontWeight: 700,
+                  color: G,
+                }}
+              >
+                {plan.organization.name.charAt(0)}
+              </div>
+            );
+          })()}
+        </div>
+
+        <div className="relative z-10 max-w-[960px] mx-auto px-6 text-center">
+          {/* Client Logo — grande e em destaque */}
+          {(() => {
+            const heroAvatar = plan.organization.logo || plan.createdBy.image;
+            return heroAvatar ? (
+              <div className="flex justify-center mb-7">
+                <div
+                  className="w-20 h-20 md:w-24 md:h-24 relative rounded-2xl overflow-hidden"
+                  style={{
+                    border: `2px solid ${G}33`,
+                    boxShadow: `0 0 40px ${G}15, 0 0 80px ${G}08`,
+                  }}
+                >
+                  <Image
+                    src={heroAvatar}
+                    alt={plan.organization.name}
+                    fill
+                    className="object-cover"
+                    unoptimized
+                  />
+                </div>
+              </div>
+            ) : null;
+          })()}
 
           {/* Org name badge */}
           <div className="flex justify-center mb-6">
