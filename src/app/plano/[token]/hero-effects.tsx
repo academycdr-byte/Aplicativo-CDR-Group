@@ -1,55 +1,64 @@
 "use client";
 
-import { useMemo } from "react";
-import type { PlanMetrics } from "@/actions/action-plan";
+// Stripe-style animated gradient mesh blobs — CDR green palette
+// Pure CSS blobs with heavy blur creating organic flowing gradients
 
-// ─── Floating Data Particles ──────────────────────
-
-const PARTICLE_COUNT = 20;
-
-export function DataParticles({ metrics }: { metrics: PlanMetrics | null }) {
-  const particles = useMemo(() => {
-    const labels = metrics
-      ? [
-          `R$ ${(metrics.faturamento / 1000).toFixed(0)}K`,
-          `${metrics.roas.toFixed(1)}x`,
-          `${metrics.totalPedidos}`,
-          `R$ ${metrics.cpa.toFixed(0)}`,
-          "ROAS", "CPA", "CTR", "%", "R$",
-        ]
-      : ["ROAS", "CPA", "CTR", "R$", "%"];
-
-    return Array.from({ length: PARTICLE_COUNT }, (_, i) => ({
-      id: i,
-      text: labels[i % labels.length],
-      style: {
-        left: `${(i * 5.2 + (i % 3) * 8) % 100}%`,
-        fontSize: `${9 + (i % 3)}px`,
-        opacity: 0.04 + (i % 5) * 0.015,
-        animationDuration: `${14 + (i % 7) * 2}s`,
-        animationDelay: `${-(i * 1.5)}s`,
-      } as React.CSSProperties,
-    }));
-  }, [metrics]);
-
+export function GradientMesh() {
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
-      {particles.map((p) => (
-        <span key={p.id} className="plan-particle" style={p.style}>
-          {p.text}
-        </span>
-      ))}
+      {/* Primary large blob — top right */}
+      <div
+        className="absolute rounded-full"
+        style={{
+          width: "800px",
+          height: "800px",
+          top: "-150px",
+          right: "-100px",
+          background: "rgba(196, 255, 0, 0.25)",
+          filter: "blur(120px)",
+          animation: "plan-drift-1 16s ease-in-out infinite",
+        }}
+      />
+      {/* Secondary blob — center right */}
+      <div
+        className="absolute rounded-full"
+        style={{
+          width: "600px",
+          height: "600px",
+          top: "100px",
+          right: "150px",
+          background: "rgba(74, 222, 128, 0.15)",
+          filter: "blur(100px)",
+          animation: "plan-drift-2 20s ease-in-out infinite",
+        }}
+      />
+      {/* Accent blob — top center */}
+      <div
+        className="absolute rounded-full"
+        style={{
+          width: "500px",
+          height: "500px",
+          top: "-100px",
+          right: "400px",
+          background: "rgba(163, 230, 53, 0.12)",
+          filter: "blur(110px)",
+          animation: "plan-drift-3 22s ease-in-out infinite",
+        }}
+      />
+      {/* Small accent — bottom glow */}
+      <div
+        className="absolute rounded-full"
+        style={{
+          width: "1200px",
+          height: "400px",
+          bottom: "-100px",
+          left: "50%",
+          transform: "translateX(-50%)",
+          background: "rgba(196, 255, 0, 0.08)",
+          filter: "blur(80px)",
+          animation: "plan-glow-pulse 6s ease-in-out infinite",
+        }}
+      />
     </div>
-  );
-}
-
-// ─── Hero Background (Grid + Glow) ───────────────
-
-export function HeroBackground() {
-  return (
-    <>
-      <div className="plan-grid-pattern" />
-      <div className="plan-hero-glow" />
-    </>
   );
 }

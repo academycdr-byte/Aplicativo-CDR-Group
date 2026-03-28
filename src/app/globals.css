@@ -732,95 +732,54 @@
    Dark theme + Neon green (#c4ff00) + Grid pattern + Glow effects
    ============================================================================ */
 
-/* CDR Neon Green accent */
-.plan-accent { color: #c4ff00; }
-.plan-accent-bg { background-color: #c4ff00; }
-
-/* Hero green glow */
-.plan-hero-glow {
-  position: absolute;
-  bottom: -200px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 120%;
-  height: 500px;
-  background: radial-gradient(ellipse at center, rgba(196, 255, 0, 0.15) 0%, rgba(196, 255, 0, 0.05) 40%, transparent 70%);
-  pointer-events: none;
-  animation: plan-glow-pulse 6s ease-in-out infinite;
-}
-
-@keyframes plan-glow-pulse {
-  0%, 100% { opacity: 0.7; transform: translateX(-50%) scale(1); }
-  50% { opacity: 1; transform: translateX(-50%) scale(1.05); }
-}
-
-/* Subtle grid pattern overlay */
-.plan-grid-pattern {
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(196, 255, 0, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(196, 255, 0, 0.03) 1px, transparent 1px);
-  background-size: 60px 60px;
-  pointer-events: none;
-  mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%);
-  -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%);
-}
-
-/* Metric card glow border (like CDR homepage) */
+/* Metric card glow border (CDR homepage style) */
 .plan-glow-card {
   border: 1px solid rgba(196, 255, 0, 0.2);
-  background: rgba(196, 255, 0, 0.03);
+  background: rgba(196, 255, 0, 0.04);
   border-radius: 16px;
-  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: border-color 0.4s ease, box-shadow 0.4s ease, background 0.4s ease;
 }
 .plan-glow-card:hover {
-  border-color: rgba(196, 255, 0, 0.4);
-  box-shadow: 0 0 30px rgba(196, 255, 0, 0.08);
+  border-color: rgba(196, 255, 0, 0.45);
+  box-shadow: 0 0 40px rgba(196, 255, 0, 0.1), inset 0 0 40px rgba(196, 255, 0, 0.03);
+  background: rgba(196, 255, 0, 0.06);
 }
 
-/* Animated number counter pulse */
-.plan-counter {
-  display: inline-block;
-  animation: plan-counter-in 1s cubic-bezier(0.16, 1, 0.3, 1) both;
+/* Gradient mesh blob animations */
+@keyframes plan-drift-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(-50px, 40px) scale(1.08); }
+  66% { transform: translate(40px, -30px) scale(0.95); }
 }
-
-@keyframes plan-counter-in {
-  from { opacity: 0; transform: translateY(20px) scale(0.95); filter: blur(4px); }
-  to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+@keyframes plan-drift-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(60px, -50px) scale(1.1); }
+  66% { transform: translate(-40px, 60px) scale(0.9); }
+}
+@keyframes plan-drift-3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(-70px, -40px) scale(1.05); }
+  66% { transform: translate(50px, 50px) scale(0.95); }
+}
+@keyframes plan-glow-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
 }
 
 /* Section reveal */
 .plan-section {
   opacity: 0;
-  transform: translateY(40px);
+  transform: translateY(30px);
   animation: plan-reveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
-
 @keyframes plan-reveal {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Green divider line */
+/* Green divider */
 .plan-divider-green {
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(196, 255, 0, 0.3), transparent);
-}
-
-/* Floating data particles */
-.plan-particle {
-  position: absolute;
-  font-family: var(--font-mono, monospace);
-  font-weight: 600;
-  color: rgba(196, 255, 0, 0.6);
-  pointer-events: none;
-  user-select: none;
-  animation: plan-float linear infinite;
-}
-
-@keyframes plan-float {
-  0% { transform: translateY(100vh); opacity: 0; }
-  8% { opacity: 1; }
-  92% { opacity: 1; }
-  100% { transform: translateY(-50px); opacity: 0; }
+  background: linear-gradient(90deg, transparent, rgba(196, 255, 0, 0.25), transparent);
 }
