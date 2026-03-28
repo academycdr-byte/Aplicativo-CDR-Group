@@ -15,6 +15,7 @@ import {
   Wallet,
   Calculator,
   Layers,
+  Target,
   type LucideIcon,
   ChevronRight,
 } from "lucide-react";
@@ -69,6 +70,7 @@ export function Sidebar() {
 
     const aiNavItems: NavItem[] = [
       { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+      { name: "Plano de Ação", href: "/plano-de-acao", icon: Target },
     ];
 
     const platformNavItems: NavItem[] = [

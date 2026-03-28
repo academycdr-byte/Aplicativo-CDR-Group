@@ -56,6 +56,7 @@ model User {
   accounts    Account[]
   sessions    Session[]
   memberships Membership[]
+  actionPlans ActionPlan[]
 
   @@map("users")
 }
@@ -130,6 +131,9 @@ model Organization {
   // Creative Pipeline
   creativeBenchmark        CreativeBenchmark?
   creativeClassifications  CreativeClassification[]
+
+  // Action Plans
+  actionPlans     ActionPlan[]
 
   @@map("organizations")
 }
@@ -516,6 +520,11 @@ model ReportLog {
 
 // ─── CREATIVE PIPELINE (ESTEIRA DE CRIATIVOS) ────
 
+enum ActionPlanStatus {
+  DRAFT
+  FINALIZED
+}
+
 enum CreativeStatus {
   EM_TESTE
   CAMPEOES_ATIVOS
@@ -560,4 +569,37 @@ model CreativeClassification {
   @@unique([organizationId, creativeName])
   @@index([organizationId, status])
   @@map("creative_classifications")
+}
+
+// ─── ACTION PLANS (PLANO DE AÇÃO) ────────────────
+
+model ActionPlan {
+  id             String           @id @default(cuid())
+  organizationId String
+  title          String
+  periodStart    DateTime
+  periodEnd      DateTime
+  status         ActionPlanStatus @default(DRAFT)
+  publicToken    String           @unique @default(cuid())
+
+  // Auto-populated metrics (editable)
+  metrics        Json?            // { faturamento, investido, convertido, roas, cpa, ticketMedio }
+  topProducts    Json?            // [{ name, quantity, revenue }]
+  topCollections Json?            // [{ name, quantity, revenue }]
+  topCreatives   Json?            // [{ adId, name, thumbnailUrl, spend, sales, roas, score }]
+
+  // Gaps and Levers (tree structure)
+  gaps           Json             @default("[]")
+  levers         Json             @default("[]")
+
+  createdById    String
+  createdBy      User             @relation(fields: [createdById], references: [id])
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([organizationId, status])
+  @@index([organizationId, createdAt])
+  @@map("action_plans")
 }

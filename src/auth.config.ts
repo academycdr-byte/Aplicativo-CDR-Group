@@ -15,7 +15,13 @@ export const authConfig = {
         nextUrl.pathname.startsWith("/ads") ||
         nextUrl.pathname.startsWith("/reports") ||
         nextUrl.pathname.startsWith("/settings") ||
-        nextUrl.pathname.startsWith("/admin");
+        nextUrl.pathname.startsWith("/admin") ||
+        nextUrl.pathname.startsWith("/plano-de-acao") ||
+        nextUrl.pathname.startsWith("/best-sellers") ||
+        nextUrl.pathname.startsWith("/esteira-criativos") ||
+        nextUrl.pathname.startsWith("/financeiro") ||
+        nextUrl.pathname.startsWith("/dre-performance") ||
+        nextUrl.pathname.startsWith("/analytics");
 
       if (isOnDashboard) {
         if (isLoggedIn) return true;
