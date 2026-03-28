@@ -88,18 +88,36 @@ export default async function PublicPlanPage({ params }: PageProps) {
             alt="CDR Group"
             width={100}
             height={28}
-            className="opacity-60"
+            className="opacity-90"
             unoptimized
           />
-          <div
-            className="w-9 h-9 rounded-lg flex items-center justify-center"
-            style={{ background: G }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="7" y1="17" x2="17" y2="7" />
-              <polyline points="7 7 17 7 17 17" />
-            </svg>
-          </div>
+          {plan.organization.logo ? (
+            <div
+              className="w-10 h-10 relative rounded-xl overflow-hidden"
+              style={{
+                border: `1.5px solid ${G}44`,
+                boxShadow: `0 0 16px ${G}15`,
+              }}
+            >
+              <Image
+                src={plan.organization.logo}
+                alt={plan.organization.name}
+                fill
+                className="object-cover"
+                unoptimized
+              />
+            </div>
+          ) : (
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center"
+              style={{ background: G }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="7" y1="17" x2="17" y2="7" />
+                <polyline points="7 7 17 7 17 17" />
+              </svg>
+            </div>
+          )}
         </div>
 
         <div className="relative z-10 max-w-[960px] mx-auto px-6 text-center">
