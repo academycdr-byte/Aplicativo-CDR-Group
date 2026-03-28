@@ -451,7 +451,6 @@ function ImageUploadField({
   onChange: (url: string) => void;
 }) {
   const [uploading, setUploading] = useState(false);
-  const inputId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -473,29 +472,30 @@ function ImageUploadField({
     }
   };
 
-  const stableId = `img-upload-${inputId.replace(/:/g, "")}`;
+  const openPicker = () => fileInputRef.current?.click();
 
   return (
     <div className="mb-3">
       <input
         ref={fileInputRef}
-        id={stableId}
         type="file"
-        accept="image/jpeg,image/png,image/webp,image/gif"
+        accept="image/*"
         onChange={handleUpload}
-        className="sr-only"
+        tabIndex={-1}
+        style={{ position: "fixed", top: -9999, left: -9999, opacity: 0, width: 0, height: 0 }}
       />
       {value ? (
         <div className="relative rounded-lg overflow-hidden border border-border">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={value} alt="Referência" className="w-full max-h-48 object-cover" />
           <div className="absolute top-2 right-2 flex gap-1">
-            <label
-              htmlFor={stableId}
-              className="p-1.5 rounded-lg bg-background/80 backdrop-blur border border-border text-xs hover:bg-muted transition-colors cursor-pointer"
+            <button
+              type="button"
+              onClick={openPicker}
+              className="p-1.5 rounded-lg bg-background/80 backdrop-blur border border-border text-xs hover:bg-muted transition-colors"
             >
               Trocar
-            </label>
+            </button>
             <button
               type="button"
               onClick={() => onChange("")}
@@ -506,10 +506,11 @@ function ImageUploadField({
           </div>
         </div>
       ) : (
-        <label
-          htmlFor={stableId}
-          aria-disabled={uploading}
-          className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-dashed border-border text-sm text-muted-foreground hover:bg-muted/50 hover:border-muted-foreground/30 transition-colors cursor-pointer ${uploading ? "opacity-50 pointer-events-none" : ""}`}
+        <button
+          type="button"
+          onClick={openPicker}
+          disabled={uploading}
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-dashed border-border text-sm text-muted-foreground hover:bg-muted/50 hover:border-muted-foreground/30 transition-colors cursor-pointer disabled:opacity-50"
         >
           {uploading ? (
             "Enviando..."
@@ -519,7 +520,7 @@ function ImageUploadField({
               Adicionar imagem de referência
             </>
           )}
-        </label>
+        </button>
       )}
     </div>
   );
