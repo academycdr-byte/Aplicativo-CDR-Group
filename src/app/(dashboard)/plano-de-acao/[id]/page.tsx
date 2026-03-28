@@ -29,6 +29,12 @@ import {
   Pencil,
   Package,
   Lightbulb,
+  ClipboardList,
+  MessageSquare,
+  Calendar,
+  User,
+  CheckCircle2,
+  Circle,
 } from "lucide-react";
 import { VideoModal } from "@/components/ads/video-modal";
 import { toast } from "sonner";
@@ -44,6 +50,8 @@ import {
   type GapNode,
   type LeverNode,
   type TreeNode,
+  type NextStep,
+  type SectionNotes,
 } from "@/actions/action-plan";
 
 // ─── Helpers ──────────────────────────────────────
@@ -646,6 +654,208 @@ function EditableTitle({
   );
 }
 
+// ─── Section Notes Field ─────────────────────────
+
+function SectionNotesField({
+  value,
+  onChange,
+  editable,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  editable: boolean;
+}) {
+  if (!editable && !value) return null;
+
+  return (
+    <div className="px-5 pb-4 -mt-2">
+      {editable ? (
+        <div className="flex items-start gap-2">
+          <MessageSquare className="w-4 h-4 text-muted-foreground/50 mt-2.5 shrink-0" />
+          <textarea
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder="Adicionar observação sobre esta seção..."
+            rows={2}
+            className="flex-1 px-3 py-2 rounded-lg border border-border bg-background text-sm placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+        </div>
+      ) : (
+        <div className="flex items-start gap-2 text-sm text-muted-foreground">
+          <MessageSquare className="w-4 h-4 mt-0.5 shrink-0" />
+          <p className="italic">{value}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Next Steps Section ──────────────────────────
+
+const PRIORITY_CONFIG = {
+  alta: { label: "Alta", color: "text-red-400 bg-red-500/10 border-red-500/20" },
+  media: { label: "Média", color: "text-amber-400 bg-amber-500/10 border-amber-500/20" },
+  baixa: { label: "Baixa", color: "text-blue-400 bg-blue-500/10 border-blue-500/20" },
+};
+
+function NextStepsSection({
+  items,
+  onChange,
+  editable,
+}: {
+  items: NextStep[];
+  onChange: (items: NextStep[]) => void;
+  editable: boolean;
+}) {
+  const addStep = () => {
+    onChange([
+      ...items,
+      { id: genId(), action: "", responsible: "", deadline: "", priority: "media", done: false },
+    ]);
+  };
+
+  const updateStep = (index: number, updated: NextStep) => {
+    const newItems = [...items];
+    newItems[index] = updated;
+    onChange(newItems);
+  };
+
+  const deleteStep = (index: number) => {
+    onChange(items.filter((_, i) => i !== index));
+  };
+
+  return (
+    <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-primary/5">
+        <div className="flex items-center gap-2">
+          <ClipboardList className="w-5 h-5 text-primary" />
+          <h3 className="font-semibold">Próximos Passos</h3>
+          <span className="text-xs text-muted-foreground ml-1">({items.length})</span>
+        </div>
+        {editable && (
+          <button
+            onClick={addStep}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border hover:bg-muted transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Adicionar
+          </button>
+        )}
+      </div>
+
+      <div className="p-5 space-y-3">
+        {items.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">
+            Nenhum próximo passo definido
+          </p>
+        ) : (
+          items.map((step, i) => (
+            <div
+              key={step.id}
+              className={`rounded-lg border border-border/50 p-4 transition-opacity ${step.done ? "opacity-50" : ""}`}
+            >
+              {editable ? (
+                <div className="space-y-3">
+                  {/* Row 1: Done toggle + Action */}
+                  <div className="flex items-start gap-3">
+                    <button
+                      onClick={() => updateStep(i, { ...step, done: !step.done })}
+                      className="mt-0.5 shrink-0"
+                      title={step.done ? "Marcar como pendente" : "Marcar como concluído"}
+                    >
+                      {step.done ? (
+                        <CheckCircle2 className="w-5 h-5 text-primary" />
+                      ) : (
+                        <Circle className="w-5 h-5 text-muted-foreground/30 hover:text-muted-foreground/60 transition-colors" />
+                      )}
+                    </button>
+                    <input
+                      type="text"
+                      value={step.action}
+                      onChange={(e) => updateStep(i, { ...step, action: e.target.value })}
+                      placeholder="Descreva a ação..."
+                      className={`flex-1 px-3 py-2 rounded-lg border border-border bg-background text-sm placeholder:text-muted-foreground/50 ${step.done ? "line-through" : ""}`}
+                    />
+                    <button
+                      onClick={() => deleteStep(i)}
+                      className="p-1.5 rounded hover:bg-red-500/10 shrink-0"
+                      title="Remover"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                    </button>
+                  </div>
+                  {/* Row 2: Responsible + Deadline + Priority */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 ml-8">
+                    <div className="relative">
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/40" />
+                      <input
+                        type="text"
+                        value={step.responsible}
+                        onChange={(e) => updateStep(i, { ...step, responsible: e.target.value })}
+                        placeholder="Responsável"
+                        className="w-full pl-8 pr-3 py-2 rounded-lg border border-border bg-background text-sm placeholder:text-muted-foreground/50"
+                      />
+                    </div>
+                    <div className="relative">
+                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/40" />
+                      <input
+                        type="date"
+                        value={step.deadline}
+                        onChange={(e) => updateStep(i, { ...step, deadline: e.target.value })}
+                        className="w-full pl-8 pr-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground [&::-webkit-calendar-picker-indicator]:invert"
+                      />
+                    </div>
+                    <select
+                      value={step.priority}
+                      onChange={(e) => updateStep(i, { ...step, priority: e.target.value as NextStep["priority"] })}
+                      className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+                    >
+                      <option value="alta">Prioridade Alta</option>
+                      <option value="media">Prioridade Média</option>
+                      <option value="baixa">Prioridade Baixa</option>
+                    </select>
+                  </div>
+                </div>
+              ) : (
+                /* Read-only view */
+                <div className="flex items-start gap-3">
+                  {step.done ? (
+                    <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                  ) : (
+                    <Circle className="w-5 h-5 text-muted-foreground/30 shrink-0 mt-0.5" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-medium ${step.done ? "line-through text-muted-foreground" : ""}`}>
+                      {step.action}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-3 mt-1.5">
+                      {step.responsible && (
+                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                          <User className="w-3 h-3" />
+                          {step.responsible}
+                        </span>
+                      )}
+                      {step.deadline && (
+                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                          <Calendar className="w-3 h-3" />
+                          {new Date(step.deadline + "T12:00:00").toLocaleDateString("pt-BR")}
+                        </span>
+                      )}
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border ${PRIORITY_CONFIG[step.priority].color}`}>
+                        {PRIORITY_CONFIG[step.priority].label}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Top Items Table ──────────────────────────────
 
 function TopItemsTable<T extends Record<string, unknown>>({
@@ -801,6 +1011,8 @@ export default function ActionPlanEditorPage() {
         topCreatives: plan.topCreatives ?? undefined,
         gaps: plan.gaps,
         levers: plan.levers,
+        nextSteps: plan.nextSteps,
+        sectionNotes: plan.sectionNotes,
       });
       setHasChanges(false);
       toast.success("Plano salvo!");
@@ -1183,6 +1395,11 @@ export default function ActionPlanEditorPage() {
           </tr>
         )}
       />
+      <SectionNotesField
+        value={plan.sectionNotes?.products || ""}
+        onChange={(val) => update("sectionNotes", { ...plan.sectionNotes, products: val })}
+        editable={!!canEdit}
+      />
 
       {/* Top Collections */}
       <TopItemsTable<TopCollection>
@@ -1262,6 +1479,11 @@ export default function ActionPlanEditorPage() {
             )}
           </tr>
         )}
+      />
+      <SectionNotesField
+        value={plan.sectionNotes?.collections || ""}
+        onChange={(val) => update("sectionNotes", { ...plan.sectionNotes, collections: val })}
+        editable={!!canEdit}
       />
 
       {/* Top Creatives */}
@@ -1366,6 +1588,11 @@ export default function ActionPlanEditorPage() {
           </tr>
         )}
       />
+      <SectionNotesField
+        value={plan.sectionNotes?.creatives || ""}
+        onChange={(val) => update("sectionNotes", { ...plan.sectionNotes, creatives: val })}
+        editable={!!canEdit}
+      />
 
       {/* Video Modal for Creatives */}
       {isModalOpen && selectedCreative && (
@@ -1411,6 +1638,13 @@ export default function ActionPlanEditorPage() {
         onChange={(items) => update("levers", items as LeverNode[])}
         editable={!!canEdit}
         colorClass="bg-emerald-500/5"
+      />
+
+      {/* Next Steps */}
+      <NextStepsSection
+        items={plan.nextSteps || []}
+        onChange={(items) => update("nextSteps", items)}
+        editable={!!canEdit}
       />
     </div>
   );

@@ -9,6 +9,8 @@ import type {
   GapNode,
   LeverNode,
   TreeNode,
+  NextStep,
+  SectionNotes,
 } from "@/actions/action-plan";
 import { CreativesSection } from "./creatives-section";
 import { GradientMesh, SectionGlow } from "./hero-effects";
@@ -68,6 +70,8 @@ export default async function PublicPlanPage({ params }: PageProps) {
   const creatives = plan.topCreatives || [];
   const gaps = plan.gaps || [];
   const levers = plan.levers || [];
+  const nextSteps = plan.nextSteps || [];
+  const sectionNotes = plan.sectionNotes || {};
 
   let sectionNum = 0;
 
@@ -373,6 +377,9 @@ export default async function PublicPlanPage({ params }: PageProps) {
                       </tbody>
                     </table>
                   </div>
+                  {sectionNotes.products && (
+                    <NoteBlock text={sectionNotes.products} />
+                  )}
                 </div>
               </section>
             </ScrollReveal>
@@ -453,6 +460,9 @@ export default async function PublicPlanPage({ params }: PageProps) {
                       </div>
                     ))}
                   </StaggerChildren>
+                  {sectionNotes.collections && (
+                    <NoteBlock text={sectionNotes.collections} />
+                  )}
                 </div>
               </section>
             </ScrollReveal>
@@ -480,6 +490,9 @@ export default async function PublicPlanPage({ params }: PageProps) {
                     Melhor performance no período
                   </p>
                   <CreativesSection creatives={creatives} />
+                  {sectionNotes.creatives && (
+                    <NoteBlock text={sectionNotes.creatives} />
+                  )}
                 </div>
               </section>
             </ScrollReveal>
@@ -543,6 +556,95 @@ export default async function PublicPlanPage({ params }: PageProps) {
               </div>
             </section>
           </ScrollReveal>
+        )}
+
+        {/* ════════════════════════════════════════
+            SECTION — Próximos Passos
+            ════════════════════════════════════════ */}
+        {nextSteps.length > 0 && (
+          <>
+            <ScrollReveal>
+              <section className="py-20 md:py-28 relative overflow-hidden">
+                <SectionGlow position="right" intensity={0.05} />
+                <div className="relative max-w-[960px] mx-auto px-6">
+                  <SectionHead
+                    num={`0${++sectionNum}`}
+                    title="Próximos Passos"
+                  />
+                  <p
+                    className="-mt-4 mb-10"
+                    style={{ fontSize: "15px", color: `${MUTED}55` }}
+                  >
+                    Plano de execução para o próximo período
+                  </p>
+                  <div className="space-y-4">
+                    {nextSteps.map((step: NextStep, i: number) => (
+                      <div
+                        key={step.id || i}
+                        className="plan-glow-card p-6"
+                        style={{
+                          borderLeft: `3px solid ${step.priority === "alta" ? "#f87171" : step.priority === "media" ? "#fbbf24" : "#60a5fa"}`,
+                          opacity: step.done ? 0.5 : 1,
+                        }}
+                      >
+                        <div className="flex items-start gap-4">
+                          {step.done ? (
+                            <svg className="w-5 h-5 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke={G} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          ) : (
+                            <span
+                              className="w-5 h-5 rounded-full border-2 shrink-0 mt-0.5"
+                              style={{
+                                borderColor: step.priority === "alta" ? "#f87171" : step.priority === "media" ? "#fbbf24" : "#60a5fa",
+                              }}
+                            />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p style={{
+                              fontSize: "15px",
+                              fontWeight: 500,
+                              color: step.done ? `${MUTED}66` : "rgba(255,255,255,0.85)",
+                              textDecoration: step.done ? "line-through" : "none",
+                              fontFamily: CLASH,
+                            }}>
+                              {step.action}
+                            </p>
+                            <div className="flex flex-wrap items-center gap-4 mt-2">
+                              {step.responsible && (
+                                <span style={{ fontSize: "12px", color: `${MUTED}66` }}>
+                                  👤 {step.responsible}
+                                </span>
+                              )}
+                              {step.deadline && (
+                                <span style={{ fontSize: "12px", color: `${MUTED}66` }}>
+                                  📅 {new Date(step.deadline + "T12:00:00").toLocaleDateString("pt-BR")}
+                                </span>
+                              )}
+                              <span
+                                className="inline-flex items-center px-2.5 py-0.5 rounded-full"
+                                style={{
+                                  fontSize: "10px",
+                                  fontWeight: 700,
+                                  letterSpacing: "0.5px",
+                                  textTransform: "uppercase" as const,
+                                  background: step.priority === "alta" ? "rgba(248,113,113,0.12)" : step.priority === "media" ? "rgba(251,191,36,0.12)" : "rgba(96,165,250,0.12)",
+                                  color: step.priority === "alta" ? "#f87171" : step.priority === "media" ? "#fbbf24" : "#60a5fa",
+                                  border: `1px solid ${step.priority === "alta" ? "rgba(248,113,113,0.2)" : step.priority === "media" ? "rgba(251,191,36,0.2)" : "rgba(96,165,250,0.2)"}`,
+                                }}
+                              >
+                                {step.priority === "alta" ? "Alta" : step.priority === "media" ? "Média" : "Baixa"}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </section>
+            </ScrollReveal>
+          </>
         )}
 
         {/* ════════════════════════════════════════
@@ -886,6 +988,27 @@ function TC({
           __html: `.plan-step-card:nth-child(${index + 1})::after { background: ${c}; }`,
         }}
       />
+    </div>
+  );
+}
+
+function NoteBlock({ text }: { text: string }) {
+  return (
+    <div
+      className="mt-8 p-5 rounded-xl"
+      style={{
+        background: "rgba(255,255,255,0.02)",
+        border: "1px solid rgba(255,255,255,0.06)",
+      }}
+    >
+      <div className="flex items-start gap-3">
+        <svg className="w-4 h-4 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke={`${MUTED}55`} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+        </svg>
+        <p style={{ fontSize: "13px", color: `${MUTED}77`, lineHeight: "1.6", fontStyle: "italic" }}>
+          {text}
+        </p>
+      </div>
     </div>
   );
 }

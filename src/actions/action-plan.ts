@@ -67,6 +67,21 @@ export type TopCreative = {
   score: number;
 };
 
+export type NextStep = {
+  id: string;
+  action: string;
+  responsible: string;
+  deadline: string;
+  priority: "alta" | "media" | "baixa";
+  done: boolean;
+};
+
+export type SectionNotes = {
+  products?: string;
+  collections?: string;
+  creatives?: string;
+};
+
 export type ActionPlanFull = {
   id: string;
   title: string;
@@ -80,6 +95,8 @@ export type ActionPlanFull = {
   topCreatives: TopCreative[] | null;
   gaps: GapNode[];
   levers: LeverNode[];
+  nextSteps: NextStep[];
+  sectionNotes: SectionNotes;
   createdAt: Date;
   updatedAt: Date;
   createdBy: { name: string | null; email: string };
@@ -167,6 +184,8 @@ export async function getActionPlan(planId: string) {
     topCreatives: plan.topCreatives as TopCreative[] | null,
     gaps: (plan.gaps as GapNode[]) || [],
     levers: (plan.levers as LeverNode[]) || [],
+    nextSteps: (plan.nextSteps as NextStep[]) || [],
+    sectionNotes: (plan.sectionNotes as SectionNotes) || {},
   } as ActionPlanFull;
 }
 
@@ -600,6 +619,8 @@ export async function updateActionPlan(
     topCreatives?: TopCreative[];
     gaps?: GapNode[];
     levers?: LeverNode[];
+    nextSteps?: NextStep[];
+    sectionNotes?: SectionNotes;
     status?: "DRAFT" | "FINALIZED";
   }
 ) {
@@ -625,6 +646,10 @@ export async function updateActionPlan(
     updateData.gaps = data.gaps as unknown as Prisma.JsonArray;
   if (data.levers !== undefined)
     updateData.levers = data.levers as unknown as Prisma.JsonArray;
+  if (data.nextSteps !== undefined)
+    updateData.nextSteps = data.nextSteps as unknown as Prisma.JsonArray;
+  if (data.sectionNotes !== undefined)
+    updateData.sectionNotes = data.sectionNotes as unknown as Prisma.JsonObject;
 
   const plan = await prisma.actionPlan.update({
     where: {
@@ -726,6 +751,8 @@ export async function getActionPlanByToken(token: string) {
     topCreatives: plan.topCreatives as TopCreative[] | null,
     gaps: (plan.gaps as GapNode[]) || [],
     levers: (plan.levers as LeverNode[]) || [],
+    nextSteps: (plan.nextSteps as NextStep[]) || [],
+    sectionNotes: (plan.sectionNotes as SectionNotes) || {},
     organization: plan.organization,
     createdBy: plan.createdBy,
     createdAt: plan.createdAt,

@@ -592,6 +592,10 @@ model ActionPlan {
   gaps           Json             @default("[]")
   levers         Json             @default("[]")
 
+  // Next Steps and Section Notes
+  nextSteps      Json             @default("[]")
+  sectionNotes   Json             @default("{}")
+
   createdById    String
   createdBy      User             @relation(fields: [createdById], references: [id])
   organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
