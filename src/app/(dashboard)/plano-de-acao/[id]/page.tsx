@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useId, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Image from "next/image";
@@ -451,7 +451,8 @@ function ImageUploadField({
   onChange: (url: string) => void;
 }) {
   const [uploading, setUploading] = useState(false);
-  const inputId = useRef(`img-upload-${Math.random().toString(36).slice(2, 8)}`).current;
+  const inputId = useId();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -468,37 +469,33 @@ function ImageUploadField({
       // silently fail
     } finally {
       setUploading(false);
-      const el = document.getElementById(inputId) as HTMLInputElement | null;
-      if (el) el.value = "";
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
-  const triggerPicker = () => {
-    const el = document.getElementById(inputId) as HTMLInputElement | null;
-    el?.click();
-  };
+  const stableId = `img-upload-${inputId.replace(/:/g, "")}`;
 
   return (
     <div className="mb-3">
       <input
-        id={inputId}
+        ref={fileInputRef}
+        id={stableId}
         type="file"
         accept="image/jpeg,image/png,image/webp,image/gif"
         onChange={handleUpload}
-        style={{ position: "absolute", width: 0, height: 0, opacity: 0, overflow: "hidden" }}
+        className="sr-only"
       />
       {value ? (
         <div className="relative rounded-lg overflow-hidden border border-border">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={value} alt="Referência" className="w-full max-h-48 object-cover" />
           <div className="absolute top-2 right-2 flex gap-1">
-            <button
-              type="button"
-              onClick={triggerPicker}
-              className="p-1.5 rounded-lg bg-background/80 backdrop-blur border border-border text-xs hover:bg-muted transition-colors"
+            <label
+              htmlFor={stableId}
+              className="p-1.5 rounded-lg bg-background/80 backdrop-blur border border-border text-xs hover:bg-muted transition-colors cursor-pointer"
             >
               Trocar
-            </button>
+            </label>
             <button
               type="button"
               onClick={() => onChange("")}
@@ -509,11 +506,10 @@ function ImageUploadField({
           </div>
         </div>
       ) : (
-        <button
-          type="button"
-          onClick={triggerPicker}
-          disabled={uploading}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-dashed border-border text-sm text-muted-foreground hover:bg-muted/50 hover:border-muted-foreground/30 transition-colors disabled:opacity-50"
+        <label
+          htmlFor={stableId}
+          aria-disabled={uploading}
+          className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-dashed border-border text-sm text-muted-foreground hover:bg-muted/50 hover:border-muted-foreground/30 transition-colors cursor-pointer ${uploading ? "opacity-50 pointer-events-none" : ""}`}
         >
           {uploading ? (
             "Enviando..."
@@ -523,7 +519,7 @@ function ImageUploadField({
               Adicionar imagem de referência
             </>
           )}
-        </button>
+        </label>
       )}
     </div>
   );
