@@ -1,31 +1,58 @@
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import { getActionPlanByToken } from "@/actions/action-plan";
-import type { PlanMetrics, TopProduct, TopCollection, TopCreative, GapNode, LeverNode, TreeNode } from "@/actions/action-plan";
+import type {
+  PlanMetrics,
+  TopProduct,
+  TopCollection,
+  TopCreative,
+  GapNode,
+  LeverNode,
+  TreeNode,
+} from "@/actions/action-plan";
 import { CreativesSection } from "./creatives-section";
-import { GradientMesh } from "./hero-effects";
+import { GradientMesh, SectionGlow } from "./hero-effects";
+import { ScrollReveal, StaggerChildren } from "./scroll-reveal";
 import type { Metadata } from "next";
 
 type PageProps = { params: Promise<{ token: string }> };
 
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: PageProps): Promise<Metadata> {
   const { token } = await params;
   const plan = await getActionPlanByToken(token);
   if (!plan) return { title: "Plano não encontrado" };
-  return { title: `${plan.title} | ${plan.organization.name}`, description: `Plano de Ação — ${plan.organization.name}` };
+  return {
+    title: `${plan.title} | ${plan.organization.name}`,
+    description: `Plano de Ação — ${plan.organization.name}`,
+  };
 }
 
-/* CDR Brand Tokens */
-const P = "#BEE000"; /* Primary — hsl(73 100% 50%) */
+/* ══ CDR Brand Tokens (exact from cdrgroup.com.br) ══ */
+const G = "#BEFF0A"; /* CDR Green — site exact */
 const BG = "#000000";
-const CARD = "#141414";
-const BORDER = "#1A1A1A";
 const MUTED = "#B3B3B3";
+const CLASH = '"Clash", "Inter", sans-serif';
 
-const fmt = (v: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
-const fmtN = (v: number, d = 2) => new Intl.NumberFormat("pt-BR", { minimumFractionDigits: d, maximumFractionDigits: d }).format(v);
-const fmtD = (date: Date) => new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "long", year: "numeric" }).format(new Date(date));
+const fmt = (v: number) =>
+  new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(v);
+const fmtN = (v: number, d = 2) =>
+  new Intl.NumberFormat("pt-BR", {
+    minimumFractionDigits: d,
+    maximumFractionDigits: d,
+  }).format(v);
+const fmtD = (date: Date) =>
+  new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  }).format(new Date(date));
 
+/* ══ Page ══ */
 export default async function PublicPlanPage({ params }: PageProps) {
   const { token } = await params;
   const plan = await getActionPlanByToken(token);
@@ -38,173 +65,514 @@ export default async function PublicPlanPage({ params }: PageProps) {
   const gaps = plan.gaps || [];
   const levers = plan.levers || [];
 
-  return (
-    <div className="min-h-screen text-white antialiased" style={{ background: BG, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+  let sectionNum = 0;
 
-      {/* ════ HERO ════ */}
-      <header className="relative overflow-hidden pb-16 md:pb-24 pt-14 md:pt-20">
+  return (
+    <div
+      className="min-h-screen text-white antialiased"
+      style={{
+        background: BG,
+        fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+      }}
+    >
+      {/* ════════════════════════════════════════
+          HERO — CDR Site Style (aurora mesh + grid + KPIs)
+          ════════════════════════════════════════ */}
+      <header className="relative overflow-hidden min-h-[85vh] md:min-h-[90vh] flex items-center justify-center">
         <GradientMesh />
-        <div className="relative z-10 max-w-[960px] mx-auto px-6">
-          {/* Badge — CDR style pill */}
-          <div className="flex justify-center mb-8">
-            <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-[200px]" style={{ border: `1px solid ${P}33`, background: `${P}0A` }}>
-              {plan.organization.logo && <Image src={plan.organization.logo} alt="" width={20} height={20} className="rounded-[8px]" unoptimized />}
-              <span style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase" as const, color: P }}>{plan.organization.name}</span>
+
+        {/* CDR Logo — top left */}
+        <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-6 md:px-10 py-6">
+          <Image
+            src="/logo-cdr.png"
+            alt="CDR Group"
+            width={100}
+            height={28}
+            className="opacity-60"
+            unoptimized
+          />
+          <div
+            className="w-9 h-9 rounded-lg flex items-center justify-center"
+            style={{
+              background: `${G}`,
+            }}
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#000"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <line x1="7" y1="17" x2="17" y2="7" />
+              <polyline points="7 7 17 7 17 17" />
+            </svg>
+          </div>
+        </div>
+
+        <div className="relative z-10 max-w-[960px] mx-auto px-6 text-center">
+          {/* Badge pill — CDR style */}
+          <div className="flex justify-center mb-10">
+            <div
+              className="inline-flex items-center gap-2.5 px-6 py-3 rounded-[200px]"
+              style={{
+                border: `1px solid ${G}33`,
+                background: `${G}0A`,
+                backdropFilter: "blur(12px)",
+              }}
+            >
+              {plan.organization.logo && (
+                <Image
+                  src={plan.organization.logo}
+                  alt=""
+                  width={22}
+                  height={22}
+                  className="rounded-lg"
+                  unoptimized
+                />
+              )}
+              <span
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  letterSpacing: "1.5px",
+                  textTransform: "uppercase" as const,
+                  color: G,
+                }}
+              >
+                {plan.organization.name}
+              </span>
             </div>
           </div>
 
-          {/* Title — CDR heading-1: 32-56px, 600, -0.32px tracking */}
-          <h1 className="text-center" style={{ fontSize: "clamp(32px, 6vw, 56px)", fontWeight: 600, lineHeight: 1.1, letterSpacing: "-1.12px" }}>
+          {/* Title — Clash Display (CDR hero style) */}
+          <h1
+            style={{
+              fontFamily: CLASH,
+              fontSize: "clamp(36px, 7vw, 72px)",
+              fontWeight: 400,
+              lineHeight: 1.05,
+              letterSpacing: "-0.02em",
+              color: "rgba(255, 255, 255, 0.92)",
+            }}
+          >
             {plan.title}
           </h1>
-          <p className="text-center mt-4" style={{ fontSize: "14px", fontWeight: 400, color: `${MUTED}99` }}>
+
+          {/* Period */}
+          <p
+            className="mt-5"
+            style={{
+              fontSize: "15px",
+              fontWeight: 400,
+              color: `${MUTED}88`,
+              letterSpacing: "0.3px",
+            }}
+          >
             {fmtD(plan.periodStart)} — {fmtD(plan.periodEnd)}
           </p>
 
-          {/* Hero KPI Cards — CDR homepage style */}
+          {/* Hero KPI Cards — CDR site .metrica style */}
           {m && (
-            <div className="grid grid-cols-3 gap-4 max-w-[720px] mx-auto mt-12">
-              <HeroKPI value={fmt(m.faturamento)} label="Faturamento Pago" />
-              <HeroKPI value={`${fmtN(m.roas)}x`} label="ROAS" />
-              <HeroKPI value={fmt(m.investido)} label="Investido" />
-            </div>
+            <StaggerChildren
+              className="grid grid-cols-3 gap-4 md:gap-5 max-w-[780px] mx-auto mt-14"
+              stagger={120}
+            >
+              <div data-stagger className="plan-reveal">
+                <HeroKPI value={fmt(m.faturamento)} label="Faturamento Pago" />
+              </div>
+              <div data-stagger className="plan-reveal">
+                <HeroKPI value={`${fmtN(m.roas)}x`} label="ROAS" />
+              </div>
+              <div data-stagger className="plan-reveal">
+                <HeroKPI value={fmt(m.investido)} label="Investido" />
+              </div>
+            </StaggerChildren>
           )}
         </div>
+
+        {/* Bottom fade to black */}
+        <div
+          className="absolute bottom-0 left-0 right-0 h-32 pointer-events-none"
+          style={{
+            background:
+              "linear-gradient(to top, #000000, transparent)",
+          }}
+        />
       </header>
 
       <main>
-        {/* ════ METRICS ════ */}
+        {/* ════════════════════════════════════════
+            SECTION — Métricas do Período
+            ════════════════════════════════════════ */}
         {m && (
-          <section className="py-16 md:py-24 plan-section" style={{ background: CARD, animationDelay: "0s" }}>
-            <div className="max-w-[960px] mx-auto px-6">
-              <SL>Métricas do Período</SL>
-              <div className="grid md:grid-cols-3 gap-4 mt-8">
-                <MC label="Faturamento Pago" value={fmt(m.faturamento)} sub={`${m.totalPedidos} pedidos`} />
-                <MC label="Valor Investido" value={fmt(m.investido)} sub="Meta Ads" />
-                <MC label="Valor Convertido" value={fmt(m.convertido)} sub="Meta Ads" />
-              </div>
-              <div className="grid md:grid-cols-3 gap-4 mt-3">
-                <MC label="ROAS" value={`${fmtN(m.roas)}x`} sub={m.roas >= 3 ? "Excelente" : m.roas >= 2 ? "Bom" : "Atenção"} accent={m.roas >= 3} />
-                <MC label="CPA" value={fmt(m.cpa)} sub={`${m.totalConversoes} conversões`} />
-                <MC label="Ticket Médio" value={fmt(m.ticketMedio)} />
-              </div>
-            </div>
-          </section>
-        )}
-
-        <div className="plan-divider" />
-
-        {/* ════ PRODUCTS ════ */}
-        {products.length > 0 && (
-          <section className="py-16 md:py-24 plan-section" style={{ background: BG, animationDelay: "50ms" }}>
-            <div className="max-w-[960px] mx-auto px-6">
-              <SL>Top 5 Produtos Mais Vendidos</SL>
-              <div className="mt-8 rounded-[10px] overflow-hidden" style={{ border: `1px solid ${BORDER}66` }}>
-                <table className="w-full">
-                  <thead>
-                    <tr style={{ background: `${CARD}` }}>
-                      <th className="px-5 py-3.5 text-left w-10" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase" as const, color: `${MUTED}66` }}>#</th>
-                      <th className="px-2 py-3.5 w-12" />
-                      <th className="px-4 py-3.5 text-left" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase" as const, color: `${MUTED}66` }}>Produto</th>
-                      <th className="px-4 py-3.5 text-right" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase" as const, color: `${MUTED}66` }}>Qtd</th>
-                      <th className="px-5 py-3.5 text-right" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase" as const, color: `${MUTED}66` }}>Faturamento</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {products.map((p: TopProduct, i: number) => (
-                      <tr key={i} className="transition-colors" style={{ borderTop: `1px solid ${BORDER}66` }} onMouseEnter={undefined}>
-                        <td className="px-5 py-4" style={{ fontSize: "14px", fontWeight: 700, color: P }}>{i + 1}</td>
-                        <td className="px-2 py-3">
-                          {p.imageUrl ? (
-                            <div className="w-10 h-10 relative rounded-[8px] overflow-hidden" style={{ border: `1px solid ${BORDER}` }}>
-                              <Image src={p.imageUrl} alt={p.name} fill className="object-cover" unoptimized sizes="40px" />
-                            </div>
-                          ) : <div className="w-10 h-10 rounded-[8px]" style={{ background: CARD }} />}
-                        </td>
-                        <td className="px-4 py-4" style={{ fontSize: "14px", fontWeight: 500, color: "white" }}>{p.name}</td>
-                        <td className="px-4 py-4 text-right" style={{ fontSize: "14px", color: `${MUTED}99` }}>{p.quantity}</td>
-                        <td className="px-5 py-4 text-right" style={{ fontSize: "14px", fontWeight: 600, color: "white" }}>{fmt(p.revenue)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* ════ COLLECTIONS — green tinted section ════ */}
-        {collections.length > 0 && (
-          <section className="relative py-16 md:py-24 overflow-hidden plan-section" style={{ background: BG, animationDelay: "100ms" }}>
-            <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at center, ${P}08 0%, transparent 70%)` }} />
-            <div className="relative max-w-[960px] mx-auto px-6">
-              <SL>Top Coleções com Mais Vendas</SL>
-              <div className="grid md:grid-cols-3 gap-4 mt-8">
-                {collections.map((c: TopCollection, i: number) => (
-                  <div key={i} className="plan-glow-card p-6 text-center">
-                    <span className="inline-flex w-8 h-8 rounded-[8px] items-center justify-center text-xs font-bold" style={{ background: P, color: BG }}>{i + 1}</span>
-                    <h4 className="mt-4" style={{ fontSize: "16px", fontWeight: 600 }}>{c.name}</h4>
-                    <p className="mt-2" style={{ fontSize: "30px", fontWeight: 700, letterSpacing: "-0.75px", color: P, fontVariantNumeric: "tabular-nums" }}>{c.quantity}</p>
-                    <p className="mt-1" style={{ fontSize: "12px", color: `${MUTED}66` }}>vendas · {fmt(c.revenue)}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-        )}
-
-        <div className="plan-divider" />
-
-        {/* ════ CREATIVES ════ */}
-        {creatives.length > 0 && (
-          <section className="py-16 md:py-24 plan-section" style={{ background: CARD, animationDelay: "150ms" }}>
-            <div className="max-w-[960px] mx-auto px-6">
-              <SL>Top 5 Criativos — Melhor Performance</SL>
-              <div className="mt-8"><CreativesSection creatives={creatives} /></div>
-            </div>
-          </section>
-        )}
-
-        <div className="plan-divider" />
-
-        {/* ════ GAPS ════ */}
-        {gaps.length > 0 && (
-          <section className="py-16 md:py-24 plan-section" style={{ background: BG, animationDelay: "200ms" }}>
-            <div className="max-w-[960px] mx-auto px-6">
-              <SL>Gaps Identificados</SL>
-              <p className="mt-1 mb-8" style={{ fontSize: "14px", color: `${MUTED}66` }}>Pontos de melhoria que precisam de atenção</p>
-              <div className="grid md:grid-cols-2 gap-3">
-                {gaps.map((g: GapNode, i: number) => <TC key={g.id} item={g} index={i} type="gap" />)}
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* ════ LEVERS ════ */}
-        {levers.length > 0 && (
           <>
-            <div className="plan-divider" />
-            <section className="relative py-16 md:py-24 overflow-hidden plan-section" style={{ background: BG, animationDelay: "250ms" }}>
-              <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at bottom left, ${P}06 0%, transparent 60%)` }} />
-              <div className="relative max-w-[960px] mx-auto px-6">
-                <SL>Alavancas de Crescimento</SL>
-                <p className="mt-1 mb-8" style={{ fontSize: "14px", color: `${MUTED}66` }}>Ações que vão gerar mais resultado</p>
-                <div className="grid md:grid-cols-2 gap-3">
-                  {levers.map((l: LeverNode, i: number) => <TC key={l.id} item={l} index={i} type="lever" />)}
+            <ScrollReveal>
+              <section className="py-20 md:py-28 relative overflow-hidden">
+                <SectionGlow position="right" intensity={0.05} />
+                <div className="relative max-w-[960px] mx-auto px-6">
+                  <SectionHead num={`0${++sectionNum}`} title="Métricas do Período" />
+                  <div className="grid md:grid-cols-3 gap-4 mt-10">
+                    <MC
+                      label="Faturamento Pago"
+                      value={fmt(m.faturamento)}
+                      sub={`${m.totalPedidos} pedidos`}
+                    />
+                    <MC
+                      label="Valor Investido"
+                      value={fmt(m.investido)}
+                      sub="Meta Ads"
+                    />
+                    <MC
+                      label="Valor Convertido"
+                      value={fmt(m.convertido)}
+                      sub="Meta Ads"
+                    />
+                  </div>
+                  <div className="grid md:grid-cols-3 gap-4 mt-4">
+                    <MC
+                      label="ROAS"
+                      value={`${fmtN(m.roas)}x`}
+                      sub={
+                        m.roas >= 3
+                          ? "Excelente"
+                          : m.roas >= 2
+                            ? "Bom"
+                            : "Atenção"
+                      }
+                      accent={m.roas >= 3}
+                    />
+                    <MC
+                      label="CPA"
+                      value={fmt(m.cpa)}
+                      sub={`${m.totalConversoes} conversões`}
+                    />
+                    <MC label="Ticket Médio" value={fmt(m.ticketMedio)} />
+                  </div>
                 </div>
-              </div>
-            </section>
+              </section>
+            </ScrollReveal>
+            <div className="plan-divider" />
           </>
         )}
 
-        {/* ════ FOOTER ════ */}
-        <footer className="py-12" style={{ borderTop: `1px solid ${BORDER}66` }}>
-          <div className="max-w-[960px] mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              {plan.organization.logo && <Image src={plan.organization.logo} alt="" width={20} height={20} className="rounded-[8px]" unoptimized />}
-              <span style={{ fontSize: "12px", fontWeight: 500, color: `${MUTED}66` }}>{plan.organization.name}</span>
+        {/* ════════════════════════════════════════
+            SECTION — Top 5 Produtos
+            ════════════════════════════════════════ */}
+        {products.length > 0 && (
+          <>
+            <ScrollReveal>
+              <section className="py-20 md:py-28">
+                <div className="max-w-[960px] mx-auto px-6">
+                  <SectionHead
+                    num={`0${++sectionNum}`}
+                    title="Top 5 Produtos Mais Vendidos"
+                  />
+                  <div className="mt-10">
+                    <table className="plan-table">
+                      <thead>
+                        <tr>
+                          <th className="text-left w-12">#</th>
+                          <th className="w-14" />
+                          <th className="text-left">Produto</th>
+                          <th className="text-right">Qtd</th>
+                          <th className="text-right">Faturamento</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {products.map((p: TopProduct, i: number) => (
+                          <tr key={i}>
+                            <td>
+                              <span
+                                style={{
+                                  fontFamily: CLASH,
+                                  fontWeight: 700,
+                                  fontSize: "16px",
+                                  color: G,
+                                }}
+                              >
+                                {String(i + 1).padStart(2, "0")}
+                              </span>
+                            </td>
+                            <td>
+                              {p.imageUrl ? (
+                                <div
+                                  className="w-11 h-11 relative rounded-xl overflow-hidden"
+                                  style={{
+                                    border: `1px solid rgba(255,255,255,0.06)`,
+                                  }}
+                                >
+                                  <Image
+                                    src={p.imageUrl}
+                                    alt={p.name}
+                                    fill
+                                    className="object-cover"
+                                    unoptimized
+                                    sizes="44px"
+                                  />
+                                </div>
+                              ) : (
+                                <div
+                                  className="w-11 h-11 rounded-xl"
+                                  style={{
+                                    background: "rgba(255,255,255,0.04)",
+                                  }}
+                                />
+                              )}
+                            </td>
+                            <td
+                              style={{
+                                fontWeight: 500,
+                                color: "rgba(255,255,255,0.85)",
+                              }}
+                            >
+                              {p.name}
+                            </td>
+                            <td
+                              className="text-right"
+                              style={{ color: `${MUTED}88` }}
+                            >
+                              {p.quantity}
+                            </td>
+                            <td
+                              className="text-right"
+                              style={{
+                                fontWeight: 600,
+                                color: "rgba(255,255,255,0.9)",
+                              }}
+                            >
+                              {fmt(p.revenue)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </section>
+            </ScrollReveal>
+            <div className="plan-divider" />
+          </>
+        )}
+
+        {/* ════════════════════════════════════════
+            SECTION — Top Coleções
+            ════════════════════════════════════════ */}
+        {collections.length > 0 && (
+          <>
+            <ScrollReveal>
+              <section className="relative py-20 md:py-28 overflow-hidden">
+                <SectionGlow position="center" intensity={0.06} />
+                <div className="relative max-w-[960px] mx-auto px-6">
+                  <SectionHead
+                    num={`0${++sectionNum}`}
+                    title="Top Coleções com Mais Vendas"
+                  />
+                  <StaggerChildren
+                    className="grid md:grid-cols-3 gap-5 mt-10"
+                    stagger={100}
+                  >
+                    {collections.map((c: TopCollection, i: number) => (
+                      <div
+                        key={i}
+                        data-stagger
+                        className="plan-reveal"
+                      >
+                        <div className="plan-glow-card p-7 text-center">
+                          {/* Big rank number */}
+                          <span
+                            style={{
+                              fontFamily: CLASH,
+                              fontSize: "48px",
+                              fontWeight: 700,
+                              lineHeight: 1,
+                              color: `${G}25`,
+                            }}
+                          >
+                            {String(i + 1).padStart(2, "0")}
+                          </span>
+                          <h4
+                            className="mt-3"
+                            style={{
+                              fontFamily: CLASH,
+                              fontSize: "18px",
+                              fontWeight: 500,
+                              color: "rgba(255,255,255,0.9)",
+                            }}
+                          >
+                            {c.name}
+                          </h4>
+                          <p
+                            className="mt-3"
+                            style={{
+                              fontFamily: CLASH,
+                              fontSize: "36px",
+                              fontWeight: 700,
+                              letterSpacing: "-1px",
+                              color: G,
+                              fontVariantNumeric: "tabular-nums",
+                            }}
+                          >
+                            {c.quantity}
+                          </p>
+                          <p
+                            className="mt-1"
+                            style={{
+                              fontSize: "12px",
+                              color: `${MUTED}55`,
+                            }}
+                          >
+                            vendas · {fmt(c.revenue)}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </StaggerChildren>
+                </div>
+              </section>
+            </ScrollReveal>
+            <div className="plan-divider" />
+          </>
+        )}
+
+        {/* ════════════════════════════════════════
+            SECTION — Top 5 Criativos
+            ════════════════════════════════════════ */}
+        {creatives.length > 0 && (
+          <>
+            <ScrollReveal>
+              <section className="py-20 md:py-28 relative overflow-hidden">
+                <SectionGlow position="left" intensity={0.04} />
+                <div className="relative max-w-[960px] mx-auto px-6">
+                  <SectionHead
+                    num={`0${++sectionNum}`}
+                    title="Top 5 Criativos"
+                  />
+                  <p
+                    className="-mt-4 mb-10"
+                    style={{ fontSize: "15px", color: `${MUTED}55` }}
+                  >
+                    Melhor performance no período
+                  </p>
+                  <CreativesSection creatives={creatives} />
+                </div>
+              </section>
+            </ScrollReveal>
+            <div className="plan-divider" />
+          </>
+        )}
+
+        {/* ════════════════════════════════════════
+            SECTION — Gaps Identificados
+            ════════════════════════════════════════ */}
+        {gaps.length > 0 && (
+          <>
+            <ScrollReveal>
+              <section className="py-20 md:py-28">
+                <div className="max-w-[960px] mx-auto px-6">
+                  <SectionHead
+                    num={`0${++sectionNum}`}
+                    title="Gaps Identificados"
+                  />
+                  <p
+                    className="-mt-4 mb-10"
+                    style={{ fontSize: "15px", color: `${MUTED}55` }}
+                  >
+                    Pontos de melhoria que precisam de atenção
+                  </p>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {gaps.map((g: GapNode, i: number) => (
+                      <TC key={g.id} item={g} index={i} type="gap" />
+                    ))}
+                  </div>
+                </div>
+              </section>
+            </ScrollReveal>
+            <div className="plan-divider" />
+          </>
+        )}
+
+        {/* ════════════════════════════════════════
+            SECTION — Alavancas de Crescimento
+            ════════════════════════════════════════ */}
+        {levers.length > 0 && (
+          <ScrollReveal>
+            <section className="relative py-20 md:py-28 overflow-hidden">
+              <SectionGlow position="bottom-left" intensity={0.05} />
+              <div className="relative max-w-[960px] mx-auto px-6">
+                <SectionHead
+                  num={`0${++sectionNum}`}
+                  title="Alavancas de Crescimento"
+                />
+                <p
+                  className="-mt-4 mb-10"
+                  style={{ fontSize: "15px", color: `${MUTED}55` }}
+                >
+                  Ações que vão gerar mais resultado
+                </p>
+                <div className="grid md:grid-cols-2 gap-4">
+                  {levers.map((l: LeverNode, i: number) => (
+                    <TC key={l.id} item={l} index={i} type="lever" />
+                  ))}
+                </div>
+              </div>
+            </section>
+          </ScrollReveal>
+        )}
+
+        {/* ════════════════════════════════════════
+            FOOTER — CDR Premium
+            ════════════════════════════════════════ */}
+        <footer
+          className="py-16 relative overflow-hidden"
+          style={{
+            borderTop: `1px solid rgba(190, 255, 10, 0.08)`,
+          }}
+        >
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background:
+                "radial-gradient(ellipse at center bottom, rgba(190, 255, 10, 0.03) 0%, transparent 60%)",
+            }}
+          />
+          <div className="relative max-w-[960px] mx-auto px-6 flex flex-col items-center gap-6">
+            <Image
+              src="/logo-cdr.png"
+              alt="CDR Group"
+              width={120}
+              height={34}
+              className="opacity-40"
+              unoptimized
+            />
+            <div className="flex flex-col md:flex-row items-center gap-2 text-center">
+              {plan.organization.logo && (
+                <Image
+                  src={plan.organization.logo}
+                  alt=""
+                  width={18}
+                  height={18}
+                  className="rounded-lg"
+                  unoptimized
+                />
+              )}
+              <span
+                style={{
+                  fontSize: "13px",
+                  fontWeight: 500,
+                  color: `${MUTED}55`,
+                }}
+              >
+                {plan.organization.name}
+              </span>
             </div>
-            <p style={{ fontSize: "12px", color: `${MUTED}33` }}>{plan.createdBy.name && `${plan.createdBy.name} · `}{fmtD(plan.createdAt)}</p>
+            <p style={{ fontSize: "12px", color: `${MUTED}33` }}>
+              {plan.createdBy.name && `${plan.createdBy.name} · `}
+              {fmtD(plan.createdAt)}
+            </p>
           </div>
         </footer>
       </main>
@@ -212,53 +580,218 @@ export default async function PublicPlanPage({ params }: PageProps) {
   );
 }
 
-/* ── CDR Components (exact brand tokens) ── */
+/* ══════════════════════════════════════════════════════════════
+   CDR Components — exact brand language from cdrgroup.com.br
+   ══════════════════════════════════════════════════════════════ */
 
-function SL({ children }: { children: React.ReactNode }) {
-  return <h2 style={{ fontSize: "clamp(24px, 4vw, 32px)", fontWeight: 600, lineHeight: 1.2, letterSpacing: "-0.32px" }}>{children}</h2>;
+function SectionHead({ num, title }: { num: string; title: string }) {
+  return (
+    <div className="flex items-baseline gap-4 mb-10">
+      <span className="plan-section-num">{num}</span>
+      <h2
+        style={{
+          fontFamily: CLASH,
+          fontSize: "clamp(28px, 4vw, 42px)",
+          fontWeight: 400,
+          lineHeight: 1.15,
+          letterSpacing: "-0.02em",
+        }}
+      >
+        {title}
+      </h2>
+    </div>
+  );
 }
 
 function HeroKPI({ value, label }: { value: string; label: string }) {
   return (
-    <div className="plan-glow-card px-4 py-5 md:px-6 md:py-7 text-center">
-      <p style={{ fontSize: "clamp(18px, 3vw, 30px)", fontWeight: 700, letterSpacing: "-0.75px", color: P, fontVariantNumeric: "tabular-nums" }}>{value}</p>
-      <p className="mt-2" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase" as const, color: `${MUTED}66` }}>{label}</p>
+    <div className="plan-metric px-4 py-6 md:px-6 md:py-8 text-center">
+      <p
+        style={{
+          fontFamily: CLASH,
+          fontSize: "clamp(20px, 3.5vw, 36px)",
+          fontWeight: 700,
+          letterSpacing: "-0.75px",
+          color: G,
+          fontVariantNumeric: "tabular-nums",
+        }}
+      >
+        {value}
+      </p>
+      <p
+        className="mt-2"
+        style={{
+          fontSize: "10px",
+          fontWeight: 700,
+          letterSpacing: "1px",
+          textTransform: "uppercase" as const,
+          color: `${MUTED}55`,
+        }}
+      >
+        {label}
+      </p>
     </div>
   );
 }
 
-function MC({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: boolean }) {
+function MC({
+  label,
+  value,
+  sub,
+  accent,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  accent?: boolean;
+}) {
   return (
-    <div className="p-5 rounded-[10px] transition-all" style={{ background: `rgba(255,255,255,0.08)`, border: `1px solid ${BORDER}66`, backdropFilter: "blur(12px) saturate(150%)" }}>
-      <p style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase" as const, color: `${MUTED}66` }}>{label}</p>
-      <p className="mt-2" style={{ fontSize: "30px", fontWeight: 700, letterSpacing: "-0.75px", fontVariantNumeric: "tabular-nums", color: accent ? P : "white" }}>{value}</p>
-      {sub && <p className="mt-1" style={{ fontSize: "12px", color: accent ? `${P}66` : `${MUTED}44` }}>{sub}</p>}
+    <div className="plan-metric">
+      <p
+        style={{
+          fontSize: "10px",
+          fontWeight: 700,
+          letterSpacing: "1px",
+          textTransform: "uppercase" as const,
+          color: `${MUTED}55`,
+        }}
+      >
+        {label}
+      </p>
+      <p
+        className="mt-1"
+        style={{
+          fontFamily: CLASH,
+          fontSize: "30px",
+          fontWeight: 700,
+          letterSpacing: "-0.75px",
+          fontVariantNumeric: "tabular-nums",
+          color: accent ? G : "white",
+        }}
+      >
+        {value}
+      </p>
+      {sub && (
+        <p
+          className="mt-0.5"
+          style={{
+            fontSize: "12px",
+            color: accent ? `${G}66` : `${MUTED}44`,
+          }}
+        >
+          {sub}
+        </p>
+      )}
     </div>
   );
 }
 
-function TC({ item, index, type }: { item: GapNode | LeverNode; index: number; type: "gap" | "lever" }) {
+function TC({
+  item,
+  index,
+  type,
+}: {
+  item: GapNode | LeverNode;
+  index: number;
+  type: "gap" | "lever";
+}) {
   const isGap = type === "gap";
-  const c = isGap ? "#FF4D4D" : P;
+  const c = isGap ? "#FF4D4D" : G;
   return (
-    <div className="rounded-[10px] p-5" style={{ border: `1px solid ${c}22`, background: `${c}08` }}>
-      <div className="flex items-center gap-3 mb-4">
-        <span className="w-7 h-7 rounded-[8px] flex items-center justify-center" style={{ fontSize: "10px", fontWeight: 700, background: c, color: isGap ? "#fff" : BG }}>{index + 1}</span>
-        <h4 style={{ fontSize: "14px", fontWeight: 600, color: c }}>{item.title || `${isGap ? "Gap" : "Alavanca"} ${index + 1}`}</h4>
+    <div
+      className="plan-step-card"
+      style={{
+        border: `1px solid ${c}22`,
+        background: `${c}06`,
+      }}
+    >
+      <div className="flex items-center gap-4 mb-5">
+        <span
+          className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+          style={{
+            fontSize: "12px",
+            fontWeight: 700,
+            fontFamily: CLASH,
+            background: c,
+            color: isGap ? "#fff" : BG,
+          }}
+        >
+          {String(index + 1).padStart(2, "0")}
+        </span>
+        <h4
+          style={{
+            fontFamily: CLASH,
+            fontSize: "16px",
+            fontWeight: 500,
+            color: c,
+          }}
+        >
+          {item.title || `${isGap ? "Gap" : "Alavanca"} ${index + 1}`}
+        </h4>
       </div>
-      {item.children.length > 0 && item.children.map((ch) => <B key={ch.id} node={ch} depth={0} />)}
+      {item.children.length > 0 &&
+        item.children.map((ch) => <B key={ch.id} node={ch} depth={0} />)}
+      {/* Bottom accent line */}
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+        .plan-step-card:nth-child(${index + 1})::after {
+          background: ${c};
+        }
+      `,
+        }}
+      />
     </div>
   );
 }
 
 function B({ node, depth }: { node: TreeNode; depth: number }) {
   return (
-    <div style={depth > 0 ? { marginLeft: "20px" } : undefined}>
-      <div className="flex items-start gap-2 py-1.5">
-        {depth > 0 && <div className="flex items-center gap-1.5 shrink-0 mt-1.5"><div style={{ width: "12px", height: "1px", background: `${BORDER}` }} /><div style={{ width: "5px", height: "5px", borderRadius: "50%", background: `${P}40` }} /></div>}
-        <span style={{ fontSize: "14px", lineHeight: "1.5", fontWeight: depth === 0 ? 500 : 400, color: depth === 0 ? "rgba(255,255,255,0.7)" : `${MUTED}66` }}>{node.text}</span>
+    <div style={depth > 0 ? { marginLeft: "22px" } : undefined}>
+      <div className="flex items-start gap-2.5 py-1.5">
+        {depth > 0 && (
+          <div className="flex items-center gap-1.5 shrink-0 mt-2">
+            <div
+              style={{
+                width: "14px",
+                height: "1px",
+                background: "rgba(255,255,255,0.08)",
+              }}
+            />
+            <div
+              style={{
+                width: "5px",
+                height: "5px",
+                borderRadius: "50%",
+                background: `${G}40`,
+              }}
+            />
+          </div>
+        )}
+        <span
+          style={{
+            fontSize: "14px",
+            lineHeight: "1.6",
+            fontWeight: depth === 0 ? 500 : 400,
+            color:
+              depth === 0 ? "rgba(255,255,255,0.7)" : `${MUTED}55`,
+          }}
+        >
+          {node.text}
+        </span>
       </div>
-      {node.children.length > 0 && <div style={{ borderLeft: `1px solid ${BORDER}`, marginLeft: "2px" }}>{node.children.map((ch) => <B key={ch.id} node={ch} depth={depth + 1} />)}</div>}
+      {node.children.length > 0 && (
+        <div
+          style={{
+            borderLeft: "1px solid rgba(255,255,255,0.06)",
+            marginLeft: "2px",
+          }}
+        >
+          {node.children.map((ch) => (
+            <B key={ch.id} node={ch} depth={depth + 1} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

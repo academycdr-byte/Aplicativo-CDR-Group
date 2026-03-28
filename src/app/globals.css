@@ -728,68 +728,242 @@
 }
 
 /* ============================================================================
-   PLANO DE AÇÃO — CDR Premium Presentation
-   Dark theme + Neon green (#c4ff00) + Grid pattern + Glow effects
+   PLANO DE AÇÃO v2 — CDR Premium Presentation
+   Design system: cdrgroup.com.br exact match
+   Font: Clash Display | Green: #BEFF0A | Background: #000
    ============================================================================ */
 
-/* ── CDR Brand Tokens (exact from cdrgroup.com.br) ── */
-/* Primary: hsl(73 100% 50%) = #BEE000 */
-/* Background: #000000 | Card: #141414 | Border: #1A1A1A */
-/* Radius: 10px | Glass: blur(12px) saturate(150%) */
+/* ── Clash Display Font (from cdrgroup.com.br) ── */
+@font-face {
+  font-family: "Clash";
+  src: url(/fonts/ClashDisplay-Bold.woff2) format("woff2");
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Clash";
+  src: url(/fonts/ClashDisplay-Medium.woff2) format("woff2");
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Clash";
+  src: url(/fonts/ClashDisplay-Regular.woff2) format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
 
+/* ── Scroll Reveal ── */
+.plan-reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.7s cubic-bezier(0, 0, 0.2, 1),
+              transform 0.7s cubic-bezier(0, 0, 0.2, 1);
+}
+.plan-reveal.plan-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── Grid Pattern Overlay (circuit board from CDR hero) ── */
+.plan-grid-overlay {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(190, 255, 10, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(190, 255, 10, 0.04) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse at 60% 40%, black 20%, transparent 70%);
+  -webkit-mask-image: radial-gradient(ellipse at 60% 40%, black 20%, transparent 70%);
+}
+.plan-grid-overlay::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(190, 255, 10, 0.08) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse at 60% 40%, black 20%, transparent 70%);
+  -webkit-mask-image: radial-gradient(ellipse at 60% 40%, black 20%, transparent 70%);
+}
+
+/* ── Metric Card (exact from cdrgroup.com.br .metrica) ── */
+.plan-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: center;
+  padding: 28px 24px;
+  border-radius: 16px;
+  background: rgba(10, 12, 8, 0.85);
+  border: 1px solid rgba(190, 255, 10, 0.25);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow:
+    0 0 0 1px rgba(190, 255, 10, 0.1) inset,
+    0 0 24px rgba(190, 255, 10, 0.1),
+    0 0 48px rgba(190, 255, 10, 0.04),
+    0 4px 24px rgba(0, 0, 0, 0.5);
+  transition: all 0.35s cubic-bezier(.22,.68,0,.71);
+  position: relative;
+  overflow: hidden;
+}
+.plan-metric::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #BEFF0A, transparent);
+  opacity: 0.4;
+  transition: opacity 0.4s;
+}
+.plan-metric:hover {
+  border-color: rgba(190, 255, 10, 0.45);
+  box-shadow:
+    0 0 0 1px rgba(190, 255, 10, 0.15) inset,
+    0 0 32px rgba(190, 255, 10, 0.15),
+    0 0 60px rgba(190, 255, 10, 0.06),
+    0 4px 28px rgba(0, 0, 0, 0.5);
+}
+.plan-metric:hover::before {
+  opacity: 0.8;
+}
+
+/* ── Glow Card (lighter version for collections/KPIs) ── */
 .plan-glow-card {
-  border: 1px solid rgba(190, 224, 0, 0.2);
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
-  backdrop-filter: blur(12px) saturate(150%);
-  -webkit-backdrop-filter: blur(12px) saturate(150%);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(190, 255, 10, 0.2);
+  background: rgba(10, 12, 8, 0.85);
+  border-radius: 16px;
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  box-shadow:
+    0 0 0 1px rgba(190, 255, 10, 0.08) inset,
+    0 0 20px rgba(190, 255, 10, 0.06),
+    0 4px 20px rgba(0, 0, 0, 0.4);
+  transition: all 0.35s cubic-bezier(.22,.68,0,.71);
+  position: relative;
+  overflow: hidden;
+}
+.plan-glow-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #BEFF0A, transparent);
+  opacity: 0.3;
+  transition: opacity 0.4s;
 }
 .plan-glow-card:hover {
-  border-color: rgba(190, 224, 0, 0.4);
-  box-shadow: 0 0 20px rgba(190, 224, 0, 0.15);
-  transform: translateY(-2px);
+  border-color: rgba(190, 255, 10, 0.4);
+  box-shadow:
+    0 0 0 1px rgba(190, 255, 10, 0.12) inset,
+    0 0 28px rgba(190, 255, 10, 0.12),
+    0 0 56px rgba(190, 255, 10, 0.05),
+    0 4px 24px rgba(0, 0, 0, 0.5);
+  transform: translateY(-3px);
+}
+.plan-glow-card:hover::before {
+  opacity: 0.7;
 }
 
-/* Gradient mesh blob animations */
+/* ── Step Card (for process/gaps/levers) ── */
+.plan-step-card {
+  border-radius: 16px;
+  padding: 28px 24px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.35s cubic-bezier(.22,.68,0,.71);
+}
+.plan-step-card::after {
+  content: "";
+  position: absolute;
+  bottom: 0; left: 24px;
+  width: 40px; height: 3px;
+  border-radius: 2px;
+  transition: width 0.4s cubic-bezier(.22,.68,0,.71);
+}
+.plan-step-card:hover::after {
+  width: 60px;
+}
+
+/* ── Premium Table ── */
+.plan-table {
+  width: 100%;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(190, 255, 10, 0.12);
+  background: rgba(10, 12, 8, 0.6);
+}
+.plan-table thead tr {
+  background: rgba(190, 255, 10, 0.04);
+  border-bottom: 1px solid rgba(190, 255, 10, 0.12);
+}
+.plan-table th {
+  padding: 14px 20px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: rgba(190, 255, 10, 0.5);
+}
+.plan-table td {
+  padding: 16px 20px;
+  font-size: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+.plan-table tbody tr {
+  transition: background 0.25s ease;
+}
+.plan-table tbody tr:hover {
+  background: rgba(190, 255, 10, 0.03);
+}
+
+/* ── Green Divider (CDR style) ── */
+.plan-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(190, 255, 10, 0.15), transparent);
+}
+
+/* ── Section Number Badge ── */
+.plan-section-num {
+  font-family: "Clash", "Inter", sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(190, 255, 10, 0.4);
+  letter-spacing: 0.5px;
+}
+
+/* ── Gradient Mesh Blob Animations ── */
 @keyframes plan-drift-1 {
   0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(-50px, 40px) scale(1.08); }
-  66% { transform: translate(40px, -30px) scale(0.95); }
+  33% { transform: translate(-60px, 50px) scale(1.1); }
+  66% { transform: translate(50px, -40px) scale(0.93); }
 }
 @keyframes plan-drift-2 {
   0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(60px, -50px) scale(1.1); }
-  66% { transform: translate(-40px, 60px) scale(0.9); }
+  33% { transform: translate(70px, -60px) scale(1.12); }
+  66% { transform: translate(-50px, 70px) scale(0.88); }
 }
 @keyframes plan-drift-3 {
   0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(-70px, -40px) scale(1.05); }
-  66% { transform: translate(50px, 50px) scale(0.95); }
+  33% { transform: translate(-80px, -50px) scale(1.06); }
+  66% { transform: translate(60px, 60px) scale(0.94); }
 }
 @keyframes plan-glow-pulse {
   0%, 100% { opacity: 0.6; }
   50% { opacity: 1; }
 }
 
-/* Section reveal (CDR: slideUp 0.3s) */
-.plan-section {
-  opacity: 0;
-  transform: translateY(16px);
-  animation: plan-reveal 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-}
-@keyframes plan-reveal {
-  to { opacity: 1; transform: translateY(0); }
-}
-
-/* CDR glow pulse (exact from site) */
-@keyframes plan-glow-card-pulse {
-  0%, 100% { box-shadow: 0 0 8px rgba(190, 224, 0, 0.15); }
-  50% { box-shadow: 0 0 20px rgba(190, 224, 0, 0.25); }
-}
-
-/* Green divider */
-.plan-divider {
-  height: 1px;
-  background: #1A1A1A;
+/* ── Responsive Plan Adjustments ── */
+@media (max-width: 768px) {
+  .plan-metric {
+    padding: 20px 16px;
+    border-radius: 12px;
+  }
+  .plan-glow-card {
+    border-radius: 12px;
+  }
+  .plan-table th,
+  .plan-table td {
+    padding: 12px 14px;
+  }
 }

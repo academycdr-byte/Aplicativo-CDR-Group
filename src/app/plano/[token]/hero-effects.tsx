@@ -1,16 +1,92 @@
 "use client";
 
-// CDR Brand gradient mesh — exact colors from cdrgroup.com.br
-// Primary: #BEE000 (hsl 73 100% 50%)
+/**
+ * CDR Group — Hero visual effects for public plan page
+ * Matches cdrgroup.com.br hero: aurora gradient mesh + circuit grid pattern
+ */
 
 export function GradientMesh() {
   return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
-      <div className="absolute rounded-full" style={{ width: "800px", height: "800px", top: "-200px", right: "-150px", background: "rgba(190, 224, 0, 0.22)", filter: "blur(120px)", animation: "plan-drift-1 16s ease-in-out infinite" }} />
-      <div className="absolute rounded-full" style={{ width: "600px", height: "600px", top: "50px", right: "200px", background: "rgba(190, 224, 0, 0.12)", filter: "blur(100px)", animation: "plan-drift-2 20s ease-in-out infinite" }} />
-      <div className="absolute rounded-full" style={{ width: "500px", height: "500px", top: "-80px", left: "10%", background: "rgba(190, 224, 0, 0.08)", filter: "blur(110px)", animation: "plan-drift-3 22s ease-in-out infinite" }} />
-      {/* Bottom glow — like CDR homepage */}
-      <div className="absolute" style={{ width: "100%", height: "300px", bottom: "0", left: "0", background: "linear-gradient(to top, rgba(190, 224, 0, 0.06), transparent)", animation: "plan-glow-pulse 6s ease-in-out infinite" }} />
+    <div
+      className="absolute inset-0 overflow-hidden pointer-events-none"
+      aria-hidden="true"
+    >
+      {/* Aurora blobs — bigger and more vivid than before */}
+      <div
+        className="absolute rounded-full"
+        style={{
+          width: "1100px",
+          height: "1100px",
+          top: "-350px",
+          right: "-250px",
+          background: "rgba(190, 255, 10, 0.28)",
+          filter: "blur(150px)",
+          animation: "plan-drift-1 16s ease-in-out infinite",
+        }}
+      />
+      <div
+        className="absolute rounded-full"
+        style={{
+          width: "800px",
+          height: "800px",
+          top: "0",
+          right: "250px",
+          background: "rgba(190, 255, 10, 0.15)",
+          filter: "blur(130px)",
+          animation: "plan-drift-2 20s ease-in-out infinite",
+        }}
+      />
+      <div
+        className="absolute rounded-full"
+        style={{
+          width: "650px",
+          height: "650px",
+          top: "-120px",
+          left: "5%",
+          background: "rgba(190, 255, 10, 0.10)",
+          filter: "blur(120px)",
+          animation: "plan-drift-3 22s ease-in-out infinite",
+        }}
+      />
+      {/* Bottom green glow band (CDR site transition effect) */}
+      <div
+        className="absolute"
+        style={{
+          width: "100%",
+          height: "500px",
+          bottom: "0",
+          left: "0",
+          background:
+            "linear-gradient(to top, rgba(190, 255, 10, 0.10), transparent)",
+          animation: "plan-glow-pulse 6s ease-in-out infinite",
+        }}
+      />
+      {/* Circuit grid pattern overlay */}
+      <div className="plan-grid-overlay" />
     </div>
+  );
+}
+
+export function SectionGlow({
+  position = "center",
+  intensity = 0.04,
+}: {
+  position?: "center" | "left" | "right" | "bottom-left";
+  intensity?: number;
+}) {
+  const posMap = {
+    center: "center",
+    left: "20% 50%",
+    right: "80% 50%",
+    "bottom-left": "20% 80%",
+  };
+  return (
+    <div
+      className="absolute inset-0 pointer-events-none"
+      aria-hidden="true"
+      style={{
+        background: `radial-gradient(ellipse at ${posMap[position]}, rgba(190, 255, 10, ${intensity}) 0%, transparent 70%)`,
+      }}
+    />
   );
 }
