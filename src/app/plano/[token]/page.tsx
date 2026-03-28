@@ -17,6 +17,10 @@ import type { Metadata } from "next";
 
 type PageProps = { params: Promise<{ token: string }> };
 
+/* Strip "'s Organization" suffix from org names */
+const cleanOrgName = (name: string) =>
+  name.replace(/'s Organization$/i, "").replace(/\s+Organization$/i, "").trim();
+
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
@@ -24,8 +28,8 @@ export async function generateMetadata({
   const plan = await getActionPlanByToken(token);
   if (!plan) return { title: "Plano não encontrado" };
   return {
-    title: `${plan.title} | ${plan.organization.name}`,
-    description: `Plano de Ação — ${plan.organization.name}`,
+    title: `${plan.title} | ${cleanOrgName(plan.organization.name)}`,
+    description: `Plano de Ação — ${cleanOrgName(plan.organization.name)}`,
   };
 }
 
@@ -109,7 +113,7 @@ export default async function PublicPlanPage({ params }: PageProps) {
                 >
                   <Image
                     src={heroAvatar}
-                    alt={plan.organization.name}
+                    alt={cleanOrgName(plan.organization.name)}
                     fill
                     className="object-cover"
                     unoptimized
@@ -130,7 +134,7 @@ export default async function PublicPlanPage({ params }: PageProps) {
                 color: `${G}99`,
               }}
             >
-              Plano de Ação {plan.organization.name}
+              Plano de Ação {cleanOrgName(plan.organization.name)}
             </span>
           </div>
 
@@ -525,7 +529,7 @@ export default async function PublicPlanPage({ params }: PageProps) {
                   color: `${MUTED}55`,
                 }}
               >
-                {plan.organization.name}
+                {cleanOrgName(plan.organization.name)}
               </span>
             </div>
             <p style={{ fontSize: "12px", color: `${MUTED}33` }}>
