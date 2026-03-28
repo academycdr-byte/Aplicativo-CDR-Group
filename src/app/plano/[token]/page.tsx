@@ -76,13 +76,13 @@ export default async function PublicPlanPage({ params }: PageProps) {
       }}
     >
       {/* ════════════════════════════════════════
-          HERO — CDR Site Style (aurora mesh + grid + KPIs)
+          HERO — Compact, logo destaque, sem KPIs duplicados
           ════════════════════════════════════════ */}
-      <header className="relative overflow-hidden min-h-[85vh] md:min-h-[90vh] flex items-center justify-center">
+      <header className="relative overflow-hidden pt-24 pb-20 md:pt-28 md:pb-24">
         <GradientMesh />
 
         {/* CDR Logo — top left */}
-        <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-6 md:px-10 py-6">
+        <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-6 md:px-10 py-5">
           <Image
             src="/logo-cdr.png"
             alt="CDR Group"
@@ -93,20 +93,9 @@ export default async function PublicPlanPage({ params }: PageProps) {
           />
           <div
             className="w-9 h-9 rounded-lg flex items-center justify-center"
-            style={{
-              background: `${G}`,
-            }}
+            style={{ background: G }}
           >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#000"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <line x1="7" y1="17" x2="17" y2="7" />
               <polyline points="7 7 17 7 17 17" />
             </svg>
@@ -114,47 +103,49 @@ export default async function PublicPlanPage({ params }: PageProps) {
         </div>
 
         <div className="relative z-10 max-w-[960px] mx-auto px-6 text-center">
-          {/* Badge pill — CDR style */}
-          <div className="flex justify-center mb-10">
-            <div
-              className="inline-flex items-center gap-2.5 px-6 py-3 rounded-[200px]"
-              style={{
-                border: `1px solid ${G}33`,
-                background: `${G}0A`,
-                backdropFilter: "blur(12px)",
-              }}
-            >
-              {plan.organization.logo && (
-                <Image
-                  src={plan.organization.logo}
-                  alt=""
-                  width={22}
-                  height={22}
-                  className="rounded-lg"
-                  unoptimized
-                />
-              )}
-              <span
+          {/* Client Logo — grande e em destaque */}
+          {plan.organization.logo && (
+            <div className="flex justify-center mb-7">
+              <div
+                className="w-20 h-20 md:w-24 md:h-24 relative rounded-2xl overflow-hidden"
                 style={{
-                  fontSize: "11px",
-                  fontWeight: 700,
-                  letterSpacing: "1.5px",
-                  textTransform: "uppercase" as const,
-                  color: G,
+                  border: `2px solid ${G}33`,
+                  boxShadow: `0 0 40px ${G}15, 0 0 80px ${G}08`,
                 }}
               >
-                {plan.organization.name}
-              </span>
+                <Image
+                  src={plan.organization.logo}
+                  alt={plan.organization.name}
+                  fill
+                  className="object-cover"
+                  unoptimized
+                />
+              </div>
             </div>
+          )}
+
+          {/* Org name badge */}
+          <div className="flex justify-center mb-6">
+            <span
+              style={{
+                fontSize: "11px",
+                fontWeight: 700,
+                letterSpacing: "1.5px",
+                textTransform: "uppercase" as const,
+                color: `${G}99`,
+              }}
+            >
+              {plan.organization.name}
+            </span>
           </div>
 
-          {/* Title — Clash Display (CDR hero style) */}
+          {/* Title — Clash Display */}
           <h1
             style={{
               fontFamily: CLASH,
-              fontSize: "clamp(36px, 7vw, 72px)",
+              fontSize: "clamp(32px, 6vw, 64px)",
               fontWeight: 400,
-              lineHeight: 1.05,
+              lineHeight: 1.08,
               letterSpacing: "-0.02em",
               color: "rgba(255, 255, 255, 0.92)",
             }}
@@ -164,7 +155,7 @@ export default async function PublicPlanPage({ params }: PageProps) {
 
           {/* Period */}
           <p
-            className="mt-5"
+            className="mt-4"
             style={{
               fontSize: "15px",
               fontWeight: 400,
@@ -174,35 +165,16 @@ export default async function PublicPlanPage({ params }: PageProps) {
           >
             {fmtD(plan.periodStart)} — {fmtD(plan.periodEnd)}
           </p>
-
-          {/* Hero KPI Cards — CDR site .metrica style */}
-          {m && (
-            <StaggerChildren
-              className="grid grid-cols-3 gap-4 md:gap-5 max-w-[780px] mx-auto mt-14"
-              stagger={120}
-            >
-              <div data-stagger className="plan-reveal">
-                <HeroKPI value={fmt(m.faturamento)} label="Faturamento Pago" />
-              </div>
-              <div data-stagger className="plan-reveal">
-                <HeroKPI value={`${fmtN(m.roas)}x`} label="ROAS" />
-              </div>
-              <div data-stagger className="plan-reveal">
-                <HeroKPI value={fmt(m.investido)} label="Investido" />
-              </div>
-            </StaggerChildren>
-          )}
         </div>
-
-        {/* Bottom fade to black */}
-        <div
-          className="absolute bottom-0 left-0 right-0 h-32 pointer-events-none"
-          style={{
-            background:
-              "linear-gradient(to top, #000000, transparent)",
-          }}
-        />
       </header>
+
+      {/* Aurora → black smooth bridge */}
+      <div
+        className="relative h-24 md:h-32 -mt-1 pointer-events-none"
+        style={{
+          background: "linear-gradient(to bottom, transparent, #000000)",
+        }}
+      />
 
       <main>
         {/* ════════════════════════════════════════
@@ -599,38 +571,6 @@ function SectionHead({ num, title }: { num: string; title: string }) {
       >
         {title}
       </h2>
-    </div>
-  );
-}
-
-function HeroKPI({ value, label }: { value: string; label: string }) {
-  return (
-    <div className="plan-metric px-4 py-6 md:px-6 md:py-8 text-center">
-      <p
-        style={{
-          fontFamily: CLASH,
-          fontSize: "clamp(16px, 2.5vw, 28px)",
-          fontWeight: 700,
-          letterSpacing: "-0.5px",
-          color: G,
-          fontVariantNumeric: "tabular-nums",
-          whiteSpace: "nowrap",
-        }}
-      >
-        {value}
-      </p>
-      <p
-        className="mt-2"
-        style={{
-          fontSize: "10px",
-          fontWeight: 700,
-          letterSpacing: "1px",
-          textTransform: "uppercase" as const,
-          color: `${MUTED}55`,
-        }}
-      >
-        {label}
-      </p>
     </div>
   );
 }

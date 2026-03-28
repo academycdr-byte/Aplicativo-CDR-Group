@@ -48,17 +48,29 @@ export function GradientMesh() {
           animation: "plan-drift-3 22s ease-in-out infinite",
         }}
       />
-      {/* Bottom green glow band (CDR site transition effect) */}
+      {/* Bottom green glow band — fades smoothly into content */}
       <div
         className="absolute"
         style={{
           width: "100%",
-          height: "500px",
+          height: "60%",
           bottom: "0",
           left: "0",
           background:
-            "linear-gradient(to top, rgba(190, 255, 10, 0.10), transparent)",
+            "linear-gradient(to top, rgba(190, 255, 10, 0.06) 0%, rgba(190, 255, 10, 0.10) 30%, transparent 100%)",
           animation: "plan-glow-pulse 6s ease-in-out infinite",
+        }}
+      />
+      {/* Bottom black fade — smooth bridge to content below */}
+      <div
+        className="absolute"
+        style={{
+          width: "100%",
+          height: "200px",
+          bottom: "0",
+          left: "0",
+          background:
+            "linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.3) 50%, transparent 100%)",
         }}
       />
       {/* Circuit grid pattern overlay */}
