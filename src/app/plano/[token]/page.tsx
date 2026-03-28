@@ -11,6 +11,7 @@ import type {
   TreeNode,
 } from "@/actions/action-plan";
 import { CreativesSection } from "./creatives-section";
+import { DataRain, MetricsCube } from "./hero-effects";
 import type { Metadata } from "next";
 
 // ─── Dynamic Metadata ─────────────────────────────
@@ -54,19 +55,19 @@ const formatDate = (date: Date) =>
 function TreeBranch({ node, depth }: { node: TreeNode; depth: number }) {
   return (
     <div className={`${depth > 0 ? "ml-6" : ""}`}>
-      <div className="flex items-start gap-2 py-1.5">
+      <div className="flex items-start gap-2.5 py-2">
         {depth > 0 && (
-          <div className="flex items-center gap-1.5 shrink-0 mt-1">
-            <div className="w-4 h-px bg-white/20" />
-            <div className="w-2 h-2 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 shrink-0" />
+          <div className="flex items-center gap-2 shrink-0 mt-1.5">
+            <div className="w-5 h-px bg-white/15" />
+            <div className="w-1.5 h-1.5 rounded-full bg-white/30 shrink-0" />
           </div>
         )}
-        <span className={`${depth === 0 ? "text-base font-semibold text-white" : "text-sm text-white/80"}`}>
+        <span className={`${depth === 0 ? "text-[15px] font-medium text-white/90" : "text-sm text-white/60"} leading-relaxed`}>
           {node.text}
         </span>
       </div>
       {node.children.length > 0 && (
-        <div className="border-l border-white/10 ml-1">
+        <div className="border-l border-white/[0.06] ml-[3px]">
           {node.children.map((child) => (
             <TreeBranch key={child.id} node={child} depth={depth + 1} />
           ))}
@@ -86,26 +87,22 @@ function GapLeverCard({
   type: "gap" | "lever";
 }) {
   const isGap = type === "gap";
-  const gradientFrom = isGap ? "from-red-500/20" : "from-emerald-500/20";
   const accentColor = isGap ? "text-red-400" : "text-emerald-400";
-  const dotColor = isGap
-    ? "bg-gradient-to-br from-red-400 to-red-600"
-    : "bg-gradient-to-br from-emerald-400 to-emerald-600";
+  const borderAccent = isGap ? "border-red-500/10" : "border-emerald-500/10";
+  const numberBg = isGap ? "bg-red-500/15 text-red-400" : "bg-emerald-500/15 text-emerald-400";
 
   return (
-    <div
-      className={`rounded-2xl bg-gradient-to-br ${gradientFrom} to-transparent border border-white/10 p-6 backdrop-blur-sm`}
-    >
-      <div className="flex items-center gap-3 mb-4">
-        <div className={`w-8 h-8 rounded-lg ${dotColor} flex items-center justify-center text-white font-bold text-sm`}>
+    <div className={`rounded-2xl border ${borderAccent} bg-white/[0.02] p-6`}>
+      <div className="flex items-center gap-3 mb-5">
+        <div className={`w-8 h-8 rounded-lg ${numberBg} flex items-center justify-center font-bold text-sm`}>
           {index + 1}
         </div>
-        <h4 className={`text-lg font-bold ${accentColor}`}>
+        <h4 className={`text-base font-semibold ${accentColor}`}>
           {item.title || `${isGap ? "Gap" : "Alavanca"} ${index + 1}`}
         </h4>
       </div>
       {item.children.length > 0 && (
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           {item.children.map((child) => (
             <TreeBranch key={child.id} node={child} depth={0} />
           ))}
@@ -131,163 +128,178 @@ export default async function PublicPlanPage({ params }: PageProps) {
   const levers = plan.levers || [];
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white">
-      {/* Hero Header */}
-      <header className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-primary/20 via-transparent to-transparent" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent" />
+    <div className="min-h-screen bg-[#050505] text-white antialiased">
 
-        <div className="relative max-w-5xl mx-auto px-6 py-16 md:py-24 text-center">
-          {plan.organization.logo ? (
-            <Image
-              src={plan.organization.logo}
-              alt={plan.organization.name}
-              width={64}
-              height={64}
-              className="mx-auto mb-6 rounded-xl"
-              unoptimized
-            />
-          ) : (
-            <div className="w-16 h-16 rounded-xl bg-primary/20 flex items-center justify-center mx-auto mb-6">
-              <span className="text-2xl font-bold text-primary">
-                {plan.organization.name.charAt(0)}
-              </span>
-            </div>
-          )}
+      {/* ─── HERO ─── */}
+      <header className="relative overflow-hidden min-h-[70vh] flex items-center justify-center">
+        {/* Background effects */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(120,119,198,0.15),transparent)]" />
+        <DataRain metrics={metrics} />
 
-          <p className="text-sm font-medium text-primary/80 uppercase tracking-widest mb-3">
-            {plan.organization.name}
-          </p>
+        {/* Content */}
+        <div className="relative z-10 max-w-3xl mx-auto px-6 text-center space-y-8">
+          {/* Logo / Org */}
+          <div className="flex items-center justify-center gap-3">
+            {plan.organization.logo ? (
+              <Image
+                src={plan.organization.logo}
+                alt={plan.organization.name}
+                width={36}
+                height={36}
+                className="rounded-lg"
+                unoptimized
+              />
+            ) : (
+              <div className="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center">
+                <span className="text-sm font-bold text-white/70">
+                  {plan.organization.name.charAt(0)}
+                </span>
+              </div>
+            )}
+            <span className="text-sm font-medium text-white/40">
+              {plan.organization.name}
+            </span>
+          </div>
 
-          <h1 className="text-3xl md:text-5xl font-bold tracking-tight mb-4 bg-gradient-to-r from-white via-white to-white/60 bg-clip-text text-transparent">
-            {plan.title}
-          </h1>
+          {/* 3D Cube */}
+          <div className="py-4">
+            <MetricsCube metrics={metrics} />
+          </div>
 
-          <p className="text-white/50 text-sm">
-            {formatDate(plan.periodStart)} — {formatDate(plan.periodEnd)}
-          </p>
+          {/* Title */}
+          <div className="space-y-4">
+            <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-white">
+              {plan.title}
+            </h1>
+            <p className="text-base text-white/30 font-medium">
+              {formatDate(plan.periodStart)} — {formatDate(plan.periodEnd)}
+            </p>
+          </div>
         </div>
+
+        {/* Bottom fade */}
+        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[#050505] to-transparent" />
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 space-y-16 pb-24">
-        {/* Metrics Section */}
+      <main className="max-w-4xl mx-auto px-6 space-y-24 pb-32">
+
+        {/* ─── METRICS ─── */}
         {metrics && (
-          <section>
-            <SectionTitle>Métricas do Período</SectionTitle>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <MetricDisplay
-                label="Faturamento Pago"
-                value={fmt(metrics.faturamento)}
-                sublabel={`${metrics.totalPedidos} pedidos`}
-              />
-              <MetricDisplay
-                label="Valor Investido"
-                value={fmt(metrics.investido)}
-                sublabel="Meta Ads"
-              />
-              <MetricDisplay
-                label="Valor Convertido"
-                value={fmt(metrics.convertido)}
-                sublabel="Meta Ads"
-              />
-              <MetricDisplay
+          <section className="space-y-8">
+            <SectionHeader
+              title="Métricas do Período"
+              subtitle="Dados consolidados dos últimos 30 dias"
+            />
+
+            {/* Primary metrics — big numbers */}
+            <div className="grid md:grid-cols-3 gap-px bg-white/[0.06] rounded-2xl overflow-hidden">
+              <MetricCell label="Faturamento Pago" value={fmt(metrics.faturamento)} sub={`${metrics.totalPedidos} pedidos`} />
+              <MetricCell label="Valor Investido" value={fmt(metrics.investido)} sub="Meta Ads" />
+              <MetricCell label="Valor Convertido" value={fmt(metrics.convertido)} sub="Meta Ads" />
+            </div>
+
+            {/* Secondary metrics */}
+            <div className="grid md:grid-cols-3 gap-px bg-white/[0.06] rounded-2xl overflow-hidden">
+              <MetricCell
                 label="ROAS"
                 value={`${fmtNum(metrics.roas)}x`}
-                sublabel={metrics.roas >= 3 ? "Excelente" : metrics.roas >= 2 ? "Bom" : "Atenção"}
-                highlight={metrics.roas >= 3 ? "green" : metrics.roas >= 2 ? "amber" : "red"}
+                sub={metrics.roas >= 3 ? "Excelente" : metrics.roas >= 2 ? "Bom" : "Atenção"}
+                accent={metrics.roas >= 3 ? "emerald" : metrics.roas >= 2 ? "amber" : "red"}
               />
-              <MetricDisplay
-                label="CPA"
-                value={fmt(metrics.cpa)}
-                sublabel={`${metrics.totalConversoes} conversões`}
-              />
-              <MetricDisplay
-                label="Ticket Médio"
-                value={fmt(metrics.ticketMedio)}
-              />
+              <MetricCell label="CPA" value={fmt(metrics.cpa)} sub={`${metrics.totalConversoes} conversões`} />
+              <MetricCell label="Ticket Médio" value={fmt(metrics.ticketMedio)} />
             </div>
           </section>
         )}
 
-        {/* Top Products */}
+        {/* ─── DIVIDER ─── */}
+        <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+
+        {/* ─── TOP PRODUCTS ─── */}
         {products.length > 0 && (
-          <section>
-            <SectionTitle>Top 5 Produtos Mais Vendidos</SectionTitle>
-            <div className="rounded-2xl border border-white/10 overflow-hidden bg-white/[0.02] backdrop-blur-sm">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-white/10">
-                    <th className="px-6 py-4 text-left text-xs font-medium text-white/40 uppercase tracking-wider w-12">#</th>
-                    <th className="px-4 py-4 text-left text-xs font-medium text-white/40 uppercase tracking-wider w-16"></th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-white/40 uppercase tracking-wider">Produto</th>
-                    <th className="px-6 py-4 text-right text-xs font-medium text-white/40 uppercase tracking-wider">Qtd</th>
-                    <th className="px-6 py-4 text-right text-xs font-medium text-white/40 uppercase tracking-wider">Faturamento</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {products.map((p: TopProduct, i: number) => (
-                    <tr key={i} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
-                      <td className="px-6 py-4">
-                        <span className="w-7 h-7 rounded-lg bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
-                          {i + 1}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        {p.imageUrl ? (
-                          <div className="w-12 h-12 relative rounded-lg overflow-hidden border border-white/10">
-                            <Image src={p.imageUrl} alt={p.name} fill className="object-cover" unoptimized sizes="48px" />
-                          </div>
-                        ) : (
-                          <div className="w-12 h-12 rounded-lg bg-white/5 flex items-center justify-center border border-white/10">
-                            <span className="text-lg text-white/10">{i + 1}</span>
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-sm font-medium">{p.name}</td>
-                      <td className="px-6 py-4 text-sm text-right text-white/70">{p.quantity}</td>
-                      <td className="px-6 py-4 text-sm text-right font-medium">{fmt(p.revenue)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        )}
-
-        {/* Top Collections */}
-        {collections.length > 0 && (
-          <section>
-            <SectionTitle>Top 3 Coleções com Mais Vendas</SectionTitle>
-            <div className="grid md:grid-cols-3 gap-4">
-              {collections.map((c: TopCollection, i: number) => (
+          <section className="space-y-8">
+            <SectionHeader title="Top 5 Produtos" subtitle="Mais vendidos no período" />
+            <div className="space-y-3">
+              {products.map((p: TopProduct, i: number) => (
                 <div
                   key={i}
-                  className="rounded-2xl border border-white/10 bg-white/[0.02] backdrop-blur-sm p-6 text-center"
+                  className="flex items-center gap-4 p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.04] transition-colors"
                 >
-                  <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center mx-auto mb-3 text-primary font-bold">
+                  {/* Rank */}
+                  <span className="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center text-xs font-bold text-white/50 shrink-0">
                     {i + 1}
+                  </span>
+
+                  {/* Image */}
+                  {p.imageUrl ? (
+                    <div className="w-12 h-12 relative rounded-lg overflow-hidden shrink-0 border border-white/[0.08]">
+                      <Image src={p.imageUrl} alt={p.name} fill className="object-cover" unoptimized sizes="48px" />
+                    </div>
+                  ) : (
+                    <div className="w-12 h-12 rounded-lg bg-white/[0.04] shrink-0 border border-white/[0.06]" />
+                  )}
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{p.name}</p>
+                    <p className="text-xs text-white/30 mt-0.5">{p.quantity} vendas</p>
                   </div>
-                  <h4 className="font-semibold mb-2">{c.name}</h4>
-                  <p className="text-2xl font-bold text-primary">{c.quantity}</p>
-                  <p className="text-xs text-white/40 mt-1">vendas · {fmt(c.revenue)}</p>
+
+                  {/* Revenue */}
+                  <p className="text-sm font-semibold text-white/80 shrink-0">{fmt(p.revenue)}</p>
                 </div>
               ))}
             </div>
           </section>
         )}
 
-        {/* Top Creatives */}
+        {/* ─── TOP COLLECTIONS ─── */}
+        {collections.length > 0 && (
+          <section className="space-y-8">
+            <SectionHeader title="Top Coleções" subtitle="Categorias com mais vendas" />
+            <div className="grid md:grid-cols-3 gap-4">
+              {collections.map((c: TopCollection, i: number) => (
+                <div
+                  key={i}
+                  className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 text-center space-y-3"
+                >
+                  <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-white/[0.06] text-xs font-bold text-white/50">
+                    {i + 1}
+                  </span>
+                  <h4 className="text-sm font-semibold">{c.name}</h4>
+                  <p className="text-3xl font-bold tracking-tight">{c.quantity}</p>
+                  <p className="text-xs text-white/30">{fmt(c.revenue)}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ─── DIVIDER ─── */}
         {creatives.length > 0 && (
-          <section>
-            <SectionTitle>Top 5 Criativos — Melhor Performance</SectionTitle>
+          <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+        )}
+
+        {/* ─── TOP CREATIVES ─── */}
+        {creatives.length > 0 && (
+          <section className="space-y-8">
+            <SectionHeader title="Top 5 Criativos" subtitle="Melhor performance no período" />
             <CreativesSection creatives={creatives} />
           </section>
         )}
 
-        {/* Gaps */}
+        {/* ─── DIVIDER ─── */}
+        {(gaps.length > 0 || levers.length > 0) && (
+          <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+        )}
+
+        {/* ─── GAPS ─── */}
         {gaps.length > 0 && (
-          <section>
-            <SectionTitle>Gaps Identificados</SectionTitle>
+          <section className="space-y-8">
+            <SectionHeader
+              title="Gaps Identificados"
+              subtitle="Pontos de melhoria que precisam de atenção"
+            />
             <div className="grid md:grid-cols-2 gap-4">
               {gaps.map((gap: GapNode, i: number) => (
                 <GapLeverCard key={gap.id} item={gap} index={i} type="gap" />
@@ -296,28 +308,29 @@ export default async function PublicPlanPage({ params }: PageProps) {
           </section>
         )}
 
-        {/* Levers */}
+        {/* ─── LEVERS ─── */}
         {levers.length > 0 && (
-          <section>
-            <SectionTitle>Alavancas de Crescimento</SectionTitle>
+          <section className="space-y-8">
+            <SectionHeader
+              title="Alavancas de Crescimento"
+              subtitle="Ações que vão gerar mais resultado"
+            />
             <div className="grid md:grid-cols-2 gap-4">
               {levers.map((lever: LeverNode, i: number) => (
-                <GapLeverCard
-                  key={lever.id}
-                  item={lever}
-                  index={i}
-                  type="lever"
-                />
+                <GapLeverCard key={lever.id} item={lever} index={i} type="lever" />
               ))}
             </div>
           </section>
         )}
 
-        {/* Footer */}
-        <footer className="text-center pt-8 border-t border-white/10">
-          <p className="text-xs text-white/30">
+        {/* ─── FOOTER ─── */}
+        <footer className="text-center pt-12 border-t border-white/[0.06] space-y-2">
+          <p className="text-xs text-white/20">
             Plano de Ação preparado por {plan.organization.name}
             {plan.createdBy.name && ` · ${plan.createdBy.name}`}
+          </p>
+          <p className="text-[10px] text-white/10">
+            {formatDate(plan.createdAt)}
           </p>
         </footer>
       </main>
@@ -327,43 +340,45 @@ export default async function PublicPlanPage({ params }: PageProps) {
 
 // ─── Sub-components ───────────────────────────────
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
+function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
-    <h2 className="text-xl md:text-2xl font-bold mb-6 flex items-center gap-3">
-      <div className="w-1 h-6 rounded-full bg-primary" />
-      {children}
-    </h2>
+    <div>
+      <h2 className="text-2xl md:text-3xl font-bold tracking-tight">{title}</h2>
+      {subtitle && (
+        <p className="text-sm text-white/30 mt-2">{subtitle}</p>
+      )}
+    </div>
   );
 }
 
-function MetricDisplay({
+function MetricCell({
   label,
   value,
-  sublabel,
-  highlight,
+  sub,
+  accent,
 }: {
   label: string;
   value: string;
-  sublabel?: string;
-  highlight?: "green" | "amber" | "red";
+  sub?: string;
+  accent?: "emerald" | "amber" | "red";
 }) {
-  const highlightClasses = {
-    green: "text-emerald-400",
+  const accentClasses = {
+    emerald: "text-emerald-400",
     amber: "text-amber-400",
     red: "text-red-400",
   };
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.02] backdrop-blur-sm p-5">
-      <p className="text-xs font-medium text-white/40 uppercase tracking-wider mb-2">
+    <div className="bg-[#050505] p-6 md:p-8">
+      <p className="text-[11px] font-medium text-white/30 uppercase tracking-wider mb-3">
         {label}
       </p>
-      <p className={`text-2xl md:text-3xl font-bold tracking-tight ${highlight ? highlightClasses[highlight] : ""}`}>
+      <p className={`text-2xl md:text-4xl font-bold tracking-tight ${accent ? accentClasses[accent] : "text-white"}`}>
         {value}
       </p>
-      {sublabel && (
-        <p className={`text-xs mt-1 ${highlight ? highlightClasses[highlight] + "/60" : "text-white/30"}`}>
-          {sublabel}
+      {sub && (
+        <p className={`text-xs mt-2 ${accent ? accentClasses[accent] + "/50" : "text-white/20"}`}>
+          {sub}
         </p>
       )}
     </div>

@@ -25,63 +25,69 @@ export function CreativesSection({ creatives }: { creatives: TopCreative[] }) {
 
   return (
     <>
-      <div className="grid md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         {creatives.map((c, i) => (
           <div
             key={i}
-            className="rounded-2xl border border-white/10 bg-white/[0.02] backdrop-blur-sm overflow-hidden cursor-pointer hover:border-primary/40 transition-colors"
+            className="group rounded-2xl border border-white/[0.06] bg-white/[0.02] overflow-hidden cursor-pointer hover:border-white/[0.12] transition-all duration-300"
             onClick={() => {
               setSelected(c);
               setIsOpen(true);
             }}
           >
-            {c.thumbnailUrl ? (
-              <div className="aspect-square relative">
-                <Image
-                  src={c.thumbnailUrl}
-                  alt={c.name}
-                  fill
-                  className="object-cover"
-                  unoptimized
-                />
-                <div className="absolute top-2 left-2">
-                  <span className="px-2 py-1 rounded-lg bg-black/60 text-xs font-bold backdrop-blur-sm">
-                    #{i + 1}
+            {/* Thumbnail */}
+            <div className="aspect-square relative overflow-hidden">
+              {c.thumbnailUrl ? (
+                <>
+                  <Image
+                    src={c.thumbnailUrl}
+                    alt={c.name}
+                    fill
+                    className="object-cover group-hover:scale-105 transition-transform duration-500"
+                    unoptimized
+                  />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-300 flex items-center justify-center">
+                    <span className="opacity-0 group-hover:opacity-100 text-white text-xs font-medium bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 transition-opacity duration-300">
+                      Ver criativo
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <div className="w-full h-full bg-white/[0.03] flex items-center justify-center">
+                  <span className="text-4xl font-bold text-white/[0.06]">
+                    {i + 1}
                   </span>
                 </div>
-                <div className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-colors flex items-center justify-center">
-                  <span className="opacity-0 hover:opacity-100 text-white text-xs font-medium bg-black/60 px-3 py-1.5 rounded-lg backdrop-blur-sm transition-opacity">
-                    Ver criativo
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <div className="aspect-square bg-white/5 flex items-center justify-center">
-                <span className="text-4xl font-bold text-white/10">
-                  {i + 1}
+              )}
+              {/* Rank badge */}
+              <div className="absolute top-2 left-2">
+                <span className="px-2 py-0.5 rounded-md bg-black/50 backdrop-blur-sm text-[10px] font-bold text-white/70 border border-white/10">
+                  #{i + 1}
                 </span>
               </div>
-            )}
-            <div className="p-4 space-y-2">
-              <p className="text-xs font-medium truncate text-white/70">
+            </div>
+
+            {/* Info */}
+            <div className="p-3 space-y-2">
+              <p className="text-xs font-medium truncate text-white/60">
                 {c.name}
               </p>
-              <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px]">
                 <div>
-                  <p className="text-white/40">Gasto</p>
-                  <p className="font-semibold">{fmt(c.spend)}</p>
+                  <p className="text-white/25">Gasto</p>
+                  <p className="font-semibold text-white/80">{fmt(c.spend)}</p>
                 </div>
                 <div>
-                  <p className="text-white/40">Vendas</p>
-                  <p className="font-semibold">{c.sales}</p>
+                  <p className="text-white/25">Vendas</p>
+                  <p className="font-semibold text-white/80">{c.sales}</p>
                 </div>
                 <div>
-                  <p className="text-white/40">ROAS</p>
-                  <p className="font-semibold">{fmtNum(c.roas)}x</p>
+                  <p className="text-white/25">ROAS</p>
+                  <p className="font-semibold text-white/80">{fmtNum(c.roas)}x</p>
                 </div>
                 <div>
-                  <p className="text-white/40">Score</p>
-                  <p className="font-semibold text-primary">
+                  <p className="text-white/25">Score</p>
+                  <p className="font-semibold text-emerald-400">
                     {fmtNum(c.score * 100, 0)}
                   </p>
                 </div>
