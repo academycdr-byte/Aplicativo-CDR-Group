@@ -28,6 +28,7 @@ import {
   ChevronRight,
   Pencil,
   Package,
+  Lightbulb,
 } from "lucide-react";
 import { VideoModal } from "@/components/ads/video-modal";
 import { toast } from "sonner";
@@ -272,6 +273,7 @@ function GapLeverSection({
   onChange,
   editable,
   colorClass,
+  showSolutions = false,
 }: {
   title: string;
   icon: React.ElementType;
@@ -279,6 +281,7 @@ function GapLeverSection({
   onChange: (items: (GapNode | LeverNode)[]) => void;
   editable: boolean;
   colorClass: string;
+  showSolutions?: boolean;
 }) {
   const addItem = () => {
     onChange([
@@ -406,6 +409,77 @@ function GapLeverSection({
                   onChange={(url) => updateItem(i, { ...item, imageUrl: url })}
                 />
               )}
+
+              {/* Solutions (gaps only) */}
+              {showSolutions && (
+                <div className="mb-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Lightbulb className="w-4 h-4 text-amber-400" />
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Soluções
+                    </span>
+                    {editable && (
+                      <button
+                        onClick={() => {
+                          const solutions = (item as GapNode).solutions || [];
+                          updateItem(i, { ...item, solutions: [...solutions, ""] });
+                        }}
+                        className="ml-auto p-1 rounded hover:bg-muted"
+                        title="Adicionar solução"
+                      >
+                        <Plus className="w-3.5 h-3.5 text-muted-foreground" />
+                      </button>
+                    )}
+                  </div>
+                  {((item as GapNode).solutions || []).length === 0 ? (
+                    editable ? (
+                      <button
+                        onClick={() => updateItem(i, { ...item, solutions: [""] })}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-dashed border-border text-xs text-muted-foreground hover:bg-muted/50 hover:border-muted-foreground/30 transition-colors"
+                      >
+                        <Lightbulb className="w-3.5 h-3.5" />
+                        Adicionar solução para este gap
+                      </button>
+                    ) : null
+                  ) : (
+                    <div className="space-y-2">
+                      {((item as GapNode).solutions || []).map((sol, si) => (
+                        <div key={si} className="flex items-start gap-2 group/sol">
+                          <span className="mt-2.5 w-1.5 h-1.5 rounded-full bg-amber-400/60 shrink-0" />
+                          {editable ? (
+                            <>
+                              <input
+                                type="text"
+                                value={sol}
+                                onChange={(e) => {
+                                  const solutions = [...((item as GapNode).solutions || [])];
+                                  solutions[si] = e.target.value;
+                                  updateItem(i, { ...item, solutions });
+                                }}
+                                placeholder={`Solução ${si + 1}`}
+                                className="flex-1 px-3 py-2 rounded-lg border border-border bg-background text-sm placeholder:text-muted-foreground/50"
+                              />
+                              <button
+                                onClick={() => {
+                                  const solutions = ((item as GapNode).solutions || []).filter((_, k) => k !== si);
+                                  updateItem(i, { ...item, solutions });
+                                }}
+                                className="mt-1.5 p-1 rounded hover:bg-red-500/10 opacity-0 group-hover/sol:opacity-100 transition-opacity"
+                                title="Remover solução"
+                              >
+                                <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                              </button>
+                            </>
+                          ) : (
+                            <span className="text-sm py-1">{sol}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {!editable && ((item as GapNode).currentMetric || (item as GapNode).targetMetric) && (
                 <div className="flex items-center gap-3 mb-3 text-sm text-muted-foreground">
                   {(item as GapNode).currentMetric && <span>Atual: {(item as GapNode).currentMetric}</span>}
@@ -1326,6 +1400,7 @@ export default function ActionPlanEditorPage() {
         onChange={(items) => update("gaps", items as GapNode[])}
         editable={!!canEdit}
         colorClass="bg-red-500/5"
+        showSolutions
       />
 
       {/* Levers */}

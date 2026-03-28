@@ -819,6 +819,51 @@ function TC({
         </div>
       )}
 
+      {/* Solutions (gaps only) */}
+      {isGap && (item as GapNode).solutions && (item as GapNode).solutions!.length > 0 && (
+        <div
+          className="mb-5 p-4 rounded-xl"
+          style={{
+            background: "rgba(251,191,36,0.04)",
+            border: "1px solid rgba(251,191,36,0.12)",
+          }}
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5" />
+              <path d="M9 18h6" /><path d="M10 22h4" />
+            </svg>
+            <p style={{
+              fontSize: "10px",
+              fontWeight: 700,
+              letterSpacing: "1.5px",
+              textTransform: "uppercase" as const,
+              color: "#fbbf24",
+              fontFamily: CLASH,
+            }}>
+              Soluções Propostas
+            </p>
+          </div>
+          <div className="space-y-2">
+            {(item as GapNode).solutions!.filter(Boolean).map((sol, si) => (
+              <div key={si} className="flex items-start gap-3">
+                <svg className="shrink-0 mt-1" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                <p style={{
+                  fontSize: "13px",
+                  fontWeight: 400,
+                  color: "rgba(255,255,255,0.75)",
+                  lineHeight: "1.5",
+                }}>
+                  {sol}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Sub-items */}
       {item.children.length > 0 &&
         item.children.map((ch) => <B key={ch.id} node={ch} depth={0} />)}

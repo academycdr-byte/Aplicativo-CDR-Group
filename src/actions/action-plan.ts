@@ -99,6 +99,7 @@ export type GapNode = {
   targetMetric?: string;
   financialImpact?: string;
   imageUrl?: string;
+  solutions?: string[];
 };
 
 export type LeverNode = {
