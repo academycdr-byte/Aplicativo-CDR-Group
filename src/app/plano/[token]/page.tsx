@@ -131,7 +131,7 @@ export default async function PublicPlanPage({ params }: PageProps) {
                 fontWeight: 700,
                 letterSpacing: "1.5px",
                 textTransform: "uppercase" as const,
-                color: `${G}99`,
+                color: G,
               }}
             >
               Plano de Ação {cleanOrgName(plan.organization.name)}
@@ -160,7 +160,7 @@ export default async function PublicPlanPage({ params }: PageProps) {
                 fontWeight: 700,
                 letterSpacing: "1.5px",
                 textTransform: "uppercase" as const,
-                color: `${MUTED}55`,
+                color: `${MUTED}AA`,
               }}
             >
               Período Analisado
