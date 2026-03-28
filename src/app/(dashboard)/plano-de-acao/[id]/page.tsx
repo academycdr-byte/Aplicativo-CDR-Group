@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Image from "next/image";
@@ -401,15 +401,10 @@ function GapLeverSection({
                 </div>
               )}
               {editable && (
-                <div className="mb-3">
-                  <input
-                    type="text"
-                    value={(item as GapNode).imageUrl || ""}
-                    onChange={(e) => updateItem(i, { ...item, imageUrl: e.target.value })}
-                    placeholder="URL da imagem de referência (opcional)"
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm placeholder:text-muted-foreground/50"
-                  />
-                </div>
+                <ImageUploadField
+                  value={(item as GapNode).imageUrl || ""}
+                  onChange={(url) => updateItem(i, { ...item, imageUrl: url })}
+                />
               )}
               {!editable && ((item as GapNode).currentMetric || (item as GapNode).targetMetric) && (
                 <div className="flex items-center gap-3 mb-3 text-sm text-muted-foreground">
@@ -442,6 +437,85 @@ function GapLeverSection({
           ))
         )}
       </div>
+    </div>
+  );
+}
+
+// ─── Image Upload Field ──────────────────────────
+
+function ImageUploadField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (url: string) => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/upload/image", { method: "POST", body: formData });
+      const data = await res.json();
+      if (data.url) onChange(data.url);
+    } catch {
+      // silently fail
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
+  return (
+    <div className="mb-3">
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        onChange={handleUpload}
+        className="hidden"
+      />
+      {value ? (
+        <div className="relative rounded-lg overflow-hidden border border-border">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={value} alt="Referência" className="w-full max-h-48 object-cover" />
+          <div className="absolute top-2 right-2 flex gap-1">
+            <button
+              onClick={() => fileRef.current?.click()}
+              className="p-1.5 rounded-lg bg-background/80 backdrop-blur border border-border text-xs hover:bg-muted transition-colors"
+            >
+              Trocar
+            </button>
+            <button
+              onClick={() => onChange("")}
+              className="p-1.5 rounded-lg bg-background/80 backdrop-blur border border-border text-xs text-red-400 hover:bg-red-500/10 transition-colors"
+            >
+              Remover
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={() => fileRef.current?.click()}
+          disabled={uploading}
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-dashed border-border text-sm text-muted-foreground hover:bg-muted/50 hover:border-muted-foreground/30 transition-colors disabled:opacity-50"
+        >
+          {uploading ? (
+            "Enviando..."
+          ) : (
+            <>
+              <ImageIcon className="w-4 h-4" />
+              Adicionar imagem de referência
+            </>
+          )}
+        </button>
+      )}
     </div>
   );
 }

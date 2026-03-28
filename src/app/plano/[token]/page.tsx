@@ -826,13 +826,11 @@ function TC({
       {/* Reference image */}
       {item.imageUrl && (
         <div className="mt-5 rounded-xl overflow-hidden" style={{ border: `1px solid ${c}15` }}>
-          <Image
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
             src={item.imageUrl}
             alt={item.title || "Referência"}
-            width={800}
-            height={450}
             className="w-full h-auto object-cover"
-            unoptimized
           />
         </div>
       )}
