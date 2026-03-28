@@ -609,11 +609,12 @@ function HeroKPI({ value, label }: { value: string; label: string }) {
       <p
         style={{
           fontFamily: CLASH,
-          fontSize: "clamp(20px, 3.5vw, 36px)",
+          fontSize: "clamp(16px, 2.5vw, 28px)",
           fontWeight: 700,
-          letterSpacing: "-0.75px",
+          letterSpacing: "-0.5px",
           color: G,
           fontVariantNumeric: "tabular-nums",
+          whiteSpace: "nowrap",
         }}
       >
         {value}
