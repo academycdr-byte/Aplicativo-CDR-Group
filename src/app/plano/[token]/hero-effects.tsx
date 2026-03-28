@@ -2,8 +2,7 @@
 
 /**
  * CDR Group — Hero visual effects for public plan page
- * Aurora gradient that bleeds naturally into the content below
- * No hard cuts — the gradient extends 150% of the header height
+ * Aurora gradient + floating particles + shimmer scan + stagger entrance
  */
 
 export function GradientMesh() {
@@ -12,7 +11,6 @@ export function GradientMesh() {
       className="absolute pointer-events-none"
       aria-hidden="true"
       style={{
-        /* Extend 60% beyond the header boundary so it covers the first section */
         top: 0,
         left: 0,
         right: 0,
@@ -57,7 +55,29 @@ export function GradientMesh() {
           animation: "plan-drift-3 22s ease-in-out infinite",
         }}
       />
-      {/* Natural bottom fade — aurora dissolves gradually */}
+
+      {/* Floating particles — small green dots */}
+      {[...Array(8)].map((_, i) => (
+        <div
+          key={i}
+          className="absolute rounded-full"
+          style={{
+            width: `${3 + (i % 3) * 2}px`,
+            height: `${3 + (i % 3) * 2}px`,
+            top: `${10 + i * 10}%`,
+            left: `${8 + i * 11}%`,
+            background: `rgba(190, 255, 10, ${0.15 + (i % 3) * 0.1})`,
+            boxShadow: `0 0 ${6 + i * 2}px rgba(190, 255, 10, 0.2)`,
+            animation: `plan-float-${(i % 3) + 1} ${8 + i * 2}s ease-in-out infinite`,
+            animationDelay: `${i * 0.7}s`,
+          }}
+        />
+      ))}
+
+      {/* Shimmer scan line — sweeps across every 8s */}
+      <div className="plan-shimmer-scan" />
+
+      {/* Natural bottom fade */}
       <div
         className="absolute"
         style={{

@@ -968,6 +968,66 @@
   50% { opacity: 1; }
 }
 
+/* ── Floating Particles ── */
+@keyframes plan-float-1 {
+  0%, 100% { transform: translate(0, 0); opacity: 0.4; }
+  25% { transform: translate(20px, -30px); opacity: 0.8; }
+  50% { transform: translate(-10px, -50px); opacity: 0.3; }
+  75% { transform: translate(30px, -20px); opacity: 0.7; }
+}
+@keyframes plan-float-2 {
+  0%, 100% { transform: translate(0, 0); opacity: 0.3; }
+  25% { transform: translate(-30px, -20px); opacity: 0.7; }
+  50% { transform: translate(20px, -40px); opacity: 0.5; }
+  75% { transform: translate(-15px, -60px); opacity: 0.2; }
+}
+@keyframes plan-float-3 {
+  0%, 100% { transform: translate(0, 0); opacity: 0.5; }
+  25% { transform: translate(15px, -40px); opacity: 0.3; }
+  50% { transform: translate(-25px, -20px); opacity: 0.8; }
+  75% { transform: translate(10px, -50px); opacity: 0.4; }
+}
+
+/* ── Shimmer Scan Line ── */
+.plan-shimmer-scan {
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(190, 255, 10, 0.03) 40%,
+    rgba(190, 255, 10, 0.06) 50%,
+    rgba(190, 255, 10, 0.03) 60%,
+    transparent 100%
+  );
+  animation: plan-shimmer-sweep 8s ease-in-out infinite;
+  animation-delay: 2s;
+  pointer-events: none;
+}
+@keyframes plan-shimmer-sweep {
+  0% { left: -60%; }
+  40%, 100% { left: 160%; }
+}
+
+/* ── Hero Stagger Entrance ── */
+.plan-hero-stagger > * {
+  opacity: 0;
+  transform: translateY(20px);
+  animation: plan-stagger-in 0.7s cubic-bezier(0, 0, 0.2, 1) forwards;
+}
+.plan-hero-stagger > *:nth-child(1) { animation-delay: 0.1s; }
+.plan-hero-stagger > *:nth-child(2) { animation-delay: 0.25s; }
+.plan-hero-stagger > *:nth-child(3) { animation-delay: 0.4s; }
+.plan-hero-stagger > *:nth-child(4) { animation-delay: 0.55s; }
+.plan-hero-stagger > *:nth-child(5) { animation-delay: 0.7s; }
+
+@keyframes plan-stagger-in {
+  to { opacity: 1; transform: translateY(0); }
+}
+
 /* ── Responsive Plan Adjustments ── */
 @media (max-width: 768px) {
   .plan-metric {

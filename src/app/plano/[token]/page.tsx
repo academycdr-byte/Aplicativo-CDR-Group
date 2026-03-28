@@ -98,7 +98,7 @@ export default async function PublicPlanPage({ params }: PageProps) {
           <div />
         </div>
 
-        <div className="relative z-10 max-w-[960px] mx-auto px-6 text-center">
+        <div className="relative z-10 max-w-[960px] mx-auto px-6 text-center plan-hero-stagger">
           {/* Client Logo — grande e em destaque */}
           {(() => {
             const heroAvatar = plan.organization.logo || plan.createdBy.image;
