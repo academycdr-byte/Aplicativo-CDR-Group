@@ -2,16 +2,25 @@
 
 /**
  * CDR Group — Hero visual effects for public plan page
- * Matches cdrgroup.com.br hero: aurora gradient mesh + circuit grid pattern
+ * Aurora gradient that bleeds naturally into the content below
+ * No hard cuts — the gradient extends 150% of the header height
  */
 
 export function GradientMesh() {
   return (
     <div
-      className="absolute inset-0 overflow-hidden pointer-events-none"
+      className="absolute pointer-events-none"
       aria-hidden="true"
+      style={{
+        /* Extend 60% beyond the header boundary so it covers the first section */
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: "-60%",
+        overflow: "hidden",
+      }}
     >
-      {/* Aurora blobs — bigger and more vivid than before */}
+      {/* Aurora blobs */}
       <div
         className="absolute rounded-full"
         style={{
@@ -48,29 +57,16 @@ export function GradientMesh() {
           animation: "plan-drift-3 22s ease-in-out infinite",
         }}
       />
-      {/* Bottom green glow band — fades smoothly into content */}
+      {/* Natural bottom fade — aurora dissolves gradually */}
       <div
         className="absolute"
         style={{
           width: "100%",
-          height: "60%",
+          height: "50%",
           bottom: "0",
           left: "0",
           background:
-            "linear-gradient(to top, rgba(190, 255, 10, 0.06) 0%, rgba(190, 255, 10, 0.10) 30%, transparent 100%)",
-          animation: "plan-glow-pulse 6s ease-in-out infinite",
-        }}
-      />
-      {/* Bottom black fade — smooth bridge to content below */}
-      <div
-        className="absolute"
-        style={{
-          width: "100%",
-          height: "200px",
-          bottom: "0",
-          left: "0",
-          background:
-            "linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.3) 50%, transparent 100%)",
+            "linear-gradient(to top, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.6) 40%, transparent 100%)",
         }}
       />
       {/* Circuit grid pattern overlay */}

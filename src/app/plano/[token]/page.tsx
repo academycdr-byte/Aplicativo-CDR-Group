@@ -78,7 +78,7 @@ export default async function PublicPlanPage({ params }: PageProps) {
       {/* ════════════════════════════════════════
           HERO — Compact, logo destaque, sem KPIs duplicados
           ════════════════════════════════════════ */}
-      <header className="relative overflow-hidden pt-24 pb-20 md:pt-28 md:pb-24">
+      <header className="relative overflow-hidden pt-24 pb-10 md:pt-28 md:pb-14">
         <GradientMesh />
 
         {/* CDR Logo — top left */}
@@ -168,14 +168,6 @@ export default async function PublicPlanPage({ params }: PageProps) {
         </div>
       </header>
 
-      {/* Aurora → black smooth bridge */}
-      <div
-        className="relative h-24 md:h-32 -mt-1 pointer-events-none"
-        style={{
-          background: "linear-gradient(to bottom, transparent, #000000)",
-        }}
-      />
-
       <main>
         {/* ════════════════════════════════════════
             SECTION — Métricas do Período
@@ -183,7 +175,7 @@ export default async function PublicPlanPage({ params }: PageProps) {
         {m && (
           <>
             <ScrollReveal>
-              <section className="py-20 md:py-28 relative overflow-hidden">
+              <section className="pt-10 pb-20 md:pt-14 md:pb-28 relative overflow-hidden">
                 <SectionGlow position="right" intensity={0.05} />
                 <div className="relative max-w-[960px] mx-auto px-6">
                   <SectionHead num={`0${++sectionNum}`} title="Métricas do Período" />
