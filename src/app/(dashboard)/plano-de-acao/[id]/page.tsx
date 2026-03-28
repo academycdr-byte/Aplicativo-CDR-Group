@@ -374,6 +374,51 @@ function GapLeverSection({
                 )}
               </div>
 
+              {/* Metrics fields */}
+              {editable && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
+                  <input
+                    type="text"
+                    value={(item as GapNode).currentMetric || ""}
+                    onChange={(e) => updateItem(i, { ...item, currentMetric: e.target.value })}
+                    placeholder="Métrica atual (ex: CTR 1.2%)"
+                    className="px-3 py-2 rounded-lg border border-border bg-background text-sm placeholder:text-muted-foreground/50"
+                  />
+                  <input
+                    type="text"
+                    value={(item as GapNode).targetMetric || ""}
+                    onChange={(e) => updateItem(i, { ...item, targetMetric: e.target.value })}
+                    placeholder="Meta (ex: CTR 2.5%)"
+                    className="px-3 py-2 rounded-lg border border-border bg-background text-sm placeholder:text-muted-foreground/50"
+                  />
+                  <input
+                    type="text"
+                    value={(item as GapNode).financialImpact || ""}
+                    onChange={(e) => updateItem(i, { ...item, financialImpact: e.target.value })}
+                    placeholder="Impacto (ex: +R$ 15k/mês)"
+                    className="px-3 py-2 rounded-lg border border-border bg-background text-sm placeholder:text-muted-foreground/50"
+                  />
+                </div>
+              )}
+              {editable && (
+                <div className="mb-3">
+                  <input
+                    type="text"
+                    value={(item as GapNode).imageUrl || ""}
+                    onChange={(e) => updateItem(i, { ...item, imageUrl: e.target.value })}
+                    placeholder="URL da imagem de referência (opcional)"
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm placeholder:text-muted-foreground/50"
+                  />
+                </div>
+              )}
+              {!editable && ((item as GapNode).currentMetric || (item as GapNode).targetMetric) && (
+                <div className="flex items-center gap-3 mb-3 text-sm text-muted-foreground">
+                  {(item as GapNode).currentMetric && <span>Atual: {(item as GapNode).currentMetric}</span>}
+                  {(item as GapNode).targetMetric && <span>→ Meta: {(item as GapNode).targetMetric}</span>}
+                  {(item as GapNode).financialImpact && <span className="text-primary font-medium">| {(item as GapNode).financialImpact}</span>}
+                </div>
+              )}
+
               {item.children.map((child, j) => (
                 <TreeNodeEditor
                   key={child.id}

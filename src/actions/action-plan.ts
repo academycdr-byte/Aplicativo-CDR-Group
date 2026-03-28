@@ -95,12 +95,20 @@ export type GapNode = {
   id: string;
   title: string;
   children: TreeNode[];
+  currentMetric?: string;
+  targetMetric?: string;
+  financialImpact?: string;
+  imageUrl?: string;
 };
 
 export type LeverNode = {
   id: string;
   title: string;
   children: TreeNode[];
+  currentMetric?: string;
+  targetMetric?: string;
+  financialImpact?: string;
+  imageUrl?: string;
 };
 
 // ─── List Action Plans ────────────────────────────

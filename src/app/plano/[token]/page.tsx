@@ -505,7 +505,7 @@ export default async function PublicPlanPage({ params }: PageProps) {
                   >
                     Pontos de melhoria que precisam de atenção
                   </p>
-                  <div className="grid md:grid-cols-2 gap-4">
+                  <div className="grid gap-5">
                     {gaps.map((g: GapNode, i: number) => (
                       <TC key={g.id} item={g} index={i} type="gap" />
                     ))}
@@ -535,7 +535,7 @@ export default async function PublicPlanPage({ params }: PageProps) {
                 >
                   Ações que vão gerar mais resultado
                 </p>
-                <div className="grid md:grid-cols-2 gap-4">
+                <div className="grid gap-5">
                   {levers.map((l: LeverNode, i: number) => (
                     <TC key={l.id} item={l} index={i} type="lever" />
                   ))}
@@ -722,6 +722,8 @@ function MC({
   );
 }
 
+const MEDALS = ["🥇", "🥈", "🥉"];
+
 function TC({
   item,
   index,
@@ -733,6 +735,9 @@ function TC({
 }) {
   const isGap = type === "gap";
   const c = isGap ? "#FF4D4D" : G;
+  const medal = MEDALS[index];
+  const hasMetrics = item.currentMetric || item.targetMetric || item.financialImpact;
+
   return (
     <div
       className="plan-step-card"
@@ -741,19 +746,24 @@ function TC({
         background: `${c}06`,
       }}
     >
+      {/* Header: medal/number + title */}
       <div className="flex items-center gap-4 mb-5">
-        <span
-          className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-          style={{
-            fontSize: "12px",
-            fontWeight: 700,
-            fontFamily: CLASH,
-            background: c,
-            color: isGap ? "#fff" : BG,
-          }}
-        >
-          {String(index + 1).padStart(2, "0")}
-        </span>
+        {medal ? (
+          <span className="text-2xl shrink-0">{medal}</span>
+        ) : (
+          <span
+            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+            style={{
+              fontSize: "12px",
+              fontWeight: 700,
+              fontFamily: CLASH,
+              background: c,
+              color: isGap ? "#fff" : BG,
+            }}
+          >
+            {String(index + 1).padStart(2, "0")}
+          </span>
+        )}
         <h4
           style={{
             fontFamily: CLASH,
@@ -765,16 +775,72 @@ function TC({
           {item.title || `${isGap ? "Gap" : "Alavanca"} ${index + 1}`}
         </h4>
       </div>
+
+      {/* Metrics bar: atual → meta → impacto */}
+      {hasMetrics && (
+        <div
+          className="grid gap-3 mb-5 p-4 rounded-xl"
+          style={{
+            gridTemplateColumns: item.financialImpact ? "1fr auto 1fr auto 1fr" : "1fr auto 1fr",
+            background: "rgba(255,255,255,0.03)",
+            border: `1px solid ${c}15`,
+          }}
+        >
+          {item.currentMetric && (
+            <div className="text-center">
+              <p style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "1px", textTransform: "uppercase" as const, color: `${MUTED}55` }}>Atual</p>
+              <p className="mt-1" style={{ fontSize: "15px", fontWeight: 600, color: "rgba(255,255,255,0.85)", fontFamily: CLASH }}>{item.currentMetric}</p>
+            </div>
+          )}
+          {item.currentMetric && item.targetMetric && (
+            <div className="flex items-center justify-center px-1">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={`${c}66`} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
+              </svg>
+            </div>
+          )}
+          {item.targetMetric && (
+            <div className="text-center">
+              <p style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "1px", textTransform: "uppercase" as const, color: `${c}88` }}>Meta</p>
+              <p className="mt-1" style={{ fontSize: "15px", fontWeight: 700, color: c, fontFamily: CLASH }}>{item.targetMetric}</p>
+            </div>
+          )}
+          {item.financialImpact && item.targetMetric && (
+            <div className="flex items-center justify-center px-1">
+              <div style={{ width: "1px", height: "28px", background: `${c}20` }} />
+            </div>
+          )}
+          {item.financialImpact && (
+            <div className="text-center">
+              <p style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "1px", textTransform: "uppercase" as const, color: `${MUTED}55` }}>Impacto</p>
+              <p className="mt-1" style={{ fontSize: "15px", fontWeight: 700, color: isGap ? "#f87171" : "#4ade80", fontFamily: CLASH }}>{item.financialImpact}</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Sub-items */}
       {item.children.length > 0 &&
         item.children.map((ch) => <B key={ch.id} node={ch} depth={0} />)}
+
+      {/* Reference image */}
+      {item.imageUrl && (
+        <div className="mt-5 rounded-xl overflow-hidden" style={{ border: `1px solid ${c}15` }}>
+          <Image
+            src={item.imageUrl}
+            alt={item.title || "Referência"}
+            width={800}
+            height={450}
+            className="w-full h-auto object-cover"
+            unoptimized
+          />
+        </div>
+      )}
+
       {/* Bottom accent line */}
       <style
         dangerouslySetInnerHTML={{
-          __html: `
-        .plan-step-card:nth-child(${index + 1})::after {
-          background: ${c};
-        }
-      `,
+          __html: `.plan-step-card:nth-child(${index + 1})::after { background: ${c}; }`,
         }}
       />
     </div>
