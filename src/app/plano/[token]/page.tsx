@@ -152,18 +152,43 @@ export default async function PublicPlanPage({ params }: PageProps) {
             {plan.title}
           </h1>
 
-          {/* Period */}
-          <p
-            className="mt-4"
-            style={{
-              fontSize: "15px",
-              fontWeight: 400,
-              color: `${MUTED}88`,
-              letterSpacing: "0.3px",
-            }}
-          >
-            {fmtD(plan.periodStart)} — {fmtD(plan.periodEnd)}
-          </p>
+          {/* Period — card com ícone de calendário */}
+          <div className="flex justify-center mt-6">
+            <div
+              className="inline-flex items-center gap-3 px-5 py-3 rounded-xl"
+              style={{
+                background: "rgba(255, 255, 255, 0.05)",
+                border: "1px solid rgba(255, 255, 255, 0.08)",
+                backdropFilter: "blur(12px)",
+              }}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke={`${G}88`}
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8" y1="2" x2="8" y2="6" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+              </svg>
+              <span
+                style={{
+                  fontSize: "14px",
+                  fontWeight: 500,
+                  color: "rgba(255, 255, 255, 0.7)",
+                  letterSpacing: "0.3px",
+                }}
+              >
+                {fmtD(plan.periodStart)} — {fmtD(plan.periodEnd)}
+              </span>
+            </div>
+          </div>
         </div>
       </header>
 
