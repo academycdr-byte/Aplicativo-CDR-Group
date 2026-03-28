@@ -10,6 +10,7 @@ import type {
   LeverNode,
   TreeNode,
 } from "@/actions/action-plan";
+import { CreativesSection } from "./creatives-section";
 import type { Metadata } from "next";
 
 // ─── Dynamic Metadata ─────────────────────────────
@@ -279,62 +280,7 @@ export default async function PublicPlanPage({ params }: PageProps) {
         {creatives.length > 0 && (
           <section>
             <SectionTitle>Top 5 Criativos — Melhor Performance</SectionTitle>
-            <div className="grid md:grid-cols-5 gap-4">
-              {creatives.map((c: TopCreative, i: number) => (
-                <div
-                  key={i}
-                  className="rounded-2xl border border-white/10 bg-white/[0.02] backdrop-blur-sm overflow-hidden"
-                >
-                  {c.thumbnailUrl ? (
-                    <div className="aspect-square relative">
-                      <Image
-                        src={c.thumbnailUrl}
-                        alt={c.name}
-                        fill
-                        className="object-cover"
-                        unoptimized
-                      />
-                      <div className="absolute top-2 left-2">
-                        <span className="px-2 py-1 rounded-lg bg-black/60 text-xs font-bold backdrop-blur-sm">
-                          #{i + 1}
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="aspect-square bg-white/5 flex items-center justify-center">
-                      <span className="text-4xl font-bold text-white/10">
-                        {i + 1}
-                      </span>
-                    </div>
-                  )}
-                  <div className="p-4 space-y-2">
-                    <p className="text-xs font-medium truncate text-white/70">
-                      {c.name}
-                    </p>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div>
-                        <p className="text-white/40">Gasto</p>
-                        <p className="font-semibold">{fmt(c.spend)}</p>
-                      </div>
-                      <div>
-                        <p className="text-white/40">Vendas</p>
-                        <p className="font-semibold">{c.sales}</p>
-                      </div>
-                      <div>
-                        <p className="text-white/40">ROAS</p>
-                        <p className="font-semibold">{fmtNum(c.roas)}x</p>
-                      </div>
-                      <div>
-                        <p className="text-white/40">Score</p>
-                        <p className="font-semibold text-primary">
-                          {fmtNum(c.score * 100, 0)}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <CreativesSection creatives={creatives} />
           </section>
         )}
 
