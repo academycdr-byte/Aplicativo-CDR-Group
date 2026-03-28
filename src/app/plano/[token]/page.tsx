@@ -652,8 +652,11 @@ function MC({
   invertChange?: boolean;
 }) {
   const hasChange = change !== undefined && change !== null;
-  const isPositive = hasChange && (invertChange ? change < 0 : change > 0);
-  const isNegative = hasChange && (invertChange ? change > 0 : change < 0);
+  const wentUp = hasChange && change > 0;
+  const wentDown = hasChange && change < 0;
+  /* Color: for CPA, going UP is bad (red), going DOWN is good (green) */
+  const isGood = invertChange ? wentDown : wentUp;
+  const isBad = invertChange ? wentUp : wentDown;
 
   return (
     <div className="plan-metric">
@@ -681,12 +684,12 @@ function MC({
             style={{
               fontSize: "11px",
               fontWeight: 600,
-              background: isPositive ? "rgba(74, 222, 128, 0.1)" : isNegative ? "rgba(248, 113, 113, 0.1)" : "rgba(255,255,255,0.05)",
-              color: isPositive ? "#4ade80" : isNegative ? "#f87171" : `${MUTED}66`,
-              border: `1px solid ${isPositive ? "rgba(74, 222, 128, 0.2)" : isNegative ? "rgba(248, 113, 113, 0.2)" : "rgba(255,255,255,0.06)"}`,
+              background: isGood ? "rgba(74, 222, 128, 0.1)" : isBad ? "rgba(248, 113, 113, 0.1)" : "rgba(255,255,255,0.05)",
+              color: isGood ? "#4ade80" : isBad ? "#f87171" : `${MUTED}66`,
+              border: `1px solid ${isGood ? "rgba(74, 222, 128, 0.2)" : isBad ? "rgba(248, 113, 113, 0.2)" : "rgba(255,255,255,0.06)"}`,
             }}
           >
-            {isPositive ? "↑" : isNegative ? "↓" : "–"}
+            {wentUp ? "↑" : wentDown ? "↓" : "–"}
             {Math.abs(change).toFixed(1)}%
           </span>
         )}
