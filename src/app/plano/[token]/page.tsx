@@ -1,10 +1,7 @@
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import { getActionPlanByToken } from "@/actions/action-plan";
-import type {
-  PlanMetrics, TopProduct, TopCollection, TopCreative,
-  GapNode, LeverNode, TreeNode,
-} from "@/actions/action-plan";
+import type { PlanMetrics, TopProduct, TopCollection, TopCreative, GapNode, LeverNode, TreeNode } from "@/actions/action-plan";
 import { CreativesSection } from "./creatives-section";
 import { GradientMesh } from "./hero-effects";
 import type { Metadata } from "next";
@@ -15,13 +12,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { token } = await params;
   const plan = await getActionPlanByToken(token);
   if (!plan) return { title: "Plano não encontrado" };
-  return {
-    title: `${plan.title} | ${plan.organization.name}`,
-    description: `Plano de Ação — ${plan.organization.name}`,
-  };
+  return { title: `${plan.title} | ${plan.organization.name}`, description: `Plano de Ação — ${plan.organization.name}` };
 }
 
-const G = "#c4ff00";
+/* CDR Brand Tokens */
+const P = "#BEE000"; /* Primary — hsl(73 100% 50%) */
+const BG = "#000000";
+const CARD = "#141414";
+const BORDER = "#1A1A1A";
+const MUTED = "#B3B3B3";
+
 const fmt = (v: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
 const fmtN = (v: number, d = 2) => new Intl.NumberFormat("pt-BR", { minimumFractionDigits: d, maximumFractionDigits: d }).format(v);
 const fmtD = (date: Date) => new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "long", year: "numeric" }).format(new Date(date));
@@ -39,47 +39,34 @@ export default async function PublicPlanPage({ params }: PageProps) {
   const levers = plan.levers || [];
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white antialiased" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <div className="min-h-screen text-white antialiased" style={{ background: BG, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
 
-      {/* ════ HERO — Gradient mesh + KPI cards ════ */}
-      <header className="relative overflow-hidden pb-20 md:pb-28 pt-16 md:pt-24">
+      {/* ════ HERO ════ */}
+      <header className="relative overflow-hidden pb-16 md:pb-24 pt-14 md:pt-20">
         <GradientMesh />
-
-        <div className="relative z-10 max-w-[1000px] mx-auto px-6">
-          {/* Org badge */}
-          <div className="flex items-center justify-center gap-2 mb-8">
-            {plan.organization.logo && (
-              <Image src={plan.organization.logo} alt="" width={22} height={22} className="rounded" unoptimized />
-            )}
-            <span className="text-[11px] font-semibold uppercase tracking-[0.2em]" style={{ color: `${G}99` }}>
-              {plan.organization.name}
-            </span>
+        <div className="relative z-10 max-w-[960px] mx-auto px-6">
+          {/* Badge — CDR style pill */}
+          <div className="flex justify-center mb-8">
+            <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-[200px]" style={{ border: `1px solid ${P}33`, background: `${P}0A` }}>
+              {plan.organization.logo && <Image src={plan.organization.logo} alt="" width={20} height={20} className="rounded-[8px]" unoptimized />}
+              <span style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase" as const, color: P }}>{plan.organization.name}</span>
+            </div>
           </div>
 
-          {/* Title */}
-          <h1 className="text-center text-4xl md:text-6xl lg:text-7xl font-bold tracking-[-0.04em] leading-[1.05] mb-4">
+          {/* Title — CDR heading-1: 32-56px, 600, -0.32px tracking */}
+          <h1 className="text-center" style={{ fontSize: "clamp(32px, 6vw, 56px)", fontWeight: 600, lineHeight: 1.1, letterSpacing: "-1.12px" }}>
             {plan.title}
           </h1>
-
-          <p className="text-center text-sm text-white/25 mb-14">
+          <p className="text-center mt-4" style={{ fontSize: "14px", fontWeight: 400, color: `${MUTED}99` }}>
             {fmtD(plan.periodStart)} — {fmtD(plan.periodEnd)}
           </p>
 
-          {/* Hero KPI Cards */}
+          {/* Hero KPI Cards — CDR homepage style */}
           {m && (
-            <div className="grid grid-cols-3 gap-4 md:gap-5 max-w-[780px] mx-auto">
-              <div className="plan-glow-card px-5 py-6 md:px-8 md:py-9 text-center">
-                <p className="text-xl md:text-3xl lg:text-4xl font-bold tracking-tight" style={{ color: G }}>{fmt(m.faturamento)}</p>
-                <p className="text-[10px] md:text-xs font-medium uppercase tracking-[0.15em] text-white/30 mt-3">Faturamento</p>
-              </div>
-              <div className="plan-glow-card px-5 py-6 md:px-8 md:py-9 text-center">
-                <p className="text-xl md:text-3xl lg:text-4xl font-bold tracking-tight" style={{ color: G }}>{fmtN(m.roas)}x</p>
-                <p className="text-[10px] md:text-xs font-medium uppercase tracking-[0.15em] text-white/30 mt-3">ROAS</p>
-              </div>
-              <div className="plan-glow-card px-5 py-6 md:px-8 md:py-9 text-center">
-                <p className="text-xl md:text-3xl lg:text-4xl font-bold tracking-tight" style={{ color: G }}>{fmt(m.investido)}</p>
-                <p className="text-[10px] md:text-xs font-medium uppercase tracking-[0.15em] text-white/30 mt-3">Investido</p>
-              </div>
+            <div className="grid grid-cols-3 gap-4 max-w-[720px] mx-auto mt-12">
+              <HeroKPI value={fmt(m.faturamento)} label="Faturamento Pago" />
+              <HeroKPI value={`${fmtN(m.roas)}x`} label="ROAS" />
+              <HeroKPI value={fmt(m.investido)} label="Investido" />
             </div>
           )}
         </div>
@@ -88,16 +75,16 @@ export default async function PublicPlanPage({ params }: PageProps) {
       <main>
         {/* ════ METRICS ════ */}
         {m && (
-          <section className="bg-[#0a0a0a] py-20 md:py-28 plan-section" style={{ animationDelay: "0.1s" }}>
-            <div className="max-w-[1000px] mx-auto px-6">
-              <H2>Métricas do Período</H2>
-              <div className="grid md:grid-cols-3 gap-5 mt-10">
+          <section className="py-16 md:py-24 plan-section" style={{ background: CARD, animationDelay: "0s" }}>
+            <div className="max-w-[960px] mx-auto px-6">
+              <SL>Métricas do Período</SL>
+              <div className="grid md:grid-cols-3 gap-4 mt-8">
                 <MC label="Faturamento Pago" value={fmt(m.faturamento)} sub={`${m.totalPedidos} pedidos`} />
                 <MC label="Valor Investido" value={fmt(m.investido)} sub="Meta Ads" />
                 <MC label="Valor Convertido" value={fmt(m.convertido)} sub="Meta Ads" />
               </div>
-              <div className="grid md:grid-cols-3 gap-5 mt-4">
-                <MC label="ROAS" value={`${fmtN(m.roas)}x`} sub={m.roas >= 3 ? "Excelente" : m.roas >= 2 ? "Bom" : "Atenção"} highlight={m.roas >= 3} />
+              <div className="grid md:grid-cols-3 gap-4 mt-3">
+                <MC label="ROAS" value={`${fmtN(m.roas)}x`} sub={m.roas >= 3 ? "Excelente" : m.roas >= 2 ? "Bom" : "Atenção"} accent={m.roas >= 3} />
                 <MC label="CPA" value={fmt(m.cpa)} sub={`${m.totalConversoes} conversões`} />
                 <MC label="Ticket Médio" value={fmt(m.ticketMedio)} />
               </div>
@@ -105,39 +92,38 @@ export default async function PublicPlanPage({ params }: PageProps) {
           </section>
         )}
 
-        <div className="plan-divider-green" />
+        <div className="plan-divider" />
 
-        {/* ════ PRODUCTS — Green accent section ════ */}
+        {/* ════ PRODUCTS ════ */}
         {products.length > 0 && (
-          <section className="relative bg-[#050505] py-20 md:py-28 overflow-hidden plan-section" style={{ animationDelay: "0.15s" }}>
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(196,255,0,0.04)_0%,transparent_60%)]" />
-            <div className="relative max-w-[1000px] mx-auto px-6">
-              <H2>Top 5 Produtos Mais Vendidos</H2>
-              <div className="mt-10 rounded-2xl border border-white/[0.06] overflow-hidden bg-white/[0.01]">
+          <section className="py-16 md:py-24 plan-section" style={{ background: BG, animationDelay: "50ms" }}>
+            <div className="max-w-[960px] mx-auto px-6">
+              <SL>Top 5 Produtos Mais Vendidos</SL>
+              <div className="mt-8 rounded-[10px] overflow-hidden" style={{ border: `1px solid ${BORDER}66` }}>
                 <table className="w-full">
                   <thead>
-                    <tr className="bg-white/[0.03]">
-                      <th className="px-5 py-4 text-left text-[10px] font-semibold uppercase tracking-widest text-white/20 w-12">#</th>
-                      <th className="px-3 py-4 w-14" />
-                      <th className="px-4 py-4 text-left text-[10px] font-semibold uppercase tracking-widest text-white/20">Produto</th>
-                      <th className="px-4 py-4 text-right text-[10px] font-semibold uppercase tracking-widest text-white/20">Qtd</th>
-                      <th className="px-5 py-4 text-right text-[10px] font-semibold uppercase tracking-widest text-white/20">Faturamento</th>
+                    <tr style={{ background: `${CARD}` }}>
+                      <th className="px-5 py-3.5 text-left w-10" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase" as const, color: `${MUTED}66` }}>#</th>
+                      <th className="px-2 py-3.5 w-12" />
+                      <th className="px-4 py-3.5 text-left" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase" as const, color: `${MUTED}66` }}>Produto</th>
+                      <th className="px-4 py-3.5 text-right" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase" as const, color: `${MUTED}66` }}>Qtd</th>
+                      <th className="px-5 py-3.5 text-right" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase" as const, color: `${MUTED}66` }}>Faturamento</th>
                     </tr>
                   </thead>
                   <tbody>
                     {products.map((p: TopProduct, i: number) => (
-                      <tr key={i} className="border-t border-white/[0.04] hover:bg-white/[0.02] transition-colors">
-                        <td className="px-5 py-4 text-sm font-bold" style={{ color: G }}>{i + 1}</td>
-                        <td className="px-3 py-3">
+                      <tr key={i} className="transition-colors" style={{ borderTop: `1px solid ${BORDER}66` }} onMouseEnter={undefined}>
+                        <td className="px-5 py-4" style={{ fontSize: "14px", fontWeight: 700, color: P }}>{i + 1}</td>
+                        <td className="px-2 py-3">
                           {p.imageUrl ? (
-                            <div className="w-10 h-10 relative rounded-lg overflow-hidden bg-white/5 border border-white/[0.06]">
+                            <div className="w-10 h-10 relative rounded-[8px] overflow-hidden" style={{ border: `1px solid ${BORDER}` }}>
                               <Image src={p.imageUrl} alt={p.name} fill className="object-cover" unoptimized sizes="40px" />
                             </div>
-                          ) : <div className="w-10 h-10 rounded-lg bg-white/[0.03]" />}
+                          ) : <div className="w-10 h-10 rounded-[8px]" style={{ background: CARD }} />}
                         </td>
-                        <td className="px-4 py-4 text-sm font-medium text-white/80">{p.name}</td>
-                        <td className="px-4 py-4 text-sm text-right text-white/35">{p.quantity}</td>
-                        <td className="px-5 py-4 text-sm text-right font-semibold">{fmt(p.revenue)}</td>
+                        <td className="px-4 py-4" style={{ fontSize: "14px", fontWeight: 500, color: "white" }}>{p.name}</td>
+                        <td className="px-4 py-4 text-right" style={{ fontSize: "14px", color: `${MUTED}99` }}>{p.quantity}</td>
+                        <td className="px-5 py-4 text-right" style={{ fontSize: "14px", fontWeight: 600, color: "white" }}>{fmt(p.revenue)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -147,18 +133,19 @@ export default async function PublicPlanPage({ params }: PageProps) {
           </section>
         )}
 
-        {/* ════ COLLECTIONS — CDR Green section ════ */}
+        {/* ════ COLLECTIONS — green tinted section ════ */}
         {collections.length > 0 && (
-          <section className="relative py-20 md:py-28 overflow-hidden plan-section" style={{ animationDelay: "0.2s", background: "linear-gradient(180deg, rgba(196,255,0,0.06) 0%, #050505 100%)" }}>
-            <div className="max-w-[1000px] mx-auto px-6">
-              <H2>Top Coleções com Mais Vendas</H2>
-              <div className="grid md:grid-cols-3 gap-5 mt-10">
+          <section className="relative py-16 md:py-24 overflow-hidden plan-section" style={{ background: BG, animationDelay: "100ms" }}>
+            <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at center, ${P}08 0%, transparent 70%)` }} />
+            <div className="relative max-w-[960px] mx-auto px-6">
+              <SL>Top Coleções com Mais Vendas</SL>
+              <div className="grid md:grid-cols-3 gap-4 mt-8">
                 {collections.map((c: TopCollection, i: number) => (
-                  <div key={i} className="plan-glow-card p-8 text-center">
-                    <span className="inline-flex w-9 h-9 rounded-lg items-center justify-center text-xs font-bold text-black" style={{ background: G }}>{i + 1}</span>
-                    <h4 className="text-base font-semibold mt-5">{c.name}</h4>
-                    <p className="text-4xl font-bold tracking-tight mt-3" style={{ color: G }}>{c.quantity}</p>
-                    <p className="text-xs text-white/20 mt-2">vendas · {fmt(c.revenue)}</p>
+                  <div key={i} className="plan-glow-card p-6 text-center">
+                    <span className="inline-flex w-8 h-8 rounded-[8px] items-center justify-center text-xs font-bold" style={{ background: P, color: BG }}>{i + 1}</span>
+                    <h4 className="mt-4" style={{ fontSize: "16px", fontWeight: 600 }}>{c.name}</h4>
+                    <p className="mt-2" style={{ fontSize: "30px", fontWeight: 700, letterSpacing: "-0.75px", color: P, fontVariantNumeric: "tabular-nums" }}>{c.quantity}</p>
+                    <p className="mt-1" style={{ fontSize: "12px", color: `${MUTED}66` }}>vendas · {fmt(c.revenue)}</p>
                   </div>
                 ))}
               </div>
@@ -166,44 +153,43 @@ export default async function PublicPlanPage({ params }: PageProps) {
           </section>
         )}
 
-        <div className="plan-divider-green" />
+        <div className="plan-divider" />
 
         {/* ════ CREATIVES ════ */}
         {creatives.length > 0 && (
-          <section className="bg-[#080808] py-20 md:py-28 plan-section" style={{ animationDelay: "0.25s" }}>
-            <div className="max-w-[1000px] mx-auto px-6">
-              <H2>Top 5 Criativos — Melhor Performance</H2>
-              <div className="mt-10"><CreativesSection creatives={creatives} /></div>
+          <section className="py-16 md:py-24 plan-section" style={{ background: CARD, animationDelay: "150ms" }}>
+            <div className="max-w-[960px] mx-auto px-6">
+              <SL>Top 5 Criativos — Melhor Performance</SL>
+              <div className="mt-8"><CreativesSection creatives={creatives} /></div>
             </div>
           </section>
         )}
 
+        <div className="plan-divider" />
+
         {/* ════ GAPS ════ */}
         {gaps.length > 0 && (
-          <>
-            <div className="plan-divider-green" />
-            <section className="bg-[#050505] py-20 md:py-28 plan-section" style={{ animationDelay: "0.3s" }}>
-              <div className="max-w-[1000px] mx-auto px-6">
-                <H2>Gaps Identificados</H2>
-                <p className="text-sm text-white/25 mt-2 mb-10">Pontos de melhoria que precisam de atenção</p>
-                <div className="grid md:grid-cols-2 gap-4">
-                  {gaps.map((g: GapNode, i: number) => <TC key={g.id} item={g} index={i} type="gap" />)}
-                </div>
+          <section className="py-16 md:py-24 plan-section" style={{ background: BG, animationDelay: "200ms" }}>
+            <div className="max-w-[960px] mx-auto px-6">
+              <SL>Gaps Identificados</SL>
+              <p className="mt-1 mb-8" style={{ fontSize: "14px", color: `${MUTED}66` }}>Pontos de melhoria que precisam de atenção</p>
+              <div className="grid md:grid-cols-2 gap-3">
+                {gaps.map((g: GapNode, i: number) => <TC key={g.id} item={g} index={i} type="gap" />)}
               </div>
-            </section>
-          </>
+            </div>
+          </section>
         )}
 
         {/* ════ LEVERS ════ */}
         {levers.length > 0 && (
           <>
-            <div className="plan-divider-green" />
-            <section className="relative bg-[#050505] py-20 md:py-28 overflow-hidden plan-section" style={{ animationDelay: "0.35s" }}>
-              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,rgba(196,255,0,0.04)_0%,transparent_60%)]" />
-              <div className="relative max-w-[1000px] mx-auto px-6">
-                <H2>Alavancas de Crescimento</H2>
-                <p className="text-sm text-white/25 mt-2 mb-10">Ações que vão gerar mais resultado</p>
-                <div className="grid md:grid-cols-2 gap-4">
+            <div className="plan-divider" />
+            <section className="relative py-16 md:py-24 overflow-hidden plan-section" style={{ background: BG, animationDelay: "250ms" }}>
+              <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at bottom left, ${P}06 0%, transparent 60%)` }} />
+              <div className="relative max-w-[960px] mx-auto px-6">
+                <SL>Alavancas de Crescimento</SL>
+                <p className="mt-1 mb-8" style={{ fontSize: "14px", color: `${MUTED}66` }}>Ações que vão gerar mais resultado</p>
+                <div className="grid md:grid-cols-2 gap-3">
                   {levers.map((l: LeverNode, i: number) => <TC key={l.id} item={l} index={i} type="lever" />)}
                 </div>
               </div>
@@ -212,13 +198,13 @@ export default async function PublicPlanPage({ params }: PageProps) {
         )}
 
         {/* ════ FOOTER ════ */}
-        <footer className="py-14 border-t border-white/[0.04]">
-          <div className="max-w-[1000px] mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-3">
+        <footer className="py-12" style={{ borderTop: `1px solid ${BORDER}66` }}>
+          <div className="max-w-[960px] mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              {plan.organization.logo && <Image src={plan.organization.logo} alt="" width={20} height={20} className="rounded" unoptimized />}
-              <span className="text-xs font-semibold text-white/30">{plan.organization.name}</span>
+              {plan.organization.logo && <Image src={plan.organization.logo} alt="" width={20} height={20} className="rounded-[8px]" unoptimized />}
+              <span style={{ fontSize: "12px", fontWeight: 500, color: `${MUTED}66` }}>{plan.organization.name}</span>
             </div>
-            <p className="text-[11px] text-white/15">{plan.createdBy.name && `${plan.createdBy.name} · `}{fmtD(plan.createdAt)}</p>
+            <p style={{ fontSize: "12px", color: `${MUTED}33` }}>{plan.createdBy.name && `${plan.createdBy.name} · `}{fmtD(plan.createdAt)}</p>
           </div>
         </footer>
       </main>
@@ -226,30 +212,39 @@ export default async function PublicPlanPage({ params }: PageProps) {
   );
 }
 
-// ─── Components ───────────────────────────────────
+/* ── CDR Components (exact brand tokens) ── */
 
-function H2({ children }: { children: React.ReactNode }) {
-  return <h2 className="text-2xl md:text-4xl font-bold tracking-tight">{children}</h2>;
+function SL({ children }: { children: React.ReactNode }) {
+  return <h2 style={{ fontSize: "clamp(24px, 4vw, 32px)", fontWeight: 600, lineHeight: 1.2, letterSpacing: "-0.32px" }}>{children}</h2>;
 }
 
-function MC({ label, value, sub, highlight }: { label: string; value: string; sub?: string; highlight?: boolean }) {
+function HeroKPI({ value, label }: { value: string; label: string }) {
   return (
-    <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-6">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/25 mb-3">{label}</p>
-      <p className="text-2xl md:text-3xl font-bold tracking-tight" style={highlight ? { color: G } : undefined}>{value}</p>
-      {sub && <p className="text-xs mt-2" style={highlight ? { color: `${G}66` } : { color: "rgba(255,255,255,0.18)" }}>{sub}</p>}
+    <div className="plan-glow-card px-4 py-5 md:px-6 md:py-7 text-center">
+      <p style={{ fontSize: "clamp(18px, 3vw, 30px)", fontWeight: 700, letterSpacing: "-0.75px", color: P, fontVariantNumeric: "tabular-nums" }}>{value}</p>
+      <p className="mt-2" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase" as const, color: `${MUTED}66` }}>{label}</p>
+    </div>
+  );
+}
+
+function MC({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: boolean }) {
+  return (
+    <div className="p-5 rounded-[10px] transition-all" style={{ background: `rgba(255,255,255,0.08)`, border: `1px solid ${BORDER}66`, backdropFilter: "blur(12px) saturate(150%)" }}>
+      <p style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase" as const, color: `${MUTED}66` }}>{label}</p>
+      <p className="mt-2" style={{ fontSize: "30px", fontWeight: 700, letterSpacing: "-0.75px", fontVariantNumeric: "tabular-nums", color: accent ? P : "white" }}>{value}</p>
+      {sub && <p className="mt-1" style={{ fontSize: "12px", color: accent ? `${P}66` : `${MUTED}44` }}>{sub}</p>}
     </div>
   );
 }
 
 function TC({ item, index, type }: { item: GapNode | LeverNode; index: number; type: "gap" | "lever" }) {
   const isGap = type === "gap";
-  const c = isGap ? "#ef4444" : G;
+  const c = isGap ? "#FF4D4D" : P;
   return (
-    <div className="rounded-xl p-6" style={{ border: `1px solid ${c}22`, background: `${c}06` }}>
-      <div className="flex items-center gap-3 mb-5">
-        <span className="w-7 h-7 rounded-md flex items-center justify-center text-[10px] font-bold" style={{ background: c, color: isGap ? "#fff" : "#000" }}>{index + 1}</span>
-        <h4 className="text-sm font-bold" style={{ color: c }}>{item.title || `${isGap ? "Gap" : "Alavanca"} ${index + 1}`}</h4>
+    <div className="rounded-[10px] p-5" style={{ border: `1px solid ${c}22`, background: `${c}08` }}>
+      <div className="flex items-center gap-3 mb-4">
+        <span className="w-7 h-7 rounded-[8px] flex items-center justify-center" style={{ fontSize: "10px", fontWeight: 700, background: c, color: isGap ? "#fff" : BG }}>{index + 1}</span>
+        <h4 style={{ fontSize: "14px", fontWeight: 600, color: c }}>{item.title || `${isGap ? "Gap" : "Alavanca"} ${index + 1}`}</h4>
       </div>
       {item.children.length > 0 && item.children.map((ch) => <B key={ch.id} node={ch} depth={0} />)}
     </div>
@@ -258,12 +253,12 @@ function TC({ item, index, type }: { item: GapNode | LeverNode; index: number; t
 
 function B({ node, depth }: { node: TreeNode; depth: number }) {
   return (
-    <div className={depth > 0 ? "ml-5" : ""}>
+    <div style={depth > 0 ? { marginLeft: "20px" } : undefined}>
       <div className="flex items-start gap-2 py-1.5">
-        {depth > 0 && <div className="flex items-center gap-1.5 shrink-0 mt-1.5"><div className="w-3 h-px bg-white/10" /><div className="w-1.5 h-1.5 rounded-full" style={{ background: `${G}40` }} /></div>}
-        <span className={`text-sm leading-relaxed ${depth === 0 ? "font-medium text-white/70" : "text-white/40"}`}>{node.text}</span>
+        {depth > 0 && <div className="flex items-center gap-1.5 shrink-0 mt-1.5"><div style={{ width: "12px", height: "1px", background: `${BORDER}` }} /><div style={{ width: "5px", height: "5px", borderRadius: "50%", background: `${P}40` }} /></div>}
+        <span style={{ fontSize: "14px", lineHeight: "1.5", fontWeight: depth === 0 ? 500 : 400, color: depth === 0 ? "rgba(255,255,255,0.7)" : `${MUTED}66` }}>{node.text}</span>
       </div>
-      {node.children.length > 0 && <div className="border-l border-white/[0.06] ml-[3px]">{node.children.map((ch) => <B key={ch.id} node={ch} depth={depth + 1} />)}</div>}
+      {node.children.length > 0 && <div style={{ borderLeft: `1px solid ${BORDER}`, marginLeft: "2px" }}>{node.children.map((ch) => <B key={ch.id} node={ch} depth={depth + 1} />)}</div>}
     </div>
   );
 }
