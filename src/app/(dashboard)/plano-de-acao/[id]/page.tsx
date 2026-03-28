@@ -27,7 +27,9 @@ import {
   ChevronDown,
   ChevronRight,
   Pencil,
+  Package,
 } from "lucide-react";
+import { VideoModal } from "@/components/ads/video-modal";
 import { toast } from "sonner";
 import {
   getActionPlan,
@@ -559,6 +561,10 @@ export default function ActionPlanEditorPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
 
+  // Video modal for creatives
+  const [selectedCreative, setSelectedCreative] = useState<TopCreative | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
   const userRole = session?.user?.role;
   const canEdit =
     (userRole === "OWNER" || userRole === "ADMIN") &&
@@ -616,6 +622,7 @@ export default function ActionPlanEditorPage() {
               ...prev,
               metrics: result.metrics,
               topProducts: result.topProducts,
+              topCollections: result.topCollections,
               topCreatives: result.topCreatives,
             }
           : prev
@@ -892,6 +899,7 @@ export default function ActionPlanEditorPage() {
         icon={ShoppingCart}
         items={plan.topProducts || []}
         columns={[
+          { key: "img", label: "" },
           { key: "name", label: "Produto" },
           { key: "quantity", label: "Qtd" },
           { key: "revenue", label: "Faturamento" },
@@ -909,6 +917,17 @@ export default function ActionPlanEditorPage() {
           <tr key={index} className="border-b border-border/50 group">
             <td className="px-5 py-3 text-sm text-muted-foreground">
               {index + 1}
+            </td>
+            <td className="px-3 py-2 w-14">
+              {item.imageUrl ? (
+                <div className="w-10 h-10 relative rounded overflow-hidden">
+                  <Image src={item.imageUrl} alt={item.name} fill className="object-cover" unoptimized sizes="40px" />
+                </div>
+              ) : (
+                <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
+                  <Package className="w-4 h-4 text-muted-foreground/30" />
+                </div>
+              )}
             </td>
             <td className="px-5 py-3">
               {editable ? (
@@ -1068,6 +1087,7 @@ export default function ActionPlanEditorPage() {
               adId: genId(),
               name: "",
               thumbnailUrl: null,
+              videoUrl: null,
               spend: 0,
               sales: 0,
               roas: 0,
@@ -1077,7 +1097,14 @@ export default function ActionPlanEditorPage() {
         }
         emptyText="Nenhum criativo encontrado no período"
         renderRow={(item, index, onUpdate, onDelete, editable) => (
-          <tr key={index} className="border-b border-border/50 group">
+          <tr
+            key={index}
+            className="border-b border-border/50 group cursor-pointer hover:bg-muted/30 transition-colors"
+            onClick={() => {
+              setSelectedCreative(item);
+              setIsModalOpen(true);
+            }}
+          >
             <td className="px-5 py-3 text-sm text-muted-foreground">
               {index + 1}
             </td>
@@ -1102,7 +1129,11 @@ export default function ActionPlanEditorPage() {
                 <input
                   type="text"
                   value={item.name}
-                  onChange={(e) => onUpdate({ ...item, name: e.target.value })}
+                  onChange={(e) => {
+                    e.stopPropagation();
+                    onUpdate({ ...item, name: e.target.value });
+                  }}
+                  onClick={(e) => e.stopPropagation()}
                   className="w-full bg-transparent text-sm focus:outline-none border-b border-transparent focus:border-primary"
                   placeholder="Nome do criativo"
                 />
@@ -1123,7 +1154,10 @@ export default function ActionPlanEditorPage() {
             {editable && (
               <td className="px-5 py-3 text-right">
                 <button
-                  onClick={onDelete}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete();
+                  }}
                   className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-500/10 transition-all"
                 >
                   <Trash2 className="w-3.5 h-3.5 text-red-400" />
@@ -1133,6 +1167,31 @@ export default function ActionPlanEditorPage() {
           </tr>
         )}
       />
+
+      {/* Video Modal for Creatives */}
+      {isModalOpen && selectedCreative && (
+        <VideoModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          creative={{
+            adId: selectedCreative.adId,
+            adName: selectedCreative.name,
+            platform: "FACEBOOK_ADS",
+            thumbnailUrl: selectedCreative.thumbnailUrl,
+            videoUrl: selectedCreative.videoUrl,
+            impressions: 0,
+            clicks: 0,
+            spend: selectedCreative.spend,
+            conversions: selectedCreative.sales,
+            revenue: selectedCreative.spend * selectedCreative.roas,
+            ctr: 0,
+            roas: selectedCreative.roas,
+            cpc: 0,
+            cpm: 0,
+            campaignName: null,
+          }}
+        />
+      )}
 
       {/* Gaps */}
       <GapLeverSection

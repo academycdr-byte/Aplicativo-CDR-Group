@@ -4,6 +4,9 @@ import { prisma } from "@/lib/prisma";
 import { getSessionWithOrg } from "@/lib/session";
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
+import { decrypt } from "@/lib/encryption";
+import { fetchNuvemshopProductsByIds, type NuvemshopProduct } from "@/lib/integrations/nuvemshop";
+import { type ShopifyProduct } from "@/lib/integrations/shopify";
 
 // ─── Types ────────────────────────────────────────
 
@@ -34,6 +37,8 @@ export type TopProduct = {
   name: string;
   quantity: number;
   revenue: number;
+  imageUrl?: string;
+  vendor?: string;
 };
 
 export type TopCollection = {
@@ -46,6 +51,7 @@ export type TopCreative = {
   adId: string;
   name: string;
   thumbnailUrl: string | null;
+  videoUrl: string | null;
   spend: number;
   sales: number;
   roas: number;
@@ -146,6 +152,35 @@ export async function getActionPlan(planId: string) {
   } as ActionPlanFull;
 }
 
+// ─── Helpers ──────────────────────────────────────
+
+function extractNuvemshopImageUrl(imageField: unknown): string {
+  if (typeof imageField === "string") return imageField;
+  if (Array.isArray(imageField)) {
+    const first = imageField[0];
+    if (!first) return "";
+    if (typeof first === "string") return first;
+    if (typeof first === "object" && first !== null) {
+      const obj = first as Record<string, unknown>;
+      return String(obj.src || obj.url || "");
+    }
+  }
+  if (imageField && typeof imageField === "object") {
+    const obj = imageField as Record<string, unknown>;
+    return String(obj.src || obj.url || "");
+  }
+  return "";
+}
+
+function extractI18nName(nameField: unknown): string {
+  if (typeof nameField === "string") return nameField || "Produto";
+  if (nameField && typeof nameField === "object") {
+    const obj = nameField as Record<string, string>;
+    return obj.pt || obj.es || obj.en || Object.values(obj).find(v => typeof v === "string" && v) || "Produto";
+  }
+  return "Produto";
+}
+
 // ─── Aggregate Metrics for Period ─────────────────
 
 async function aggregateMetrics(
@@ -155,6 +190,7 @@ async function aggregateMetrics(
 ): Promise<{
   metrics: PlanMetrics;
   topProducts: TopProduct[];
+  topCollections: TopCollection[];
   topCreatives: TopCreative[];
 }> {
   // 1. Order metrics (Faturamento, Ticket Médio)
@@ -203,7 +239,7 @@ async function aggregateMetrics(
     totalConversoes,
   };
 
-  // 3. Top 5 Products from Order.rawData line_items
+  // 3. Products: aggregate from orders, then enrich via platform API
   const orders = await prisma.order.findMany({
     where: {
       organizationId: orgId,
@@ -211,10 +247,22 @@ async function aggregateMetrics(
       status: { in: ["paid", "partially_refunded"] },
       rawData: { not: Prisma.DbNull },
     },
-    select: { rawData: true },
+    select: { rawData: true, platform: true },
   });
 
-  const productMap = new Map<string, { quantity: number; revenue: number }>();
+  // Find active e-commerce integration
+  const integration = await prisma.integration.findFirst({
+    where: {
+      organizationId: orgId,
+      status: "CONNECTED",
+      platform: { in: ["SHOPIFY", "NUVEMSHOP", "CARTPANDA", "YAMPI"] },
+    },
+  });
+
+  // Aggregate by product_id for enrichment, and by name as fallback
+  const salesById = new Map<string, { quantity: number; revenue: number }>();
+  const salesByName = new Map<string, { quantity: number; revenue: number }>();
+  const productIds = new Set<string>();
 
   for (const order of orders) {
     const raw = order.rawData as Record<string, unknown>;
@@ -225,32 +273,139 @@ async function aggregateMetrics(
       [];
 
     for (const item of lineItems) {
-      const name =
-        (item.name as string) || (item.title as string) || "Produto sem nome";
+      const pid = String(item.product_id || "");
+      const name = (item.name as string) || (item.title as string) || "Produto sem nome";
       const qty = Number(item.quantity || 1);
       const price = Number(item.price || 0);
       const revenue = qty * price;
 
-      const existing = productMap.get(name);
-      if (existing) {
-        existing.quantity += qty;
-        existing.revenue += revenue;
+      // By name (always)
+      const existingName = salesByName.get(name);
+      if (existingName) {
+        existingName.quantity += qty;
+        existingName.revenue += revenue;
       } else {
-        productMap.set(name, { quantity: qty, revenue });
+        salesByName.set(name, { quantity: qty, revenue });
+      }
+
+      // By product_id (for API enrichment)
+      if (pid) {
+        productIds.add(pid);
+        const existingId = salesById.get(pid);
+        if (existingId) {
+          existingId.quantity += qty;
+          existingId.revenue += revenue;
+        } else {
+          salesById.set(pid, { quantity: qty, revenue });
+        }
       }
     }
   }
 
-  const topProducts = Array.from(productMap.entries())
+  // Sort by quantity, get top product IDs for API enrichment
+  const sortedByName = Array.from(salesByName.entries())
+    .sort((a, b) => b[1].quantity - a[1].quantity);
+
+  const sortedById = Array.from(salesById.entries())
+    .sort((a, b) => b[1].quantity - a[1].quantity)
+    .slice(0, 50);
+
+  const topProductIds = sortedById.map(([id]) => id);
+
+  // Fetch product details from platform API (images + vendor)
+  const productDetailsMap = new Map<string, { imageUrl: string; vendor: string; title: string }>();
+
+  if (integration && topProductIds.length > 0) {
+    try {
+      if (integration.platform === "SHOPIFY" && integration.accessToken && integration.externalStoreId) {
+        const accessToken = decrypt(integration.accessToken);
+        const shop = integration.externalStoreId;
+        const idsParam = topProductIds.join(",");
+        const url = `https://${shop}/admin/api/${process.env.SHOPIFY_API_VERSION || "2025-01"}/products.json?ids=${idsParam}&fields=id,title,vendor,image,images`;
+        const response = await fetch(url, {
+          headers: { "X-Shopify-Access-Token": accessToken, "Content-Type": "application/json" },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          for (const p of (data.products || []) as ShopifyProduct[]) {
+            productDetailsMap.set(String(p.id), {
+              imageUrl: p.image?.src || p.images?.[0]?.src || "",
+              vendor: p.vendor || "",
+              title: p.title,
+            });
+          }
+        }
+      } else if (integration.platform === "NUVEMSHOP") {
+        const products = await fetchNuvemshopProductsByIds(integration.id, topProductIds);
+        for (const p of products as NuvemshopProduct[]) {
+          productDetailsMap.set(String(p.id), {
+            imageUrl: extractNuvemshopImageUrl(p.images?.[0]),
+            vendor: p.brand || "",
+            title: extractI18nName(p.name),
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch product details for action plan:", err);
+    }
+  }
+
+  // Build top products with images — match by product_id first, fall back to name
+  const topProducts: TopProduct[] = [];
+  const usedNames = new Set<string>();
+
+  // First pass: enriched products (have API data)
+  for (const [pid, sales] of sortedById) {
+    if (topProducts.length >= 5) break;
+    const details = productDetailsMap.get(pid);
+    if (details) {
+      topProducts.push({
+        name: details.title,
+        quantity: sales.quantity,
+        revenue: sales.revenue,
+        imageUrl: details.imageUrl || undefined,
+        vendor: details.vendor || undefined,
+      });
+      usedNames.add(details.title);
+    }
+  }
+
+  // Second pass: fill remaining from name-based aggregation
+  if (topProducts.length < 5) {
+    for (const [name, sales] of sortedByName) {
+      if (topProducts.length >= 5) break;
+      if (usedNames.has(name)) continue;
+      topProducts.push({ name, quantity: sales.quantity, revenue: sales.revenue });
+    }
+  }
+
+  // Build top 3 collections from vendor grouping
+  const vendorMap = new Map<string, { quantity: number; revenue: number }>();
+  for (const [pid, sales] of salesById) {
+    const details = productDetailsMap.get(pid);
+    const vendor = details?.vendor;
+    if (vendor) {
+      const existing = vendorMap.get(vendor);
+      if (existing) {
+        existing.quantity += sales.quantity;
+        existing.revenue += sales.revenue;
+      } else {
+        vendorMap.set(vendor, { quantity: sales.quantity, revenue: sales.revenue });
+      }
+    }
+  }
+
+  const topCollections: TopCollection[] = Array.from(vendorMap.entries())
     .map(([name, data]) => ({ name, ...data }))
     .sort((a, b) => b.quantity - a.quantity)
-    .slice(0, 5);
+    .slice(0, 3);
 
-  // 4. Top 5 Creatives with composite score
+  // 4. Top 5 Creatives with composite score + videoUrl
   type CreativeRow = {
     ad_id: string;
     ad_name: string | null;
     thumbnail_url: string | null;
+    video_url: string | null;
     total_spend: number;
     total_conversions: bigint;
     total_revenue: number;
@@ -261,6 +416,7 @@ async function aggregateMetrics(
       "adId" as ad_id,
       MAX("adName") as ad_name,
       MAX("thumbnailUrl") as thumbnail_url,
+      MAX("videoUrl") as video_url,
       COALESCE(SUM(spend), 0) as total_spend,
       COALESCE(SUM(conversions), 0) as total_conversions,
       COALESCE(SUM(revenue), 0) as total_revenue
@@ -276,7 +432,6 @@ async function aggregateMetrics(
     LIMIT 50
   `;
 
-  // Compute composite score with equal weights (min-max normalization)
   let topCreatives: TopCreative[] = [];
 
   if (creativeRows.length > 0) {
@@ -289,6 +444,7 @@ async function aggregateMetrics(
         adId: row.ad_id,
         name: row.ad_name || row.ad_id,
         thumbnailUrl: row.thumbnail_url,
+        videoUrl: row.video_url,
         spend,
         sales,
         roas,
@@ -296,7 +452,6 @@ async function aggregateMetrics(
       };
     });
 
-    // Min-max normalization
     const maxRoas = Math.max(...creatives.map((c) => c.roas), 0.001);
     const minRoas = Math.min(...creatives.map((c) => c.roas));
     const maxSales = Math.max(...creatives.map((c) => c.sales), 0.001);
@@ -320,7 +475,7 @@ async function aggregateMetrics(
       .slice(0, 5);
   }
 
-  return { metrics, topProducts, topCreatives };
+  return { metrics, topProducts, topCollections, topCreatives };
 }
 
 // ─── Create Action Plan (with auto-populate) ──────
@@ -341,7 +496,7 @@ export async function createActionPlan(data: {
   const periodEnd = new Date(data.periodEnd);
 
   // Auto-populate metrics
-  const { metrics, topProducts, topCreatives } = await aggregateMetrics(
+  const { metrics, topProducts, topCollections, topCreatives } = await aggregateMetrics(
     ctx.organization.id,
     periodStart,
     periodEnd
@@ -356,7 +511,7 @@ export async function createActionPlan(data: {
       createdById: ctx.user.id,
       metrics: metrics as unknown as Prisma.JsonObject,
       topProducts: topProducts as unknown as Prisma.JsonArray,
-      topCollections: [] as unknown as Prisma.JsonArray,
+      topCollections: topCollections as unknown as Prisma.JsonArray,
       topCreatives: topCreatives as unknown as Prisma.JsonArray,
     },
   });
@@ -452,7 +607,7 @@ export async function refreshActionPlanMetrics(planId: string) {
 
   if (!plan) throw new Error("Plano não encontrado");
 
-  const { metrics, topProducts, topCreatives } = await aggregateMetrics(
+  const { metrics, topProducts, topCollections, topCreatives } = await aggregateMetrics(
     ctx.organization.id,
     plan.periodStart,
     plan.periodEnd
@@ -463,12 +618,13 @@ export async function refreshActionPlanMetrics(planId: string) {
     data: {
       metrics: metrics as unknown as Prisma.JsonObject,
       topProducts: topProducts as unknown as Prisma.JsonArray,
+      topCollections: topCollections as unknown as Prisma.JsonArray,
       topCreatives: topCreatives as unknown as Prisma.JsonArray,
     },
   });
 
   revalidatePath(`/plano-de-acao/${planId}`);
-  return { metrics, topProducts, topCreatives };
+  return { metrics, topProducts, topCollections, topCreatives };
 }
 
 // ─── Get Plan by Public Token (no auth) ───────────

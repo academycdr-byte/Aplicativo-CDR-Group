@@ -217,6 +217,7 @@ export default async function PublicPlanPage({ params }: PageProps) {
                 <thead>
                   <tr className="border-b border-white/10">
                     <th className="px-6 py-4 text-left text-xs font-medium text-white/40 uppercase tracking-wider w-12">#</th>
+                    <th className="px-4 py-4 text-left text-xs font-medium text-white/40 uppercase tracking-wider w-16"></th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-white/40 uppercase tracking-wider">Produto</th>
                     <th className="px-6 py-4 text-right text-xs font-medium text-white/40 uppercase tracking-wider">Qtd</th>
                     <th className="px-6 py-4 text-right text-xs font-medium text-white/40 uppercase tracking-wider">Faturamento</th>
@@ -229,6 +230,17 @@ export default async function PublicPlanPage({ params }: PageProps) {
                         <span className="w-7 h-7 rounded-lg bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
                           {i + 1}
                         </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        {p.imageUrl ? (
+                          <div className="w-12 h-12 relative rounded-lg overflow-hidden border border-white/10">
+                            <Image src={p.imageUrl} alt={p.name} fill className="object-cover" unoptimized sizes="48px" />
+                          </div>
+                        ) : (
+                          <div className="w-12 h-12 rounded-lg bg-white/5 flex items-center justify-center border border-white/10">
+                            <span className="text-lg text-white/10">{i + 1}</span>
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-sm font-medium">{p.name}</td>
                       <td className="px-6 py-4 text-sm text-right text-white/70">{p.quantity}</td>
