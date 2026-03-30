@@ -747,20 +747,20 @@ function KPICard({ label, value, change, icon: Icon, trend, action, tag }: {
 
   return (
     <div
-      className="bg-card border border-border rounded-[20px] p-5 sm:p-7"
+      className="bg-card border border-border rounded-[20px] p-4 sm:p-5"
       role="status"
       aria-label={`${label}${tag ? ` (${tag})` : ""}: ${value}`}
     >
       {/* Row 1: icon + label + action */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: "var(--accent-surface)" }}>
-            <Icon className="w-[22px] h-[22px] text-primary" strokeWidth={1.8} />
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: "var(--accent-surface)" }}>
+            <Icon className="w-[18px] h-[18px] text-primary" strokeWidth={1.8} />
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-[16px] font-medium text-foreground">{label}</span>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="text-[13px] font-medium text-muted-foreground uppercase tracking-wide truncate">{label}</span>
             {tag && (
-              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wide" style={{ background: "var(--success-surface)", color: "var(--success)" }}>
+              <span className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wide shrink-0" style={{ background: "var(--success-surface)", color: "var(--success)" }}>
                 <CheckCircle className="w-2.5 h-2.5" />
                 {tag}
               </span>
@@ -769,14 +769,15 @@ function KPICard({ label, value, change, icon: Icon, trend, action, tag }: {
         </div>
         {action}
       </div>
-      {/* Row 2: KPI Value + Badge */}
-      <div className="flex items-end gap-3">
-        <h3 className="text-[28px] sm:text-[48px] font-bold leading-none tracking-[-0.02em] text-foreground" style={{ fontVariantNumeric: "tabular-nums" }}>
-          {value}
-        </h3>
+      {/* Row 2: KPI Value */}
+      <h3 className="text-xl sm:text-2xl font-bold leading-none tracking-[-0.02em] text-foreground truncate" style={{ fontVariantNumeric: "tabular-nums" }}>
+        {value}
+      </h3>
+      {/* Row 3: Badge + Comparison */}
+      <div className="flex items-center gap-2 mt-2">
         {change && change !== "0%" && changeNum !== "0" && (
           <span
-            className="text-[14px] font-semibold px-2 py-0.5 rounded-md mb-1 sm:mb-2"
+            className="text-[12px] font-semibold px-1.5 py-0.5 rounded shrink-0"
             style={{
               background: isPositive ? "var(--success-surface)" : isNegative ? "var(--danger-surface)" : undefined,
               color: isPositive ? "var(--success)" : isNegative ? "var(--destructive)" : "var(--muted-foreground)",
@@ -785,9 +786,8 @@ function KPICard({ label, value, change, icon: Icon, trend, action, tag }: {
             {isPositive ? "↑" : isNegative ? "↓" : ""} {change}
           </span>
         )}
+        <span className="text-[12px] text-muted-foreground/60 hidden sm:inline truncate">vs período anterior</span>
       </div>
-      {/* Row 3: Comparison text */}
-      <p className="text-[14px] mt-2" style={{ color: "var(--text-tertiary)" }}>vs período anterior</p>
     </div>
   );
 }
