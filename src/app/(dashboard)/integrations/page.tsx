@@ -1014,7 +1014,7 @@ function IntegrationsContent() {
                       <p className="text-xs text-muted-foreground">{account.id}</p>
                     </div>
                     {account.currency && account.currency !== "BRL" && (
-                      <Badge variant="outline" className="shrink-0 text-xs font-mono">
+                      <Badge variant="outline" className="shrink-0 text-xs font-semibold">
                         {account.currency}
                       </Badge>
                     )}

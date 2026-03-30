@@ -665,7 +665,7 @@ export default function DashboardPage() {
                 <CardTitle>Funil de Conversão</CardTitle>
                 <CardDescription>Baseado nos eventos rastreados pelo Meta Ads</CardDescription>
               </div>
-              <Badge variant="secondary" className="font-mono">META ADS</Badge>
+              <Badge variant="secondary" className="text-[11px] font-semibold tracking-wide">META ADS</Badge>
             </div>
           </CardHeader>
           <CardContent className="p-6">

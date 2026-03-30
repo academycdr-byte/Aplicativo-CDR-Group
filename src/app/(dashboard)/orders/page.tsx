@@ -268,7 +268,7 @@ export default function OrdersPage() {
                     return (
                       <TableRow key={order.id} className="hover:bg-muted/30 border-b border-border/50">
                         <TableCell className="font-medium text-xs">
-                          <span className="font-mono text-muted-foreground">#</span>{order.externalOrderId}
+                          <span className="text-muted-foreground">#</span>{order.externalOrderId}
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-col">

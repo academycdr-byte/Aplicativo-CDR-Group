@@ -766,7 +766,7 @@ export default function AdsPage() {
         <div className="flex items-center gap-2 pt-2">
           <ImageIcon className="w-5 h-5 text-muted-foreground" />
           <h3 className="text-lg font-semibold tracking-tight">Galeria de Criativos</h3>
-          <Badge variant="secondary" className="font-mono text-xs">{sortedCreatives.length}</Badge>
+          <Badge variant="secondary" className="text-xs font-semibold">{sortedCreatives.length}</Badge>
         </div>
 
         {/* Creatives Toolbar */}

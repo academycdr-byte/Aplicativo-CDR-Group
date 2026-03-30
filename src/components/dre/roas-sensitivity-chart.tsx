@@ -88,7 +88,7 @@ export const ROASSensitivityChart = memo(function ROASSensitivityChart({
             Simula sua margem se o ROAS subir ou cair
           </p>
         </div>
-        <Badge variant="outline" className="text-xs font-mono shrink-0">
+        <Badge variant="outline" className="text-xs font-semibold shrink-0">
           Mínimo: {breakevenRoas.toFixed(1)}x
         </Badge>
       </div>

@@ -350,7 +350,7 @@ function KanbanColumn({
         <span className="text-sm font-semibold flex-1">{sc.label}</span>
         <Badge
           variant="outline"
-          className={`${sc.border} ${sc.color} text-[11px] h-5 font-mono`}
+          className={`${sc.border} ${sc.color} text-[11px] h-5 font-semibold`}
         >
           {creatives.length}
         </Badge>
