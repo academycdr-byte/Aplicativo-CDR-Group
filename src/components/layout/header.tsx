@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { User, LogOut, Bell, Search, MessageSquare } from "lucide-react";
+import { User, LogOut } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
-import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -35,43 +34,11 @@ export function Header() {
         <span className="text-sm font-semibold">CDR Group</span>
       </div>
 
-      {/* Desktop: spacer left */}
-      <div className="hidden md:block w-[240px] shrink-0" />
+      {/* Desktop: spacer left (alinha com a sidebar) */}
+      <div className="hidden md:block flex-1" />
 
-      {/* Center: Search — Design System v2.1 §3 */}
-      <div className="hidden md:flex flex-1 justify-center">
-        <div className="relative w-full max-w-[480px]">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary" />
-          <input
-            type="text"
-            placeholder="Buscar..."
-            aria-label="Buscar no sistema"
-            className="w-full h-10 pl-10 pr-16 bg-transparent border border-border rounded-xl text-sm text-foreground placeholder:text-text-tertiary focus:outline-none focus:border-primary/30 focus:ring-2 focus:ring-primary/15 transition-all"
-          />
-          <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-text-tertiary bg-secondary px-1.5 py-0.5 rounded">
-            Ctrl+K
-          </kbd>
-        </div>
-      </div>
-
-      {/* Right: icons + avatar — Design System v2.1 §3 */}
+      {/* Right: theme toggle + avatar */}
       <div className="ml-auto flex items-center gap-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-9 w-9 text-text-tertiary hover:text-foreground rounded-lg"
-          aria-label="Mensagens"
-        >
-          <MessageSquare className="w-5 h-5" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-9 w-9 text-text-tertiary hover:text-foreground rounded-lg"
-          aria-label="Notificações"
-        >
-          <Bell className="w-5 h-5" />
-        </Button>
         <ThemeToggle />
 
         <div className="h-5 w-px bg-border mx-1" />
