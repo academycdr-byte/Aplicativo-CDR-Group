@@ -483,10 +483,10 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
 
-          <CardContent className="px-1 sm:px-6 pb-4 sm:pb-6">
+          <CardContent className="px-2 sm:px-6 pb-2 sm:pb-4">
             {metricsData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={280} className="sm:!h-[360px]" aria-label="Gráfico de performance das campanhas ao longo do tempo">
-                <ComposedChart data={convertedMetrics} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+              <ResponsiveContainer width="100%" height={320} className="sm:!h-[400px]" aria-label="Gráfico de performance das campanhas ao longo do tempo">
+                <ComposedChart data={convertedMetrics} margin={{ top: 10, right: 5, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="gradFaturamento" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#10b981" stopOpacity={0.25} />
@@ -497,35 +497,34 @@ export default function DashboardPage() {
                       <stop offset="100%" stopColor="#f43f5e" stopOpacity={0.02} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} opacity={0.15} />
+                  <CartesianGrid strokeDasharray="4 4" stroke="var(--border)" vertical={false} opacity={0.2} />
                   <XAxis
                     dataKey="date"
-                    tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                    tick={{ fontSize: 13, fill: "var(--muted-foreground)" }}
                     tickLine={false}
                     axisLine={false}
-                    tickMargin={10}
+                    tickMargin={12}
                     interval="preserveStartEnd"
                     tickFormatter={(v) => {
-                      // Parse YYYY-MM-DD directly to avoid timezone-related off-by-one
                       const parts = String(v).split("-");
                       return `${parts[2]}/${parts[1]}`;
                     }}
                   />
                   <YAxis
                     yAxisId="left"
-                    tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                    tick={{ fontSize: 13, fill: "var(--muted-foreground)" }}
                     tickLine={false}
                     axisLine={false}
                     tickFormatter={(v) => fmtShort(v)}
-                    width={45}
+                    width={65}
                   />
                   <YAxis
                     yAxisId="right"
                     orientation="right"
-                    tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                    tick={{ fontSize: 13, fill: "var(--muted-foreground)" }}
                     tickLine={false}
                     axisLine={false}
-                    width={30}
+                    width={40}
                   />
                   <Tooltip
                     cursor={{ stroke: "var(--muted-foreground)", strokeWidth: 1, strokeDasharray: "4 4", opacity: 0.3 }}
@@ -638,7 +637,7 @@ export default function DashboardPage() {
                 </ComposedChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-[280px] sm:h-[340px] flex flex-col items-center justify-center text-muted-foreground space-y-2">
+              <div className="h-[320px] sm:h-[400px] flex flex-col items-center justify-center text-muted-foreground space-y-2">
                 <BarChart className="w-8 h-8 opacity-20" />
                 <p className="text-sm">Sem dados para exibir no momento</p>
               </div>
