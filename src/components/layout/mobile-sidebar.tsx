@@ -112,7 +112,7 @@ export function MobileSidebar() {
         <nav className="flex-1 overflow-y-auto px-4 pb-4" aria-label="Navegação principal">
           {filteredAiNav.length > 0 && (
             <div className="mb-6">
-              <p className="section-label px-4 mb-2">CDR AI</p>
+              <p className="section-label px-4 mb-2">Visão Geral</p>
               <div className="space-y-0.5">
                 {filteredAiNav.map((item) => <NavLink key={item.href} item={item} />)}
               </div>
