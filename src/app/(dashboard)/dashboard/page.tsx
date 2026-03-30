@@ -450,8 +450,8 @@ export default function DashboardPage() {
       {/* Main Chart + Calendar Section */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Performance Chart */}
-        <Card className="xl:col-span-2 border-border rounded-[20px] shadow-none">
-          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between space-y-0 pb-4">
+        <Card className="xl:col-span-2 border-border rounded-[20px] shadow-none flex flex-col">
+          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between space-y-0 pb-4 shrink-0">
             <div className="space-y-1">
               <CardTitle>Performance</CardTitle>
               <CardDescription className="hidden sm:block">Análise detalhada do período</CardDescription>
@@ -483,9 +483,9 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
 
-          <CardContent className="px-2 sm:px-6 pb-2 sm:pb-4">
+          <CardContent className="px-2 sm:px-6 pb-2 sm:pb-4 flex-1 min-h-0">
             {metricsData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={320} className="sm:!h-[400px]" aria-label="Gráfico de performance das campanhas ao longo do tempo">
+              <ResponsiveContainer width="100%" height="100%" minHeight={280} aria-label="Gráfico de performance das campanhas ao longo do tempo">
                 <ComposedChart data={convertedMetrics} margin={{ top: 10, right: 5, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="gradFaturamento" x1="0" y1="0" x2="0" y2="1">
@@ -637,7 +637,7 @@ export default function DashboardPage() {
                 </ComposedChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-[320px] sm:h-[400px] flex flex-col items-center justify-center text-muted-foreground space-y-2">
+              <div className="h-full min-h-[280px] flex flex-col items-center justify-center text-muted-foreground space-y-2">
                 <BarChart className="w-8 h-8 opacity-20" />
                 <p className="text-sm">Sem dados para exibir no momento</p>
               </div>
