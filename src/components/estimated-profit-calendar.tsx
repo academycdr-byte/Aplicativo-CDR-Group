@@ -56,7 +56,6 @@ export function EstimatedProfitCalendar({ data, totalProfit, currentMonthLabel, 
             {/* Header */}
             <div className="mb-6 flex items-end justify-between">
                 <div>
-                    <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-semibold">Lucro Estimado</p>
                     <p className={cn(
                         "text-2xl font-bold tracking-tight",
                         totalProfit >= 0 ? "text-emerald-600" : "text-red-600"
