@@ -38,14 +38,14 @@ function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
     <Link
       href={item.href}
       aria-current={isActive ? "page" : undefined}
-      className={`group flex items-center gap-3 px-4 py-3 rounded-2xl text-[16px] transition-colors duration-200 ${
+      className={`group flex items-center gap-2.5 px-4 py-2.5 rounded-2xl text-[13px] transition-colors duration-200 ${
         isActive
           ? "bg-accent-surface text-primary font-semibold"
           : "text-muted-foreground hover:bg-bg-hover"
       }`}
     >
       <Icon
-        className={`w-[22px] h-[22px] shrink-0 ${
+        className={`w-[18px] h-[18px] shrink-0 ${
           isActive ? "text-primary" : "text-text-tertiary group-hover:text-muted-foreground"
         }`}
         strokeWidth={1.8}
