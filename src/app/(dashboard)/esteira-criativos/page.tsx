@@ -197,7 +197,7 @@ function CreativeCardContent({
 
   return (
     <Card
-      className={`group overflow-hidden transition-all duration-300 border border-border/40 hover:border-border/60 shadow-none rounded-xl cursor-pointer ${isDragging ? "shadow-xl ring-2 ring-primary/40 rotate-2 scale-105" : ""}`}
+      className={`group overflow-hidden border border-border shadow-none rounded-[20px] cursor-pointer ${isDragging ? "ring-2 ring-primary/40 rotate-2 scale-105" : ""}`}
     >
       {/* Thumbnail */}
       <div className="relative aspect-[4/3] bg-muted flex items-center justify-center overflow-hidden">
@@ -206,7 +206,7 @@ function CreativeCardContent({
             src={creative.thumbnailUrl}
             alt={creative.creativeName}
             fill
-            className="object-cover transition-transform group-hover:scale-105"
+            className="object-cover"
             sizes="(max-width: 640px) 100vw, 280px"
             unoptimized
           />
@@ -270,19 +270,19 @@ function CreativeCardContent({
         <div className="grid grid-cols-2 gap-2">
           <div className="bg-muted/50 rounded-lg px-2.5 py-2">
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Gasto</p>
-            <p className="font-semibold text-sm mt-0.5">{fmt(creative.spend)}</p>
+            <p className="font-semibold text-sm mt-0.5" style={{ fontVariantNumeric: "tabular-nums" }}>{fmt(creative.spend)}</p>
           </div>
           <div className="bg-muted/50 rounded-lg px-2.5 py-2">
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Receita</p>
-            <p className="font-semibold text-sm mt-0.5 text-emerald-500">{fmt(creative.revenue)}</p>
+            <p className="font-semibold text-sm mt-0.5 text-emerald-500" style={{ fontVariantNumeric: "tabular-nums" }}>{fmt(creative.revenue)}</p>
           </div>
           <div className={`${roasBg} rounded-lg px-2.5 py-2`}>
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider">ROAS</p>
-            <p className={`font-bold text-sm mt-0.5 ${roasColor}`}>{creative.roas.toFixed(2)}x</p>
+            <p className={`font-bold text-sm mt-0.5 ${roasColor}`} style={{ fontVariantNumeric: "tabular-nums" }}>{creative.roas.toFixed(2)}x</p>
           </div>
           <div className="bg-muted/50 rounded-lg px-2.5 py-2">
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Compras</p>
-            <p className="font-semibold text-sm mt-0.5">{creative.purchases}</p>
+            <p className="font-semibold text-sm mt-0.5" style={{ fontVariantNumeric: "tabular-nums" }}>{creative.purchases}</p>
           </div>
         </div>
       </CardContent>
@@ -620,9 +620,9 @@ export default function EsteiraPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">
+          <h2 className="text-[30px] font-bold tracking-[-0.02em]">
             Esteira de Criativos
-          </h1>
+          </h2>
           <p className="text-sm text-muted-foreground mt-1">
             {totalCreatives > 0
               ? `${totalCreatives} criativos classificados`
@@ -656,7 +656,7 @@ export default function EsteiraPage() {
 
       {/* Benchmark Config Panel */}
       {showConfig && (
-        <Card className="border-primary/20">
+        <Card className="border-primary/20 rounded-[20px] shadow-none">
           <CardHeader className="pb-4">
             <CardTitle className="text-base">Configurar Benchmarks</CardTitle>
             <CardDescription>
@@ -799,7 +799,7 @@ export default function EsteiraPage() {
 
       {/* Empty State */}
       {totalCreatives === 0 && (
-        <Card>
+        <Card className="rounded-[20px] shadow-none border border-border">
           <CardContent className="flex flex-col items-center justify-center py-16 text-center">
             <FlaskConical className="w-12 h-12 text-muted-foreground/40 mb-4" />
             <h3 className="text-lg font-semibold mb-2">
@@ -868,7 +868,7 @@ export default function EsteiraPage() {
       {/* Loading overlay for creative click */}
       {loadingCreative && (
         <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 flex items-center justify-center">
-          <div className="bg-card rounded-xl p-6 flex items-center gap-3 shadow-lg">
+          <div className="bg-card rounded-[20px] p-6 flex items-center gap-3 shadow-none border border-border">
             <Loader2 className="w-5 h-5 animate-spin text-primary" />
             <span className="text-sm">Carregando criativo...</span>
           </div>

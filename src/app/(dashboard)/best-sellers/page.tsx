@@ -128,9 +128,9 @@ export default function BestSellersPage() {
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
             {/* Header Section */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border/40 pb-6">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border pb-6">
                 <div>
-                    <h2 className="text-2xl font-bold tracking-tight text-foreground">
+                    <h2 className="text-[30px] font-bold tracking-[-0.02em] text-foreground">
                         Mais Vendidos
                     </h2>
                     <p className="text-muted-foreground mt-2 max-w-2xl">
@@ -166,7 +166,7 @@ export default function BestSellersPage() {
                             placeholder="Buscar produto..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            className="w-[180px] sm:w-[220px] pl-9 pr-8 bg-background/50 backdrop-blur-sm border-border/50 hover:bg-accent/50 transition-colors"
+                            className="w-[180px] sm:w-[220px] pl-9 pr-8 bg-background border-border hover:bg-accent/50 transition-colors"
                         />
                         {search && (
                             <button
@@ -191,24 +191,24 @@ export default function BestSellersPage() {
             {/* KPI Cards */}
             {!loading && products.length > 0 && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <Card className="border border-border/40 hover:border-border/60 transition-colors duration-300 bg-card/30 backdrop-blur-sm shadow-none rounded-lg">
+                    <Card className="border border-border shadow-none rounded-[20px]">
                         <CardContent className="p-5">
                             <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-semibold">Produtos Diferentes</p>
-                            <p className="text-2xl font-bold tracking-tight text-foreground mt-1">{filteredProducts.length}</p>
+                            <p className="text-2xl font-bold tracking-tight text-foreground mt-1" style={{ fontVariantNumeric: "tabular-nums" }}>{filteredProducts.length}</p>
                         </CardContent>
                     </Card>
-                    <Card className="border border-border/40 hover:border-border/60 transition-colors duration-300 bg-card/30 backdrop-blur-sm shadow-none rounded-lg">
+                    <Card className="border border-border shadow-none rounded-[20px]">
                         <CardContent className="p-5">
                             <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-semibold">Total Unidades Vendidas</p>
-                            <p className="text-2xl font-bold tracking-tight text-foreground mt-1">
+                            <p className="text-2xl font-bold tracking-tight text-foreground mt-1" style={{ fontVariantNumeric: "tabular-nums" }}>
                                 {filteredProducts.reduce((sum, p) => sum + (p.totalSold || 0), 0).toLocaleString("pt-BR")}
                             </p>
                         </CardContent>
                     </Card>
-                    <Card className="border border-border/40 hover:border-border/60 transition-colors duration-300 bg-card/30 backdrop-blur-sm shadow-none rounded-lg">
+                    <Card className="border border-border shadow-none rounded-[20px]">
                         <CardContent className="p-5">
                             <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-semibold">Receita Total</p>
-                            <p className="text-2xl font-bold tracking-tight text-foreground mt-1">
+                            <p className="text-2xl font-bold tracking-tight text-foreground mt-1" style={{ fontVariantNumeric: "tabular-nums" }}>
                                 {formatCurrency(
                                     searchTerm
                                         ? filteredProducts.reduce((sum, p) => sum + getProductRevenue(p), 0)
@@ -225,13 +225,13 @@ export default function BestSellersPage() {
                 viewMode === "grid" ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                         {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-                            <Card key={i} className="border-border/40 bg-card/30 overflow-hidden h-[380px]">
+                            <Card key={i} className="border-border overflow-hidden h-[380px] rounded-[20px] shadow-none">
                                 <div className="animate-pulse h-full w-full bg-muted/10"></div>
                             </Card>
                         ))}
                     </div>
                 ) : (
-                    <Card className="border-border/40 bg-card/30 overflow-hidden">
+                    <Card className="border-border overflow-hidden rounded-[20px] shadow-none">
                         <div className="animate-pulse h-80 w-full bg-muted/10"></div>
                     </Card>
                 )
@@ -248,7 +248,7 @@ export default function BestSellersPage() {
                             >
                                 {sortedProducts.map((product, index) => (
                                     <motion.div key={product.id} variants={item}>
-                                        <Card className="overflow-hidden bg-gradient-to-b from-card/50 to-card/30 border-white/5 transition-all duration-300 h-full flex flex-col backdrop-blur-sm">
+                                        <Card className="overflow-hidden border border-border shadow-none rounded-[20px] h-full flex flex-col">
                                             {/* Image Container */}
                                             <div className="relative aspect-[4/5] overflow-hidden bg-muted/20">
                                                 {product.imageUrl ? (
@@ -269,7 +269,7 @@ export default function BestSellersPage() {
 
                                                 {/* Rank Badge */}
                                                 <div className="absolute top-3 left-3 z-10">
-                                                    <Badge className={`${index < 3 ? 'bg-primary text-primary-foreground' : 'bg-black/60 text-white border-white/10'} backdrop-blur-md px-2.5 py-1 shadow-lg`}>
+                                                    <Badge className={`${index < 3 ? 'bg-primary text-primary-foreground' : 'bg-black/60 text-white border-white/10'} px-2.5 py-1`}>
                                                         #{index + 1}
                                                     </Badge>
                                                 </div>
@@ -285,7 +285,7 @@ export default function BestSellersPage() {
                                                     <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{product.vendor}</p>
                                                 </div>
 
-                                                <div className="flex items-end justify-between border-t border-border/40 pt-4 mt-2">
+                                                <div className="flex items-end justify-between border-t border-border pt-4 mt-2">
                                                     <div className="flex flex-col">
                                                         <span className="text-[10px] text-muted-foreground uppercase opacity-70">Receita</span>
                                                         <span className="text-lg font-bold text-foreground">
@@ -307,7 +307,7 @@ export default function BestSellersPage() {
                             </motion.div>
                         ) : (
                             /* List View */
-                            <Card className="overflow-hidden border-border/40 bg-card/30 backdrop-blur-sm">
+                            <Card className="overflow-hidden border border-border shadow-none rounded-[20px]">
                                 {/* Mobile scroll hint */}
                                 <div className="flex items-center gap-2 px-4 py-2 text-xs text-muted-foreground border-b border-border/30 sm:hidden">
                                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="shrink-0 opacity-60">
@@ -318,7 +318,7 @@ export default function BestSellersPage() {
                                 <div className="overflow-x-auto">
                                     <table className="w-full min-w-[640px]">
                                         <thead>
-                                            <tr className="border-b border-border/40 text-xs text-muted-foreground uppercase tracking-wider">
+                                            <tr className="border-b border-border text-xs text-muted-foreground uppercase tracking-wider">
                                                 <th className="text-left px-4 py-3 font-medium w-12">#</th>
                                                 <th className="text-left px-4 py-3 font-medium w-16">Imagem</th>
                                                 <th className="text-left px-4 py-3 font-medium">Nome</th>

@@ -101,13 +101,13 @@ export default function AnalyticsPage() {
             <div className="space-y-6 animate-in fade-in duration-500">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
-                        <h2 className="text-2xl font-bold tracking-tight">Analytics</h2>
+                        <h2 className="text-[30px] font-bold tracking-[-0.02em]">Analytics</h2>
                         <p className="text-muted-foreground text-sm mt-0.5">Dados do website via Google Analytics 4.</p>
                     </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     {[1, 2, 3, 4].map((i) => (
-                        <Card key={i} className="h-28">
+                        <Card key={i} className="h-28 rounded-[20px] shadow-none border-border">
                             <CardContent className="pt-5">
                                 <div className="animate-pulse space-y-3">
                                     <div className="h-4 w-20 bg-muted/40 rounded" />
@@ -117,8 +117,8 @@ export default function AnalyticsPage() {
                         </Card>
                     ))}
                 </div>
-                <Card className="h-80">
-                    <div className="animate-pulse h-full w-full bg-muted/10 rounded-lg" />
+                <Card className="h-80 rounded-[20px] shadow-none border-border">
+                    <div className="animate-pulse h-full w-full bg-muted/10 rounded-[20px]" />
                 </Card>
             </div>
         );
@@ -138,7 +138,7 @@ export default function AnalyticsPage() {
             </div>
 
             {!gaData ? (
-                <Card className="border border-dashed border-border shadow-none rounded-lg">
+                <Card className="border border-dashed border-border shadow-none rounded-[20px]">
                     <CardContent className="flex flex-col items-center justify-center py-16 gap-4">
                         <Globe className="w-12 h-12 text-muted-foreground opacity-50" />
                         <div className="text-center">
@@ -177,11 +177,11 @@ export default function AnalyticsPage() {
 
                     {/* GA Secondary KPIs */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <Card className="border border-border/40 hover:border-border/60 transition-colors duration-300 shadow-none rounded-lg p-4">
+                        <Card className="border border-border shadow-none rounded-[20px] p-4">
                             <span className="text-[11px] uppercase tracking-wider font-medium text-muted-foreground">Novos Usuários</span>
-                            <div className="text-lg font-bold mt-1">{fmtNum(gaData.totals.newUsers)}</div>
+                            <div className="text-xl font-bold mt-1" style={{ fontVariantNumeric: "tabular-nums" }}>{fmtNum(gaData.totals.newUsers)}</div>
                         </Card>
-                        <Card className="border border-border/40 hover:border-border/60 transition-colors duration-300 shadow-none rounded-lg p-4">
+                        <Card className="border border-border shadow-none rounded-[20px] p-4">
                             <div className="flex items-center gap-1.5">
                                 <span className="text-[11px] uppercase tracking-wider font-medium text-muted-foreground">Bounce Rate</span>
                                 <div className="relative">
@@ -201,23 +201,23 @@ export default function AnalyticsPage() {
                                     )}
                                 </div>
                             </div>
-                            <div className="text-lg font-bold mt-1">{fmtPercent(gaData.totals.bounceRate)}</div>
+                            <div className="text-xl font-bold mt-1" style={{ fontVariantNumeric: "tabular-nums" }}>{fmtPercent(gaData.totals.bounceRate)}</div>
                         </Card>
-                        <Card className="border border-border/40 hover:border-border/60 transition-colors duration-300 shadow-none rounded-lg p-4">
+                        <Card className="border border-border shadow-none rounded-[20px] p-4">
                             <span className="text-[11px] uppercase tracking-wider font-medium text-muted-foreground">Tempo Médio</span>
-                            <div className="text-lg font-bold mt-1">{fmtDuration(gaData.totals.avgSessionDuration)}</div>
+                            <div className="text-xl font-bold mt-1" style={{ fontVariantNumeric: "tabular-nums" }}>{fmtDuration(gaData.totals.avgSessionDuration)}</div>
                         </Card>
                     </div>
 
                     {/* GA Daily Chart */}
-                    <Card className="border border-border/40 hover:border-border/60 transition-colors duration-300 shadow-none rounded-lg">
-                        <CardHeader className="border-b border-border/50 px-5 py-4">
+                    <Card className="border border-border shadow-none rounded-[20px]">
+                        <CardHeader className="border-b border-border px-5 py-4">
                             <CardTitle className="text-base font-semibold">Sessões e Usuários por Dia</CardTitle>
                         </CardHeader>
                         <CardContent className="p-5 h-[350px]">
                             <ResponsiveContainer width="100%" height="100%">
                                 <LineChart data={gaData.dailyData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} opacity={0.3} />
+                                    <CartesianGrid strokeDasharray="4 4" stroke="var(--border)" vertical={false} opacity={0.3} />
                                     <XAxis dataKey="date" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false}
                                         tickFormatter={(v) => { const parts = String(v).split("-"); return `${parseInt(parts[2])}/${parseInt(parts[1])}`; }}
                                     />
@@ -235,8 +235,8 @@ export default function AnalyticsPage() {
                     {/* Traffic Sources (redesigned) + Traffic Table + Top Pages */}
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         {/* Traffic Sources - Horizontal Bars */}
-                        <Card className="lg:col-span-1 border border-border/40 hover:border-border/60 transition-colors duration-300 shadow-none rounded-lg">
-                            <CardHeader className="border-b border-border/50 px-5 py-4">
+                        <Card className="lg:col-span-1 border border-border shadow-none rounded-[20px]">
+                            <CardHeader className="border-b border-border px-5 py-4">
                                 <CardTitle className="text-base font-semibold">Origens de Tráfego</CardTitle>
                             </CardHeader>
                             <CardContent className="p-5">
@@ -278,14 +278,14 @@ export default function AnalyticsPage() {
                         </Card>
 
                         {/* Traffic Sources Table */}
-                        <Card className="border border-border/40 hover:border-border/60 transition-colors duration-300 shadow-none rounded-lg">
-                            <CardHeader className="border-b border-border/50 px-5 py-4">
+                        <Card className="border border-border shadow-none rounded-[20px]">
+                            <CardHeader className="border-b border-border px-5 py-4">
                                 <CardTitle className="text-base font-semibold">Fontes de Tráfego</CardTitle>
                             </CardHeader>
                             <CardContent className="p-0">
                                 <Table>
                                     <TableHeader>
-                                        <TableRow className="hover:bg-transparent border-b border-border/50">
+                                        <TableRow className="hover:bg-transparent border-b border-border">
                                             <TableHead>Fonte / Meio</TableHead>
                                             <TableHead className="text-right">Sessões</TableHead>
                                             <TableHead className="text-right">Usuários</TableHead>
@@ -293,7 +293,7 @@ export default function AnalyticsPage() {
                                     </TableHeader>
                                     <TableBody>
                                         {gaData.trafficSources.length > 0 ? gaData.trafficSources.map((s, i) => (
-                                            <TableRow key={i} className="hover:bg-muted/50 border-b border-border/50">
+                                            <TableRow key={i} className="hover:bg-muted/50 border-b border-border">
                                                 <TableCell className="font-medium text-sm">{s.source}</TableCell>
                                                 <TableCell className="text-right text-sm">{fmtNum(s.sessions)}</TableCell>
                                                 <TableCell className="text-right text-sm">{fmtNum(s.activeUsers)}</TableCell>
@@ -309,14 +309,14 @@ export default function AnalyticsPage() {
                         </Card>
 
                         {/* Top Pages */}
-                        <Card className="border border-border/40 hover:border-border/60 transition-colors duration-300 shadow-none rounded-lg">
-                            <CardHeader className="border-b border-border/50 px-5 py-4">
+                        <Card className="border border-border shadow-none rounded-[20px]">
+                            <CardHeader className="border-b border-border px-5 py-4">
                                 <CardTitle className="text-base font-semibold">Top Páginas</CardTitle>
                             </CardHeader>
                             <CardContent className="p-0">
                                 <Table>
                                     <TableHeader>
-                                        <TableRow className="hover:bg-transparent border-b border-border/50">
+                                        <TableRow className="hover:bg-transparent border-b border-border">
                                             <TableHead>Página</TableHead>
                                             <TableHead className="text-right">Views</TableHead>
                                             <TableHead className="text-right">Usuários</TableHead>
@@ -324,7 +324,7 @@ export default function AnalyticsPage() {
                                     </TableHeader>
                                     <TableBody>
                                         {gaData.topPages.length > 0 ? gaData.topPages.map((p, i) => (
-                                            <TableRow key={i} className="hover:bg-muted/50 border-b border-border/50">
+                                            <TableRow key={i} className="hover:bg-muted/50 border-b border-border">
                                                 <TableCell className="font-medium text-xs max-w-[140px] sm:max-w-[200px] truncate">{p.path}</TableCell>
                                                 <TableCell className="text-right text-sm">{fmtNum(p.screenPageViews)}</TableCell>
                                                 <TableCell className="text-right text-sm">{fmtNum(p.activeUsers)}</TableCell>
@@ -342,8 +342,8 @@ export default function AnalyticsPage() {
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* Devices */}
-                        <Card className="border border-border/40 hover:border-border/60 transition-colors duration-300 shadow-none rounded-lg">
-                            <CardHeader className="border-b border-border/50 px-5 py-4">
+                        <Card className="border border-border shadow-none rounded-[20px]">
+                            <CardHeader className="border-b border-border px-5 py-4">
                                 <div>
                                     <CardTitle className="text-base font-semibold">Dispositivos</CardTitle>
                                     <p className="text-xs text-muted-foreground mt-0.5">Sessões por tipo de dispositivo</p>
@@ -378,8 +378,8 @@ export default function AnalyticsPage() {
                         </Card>
 
                         {/* Geography - Top 10 */}
-                        <Card className="border border-border/40 hover:border-border/60 transition-colors duration-300 shadow-none rounded-lg">
-                            <CardHeader className="border-b border-border/50 px-5 py-4">
+                        <Card className="border border-border shadow-none rounded-[20px]">
+                            <CardHeader className="border-b border-border px-5 py-4">
                                 <div>
                                     <CardTitle className="text-base font-semibold">Top 10 Regiões</CardTitle>
                                     <p className="text-xs text-muted-foreground mt-0.5">Sessões por região</p>
@@ -421,7 +421,7 @@ function AnalyticsKPICard({ title, value, tooltip }: { title: string; value: str
     const [showTooltip, setShowTooltip] = useState(false);
 
     return (
-        <Card className="border border-border/40 hover:border-border/60 transition-colors duration-300 shadow-none rounded-lg p-5">
+        <Card className="border border-border shadow-none rounded-[20px] p-5">
             <div className="flex items-center gap-1.5 mb-2">
                 <span className="text-[11px] uppercase tracking-wider font-medium text-muted-foreground">{title}</span>
                 {tooltip && (
@@ -443,7 +443,7 @@ function AnalyticsKPICard({ title, value, tooltip }: { title: string; value: str
                     </div>
                 )}
             </div>
-            <div className="text-2xl font-bold tracking-tight">{value}</div>
+            <div className="text-[28px] font-bold tracking-tight" style={{ fontVariantNumeric: "tabular-nums" }}>{value}</div>
         </Card>
     );
 }

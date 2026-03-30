@@ -5,206 +5,185 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ============================================================================
-   ACADEMIA LENDARIA DESIGN SYSTEM
-   Glassmorphism + Premium Dark + Apple HIG
-   Paleta: CDR Green (mantida)
+   CDR APP DESIGN SYSTEM v2.1
+   Ref: "Metrics" by Pixelz (Dribbble) — 100% fidelity
+   Accent: Verde CDR (#A8D600)
+   Principle: RESTRAINT — fewer effects, stronger typography
    ============================================================================ */
 
 :root {
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 
-  /* === BORDER RADIUS (Academia Lendaria Scale) === */
+  /* === BORDER RADIUS (CDR Design System v2.1) === */
   --radius: 1rem;
   --radius-pill: 200px;
   --radius-circle: 50%;
 
-  /* === TIPOGRAFIA (Academia Lendaria Scale) ===
-     Extraido pixel-perfect de academialendaria.ai */
-  --text-hero: 4rem;          /* 64px - hero display */
-  --text-hero-sub: 3rem;      /* 48px - hero headline */
-  --text-large-title: 3.5rem; /* 56px - titulos de secao h2 */
-  --text-title-1: 2rem;       /* 32px - h3, cards, features */
-  --text-title-2: 1.5rem;     /* 24px - sub-headings */
-  --text-title-3: 1.25rem;    /* 20px */
-  --text-headline: 1.125rem;  /* 18px - body large */
-  --text-body: 1rem;          /* 16px - body text */
-  --text-subheadline: 0.875rem; /* 14px - captions, sidebar */
-  --text-footnote: 0.8125rem; /* 13px */
-  --text-caption-1: 0.75rem;  /* 12px - nav links, small */
-  --text-caption-2: 0.6875rem; /* 11px - section labels */
+  /* === LIGHT MODE — Clean, Neutral, "Metrics" reference === */
+  --background: #ECEEF2;
+  --foreground: #111114;
 
-  /* === LETTER SPACING (Academia Precision) === */
-  --tracking-tight: -0.02em;  /* headings */
-  --tracking-tighter: -0.03em; /* large titles */
-  --tracking-wide: 0.05em;    /* section labels */
-  --tracking-widest: 0.1em;   /* uppercase labels */
+  --card: #FFFFFF;
+  --card-foreground: #111114;
 
-  /* === APPLE SEMANTIC COLORS (mantidos) === */
-  --system-blue: oklch(0.59 0.2 260);
-  --system-green: oklch(0.62 0.19 145);
-  --system-orange: oklch(0.75 0.17 55);
-  --system-red: oklch(0.63 0.22 25);
-  --system-yellow: oklch(0.88 0.15 90);
-  --system-purple: oklch(0.55 0.2 300);
-  --system-gray: oklch(0.56 0 0);
-  --system-gray2: oklch(0.68 0 0);
-  --system-gray3: oklch(0.78 0 0);
-  --system-gray4: oklch(0.85 0 0);
-  --system-gray5: oklch(0.92 0 0);
-  --system-gray6: oklch(0.97 0 0);
+  --popover: #FFFFFF;
+  --popover-foreground: #111114;
 
-  /* === LIGHT MODE - Clean, Neutral, Apple-like === */
-  --background: oklch(0.985 0.001 0);
-  --foreground: oklch(0.14 0.005 0);
+  --primary: #A8D600;
+  --primary-foreground: #FFFFFF;
 
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.14 0.005 0);
+  --secondary: #F5F7FA;
+  --secondary-foreground: #111114;
 
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.14 0.005 0);
+  --muted: #F5F7FA;
+  --muted-foreground: #6B7280;
 
-  --primary: oklch(0.53 0.2 142);
-  --primary-foreground: oklch(0.985 0 0);
+  --accent: #F9FAFB;
+  --accent-foreground: #111114;
 
-  --secondary: oklch(0.96 0.005 0);
-  --secondary-foreground: oklch(0.2 0.005 0);
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
 
-  --muted: oklch(0.96 0.005 0);
-  --muted-foreground: oklch(0.55 0.01 0);
+  --success: #10B981;
+  --warning: #F59E0B;
 
-  --accent: oklch(0.96 0.005 0);
-  --accent-foreground: oklch(0.2 0.005 0);
+  --border: #E5E7EB;
+  --input: #E5E7EB;
+  --ring: #A8D600;
 
-  --destructive: oklch(0.63 0.22 25);
-  --destructive-foreground: oklch(0.985 0 0);
+  /* === CDR Design System v2.1 — Extended Tokens (Light) === */
+  --bg-outer: #ECEEF2;
+  --bg-primary: #F5F7FA;
+  --bg-card: #FFFFFF;
+  --bg-hover: #F9FAFB;
+  --accent-color: #A8D600;
+  --accent-hover: #C2F000;
+  --accent-surface: rgba(168, 214, 0, 0.06);
+  --text-primary: #111114;
+  --text-secondary: #6B7280;
+  --text-tertiary: #9CA3AF;
+  --border-strong: #D1D5DB;
+  --success-surface: #ECFDF5;
+  --danger-surface: #FEF2F2;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.04);
 
-  --success: oklch(0.62 0.19 145);
-  --warning: oklch(0.85 0.16 85);
+  /* === Chart Color Scale — monocromatic accent (Light) === */
+  --chart-100: rgba(168, 214, 0, 0.10);
+  --chart-200: rgba(168, 214, 0, 0.25);
+  --chart-300: rgba(168, 214, 0, 0.50);
+  --chart-400: rgba(168, 214, 0, 0.80);
+  --chart-500: #A8D600;
 
-  --border: oklch(0.92 0.005 0);
-  --input: oklch(0.92 0.005 0);
-  --ring: oklch(0.53 0.2 142);
+  /* Donut semantic colors */
+  --donut-primary: #A8D600;
+  --donut-secondary: #F59E0B;
+  --donut-tertiary: #F97316;
 
-  /* Charts - Light Mode */
-  --chart-1: oklch(0.53 0.2 142);
-  --chart-2: oklch(0.6 0.16 160);
-  --chart-3: oklch(0.45 0.12 180);
-  --chart-4: oklch(0.7 0.18 120);
-  --chart-5: oklch(0.4 0.1 150);
+  /* Charts — shadcn compat */
+  --chart-1: #A8D600;
+  --chart-2: rgba(168, 214, 0, 0.60);
+  --chart-3: rgba(168, 214, 0, 0.35);
+  --chart-4: #F59E0B;
+  --chart-5: #F97316;
 
-  /* Sidebar Light - Dark Green Contrast */
-  --sidebar-bg: oklch(0.16 0.03 150);
-  --sidebar-text: oklch(0.85 0.01 0);
-  --sidebar-hover: oklch(0.22 0.02 150);
-  --sidebar-active: oklch(0.22 0.02 150);
-  --sidebar-border: oklch(1 0 0 / 0.08);
+  /* Sidebar — Light (part of white container, NO dark bg) */
+  --sidebar-bg: #FFFFFF;
+  --sidebar-text: #6B7280;
+  --sidebar-hover: #F9FAFB;
+  --sidebar-active: rgba(168, 214, 0, 0.06);
+  --sidebar-border: #E5E7EB;
+  --sidebar-foreground-text: #111114;
 
-  --sidebar: oklch(0.985 0.001 0);
-  --sidebar-foreground: oklch(0.14 0.005 0);
-  --sidebar-primary: oklch(0.53 0.2 142);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.96 0.005 0);
-  --sidebar-accent-foreground: oklch(0.2 0.005 0);
-  --sidebar-ring: oklch(0.53 0.2 142);
-
-  /* === SURFACES (Light Mode) === */
-  --surface-hover: rgba(0, 0, 0, 0.03);
-  --surface-elevated: rgba(0, 0, 0, 0.02);
-  --surface-glass: rgba(255, 255, 255, 0.8);
-  --surface-active: rgba(0, 0, 0, 0.05);
-
-  /* === SHADOWS (Light Mode) === */
-  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
-  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-  --shadow-floating: 0 12px 32px rgba(0, 0, 0, 0.12);
-  --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.06);
+  --sidebar: #FFFFFF;
+  --sidebar-foreground: #111114;
+  --sidebar-primary: #A8D600;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #F9FAFB;
+  --sidebar-accent-foreground: #111114;
+  --sidebar-ring: #A8D600;
 }
 
 .dark {
-  /* === DARK MODE — Premium Neutral (Linear / Vercel / Stripe reference)
-     Backgrounds are pure neutral (chroma 0). Brand green shows only
-     in primary, charts, and interactive accents — never in surfaces.
-     This creates a professional, grown-up look where DATA is the hero. === */
-  --background: oklch(0.085 0 0);
-  --foreground: oklch(0.95 0 0);
+  /* === DARK MODE — CDR Design System v2.1 === */
+  --background: #020204;
+  --foreground: #FFFFFF;
 
-  --card: oklch(0.115 0 0);
-  --card-foreground: oklch(0.95 0 0);
+  --card: #0F0F12;
+  --card-foreground: #FFFFFF;
 
-  --popover: oklch(0.12 0 0);
-  --popover-foreground: oklch(0.95 0 0);
+  --popover: #0F0F12;
+  --popover-foreground: #FFFFFF;
 
-  /* Primary — CDR brand green (the ONLY color accent) */
-  --primary: oklch(0.72 0.17 148);
-  --primary-foreground: oklch(0.08 0 0);
+  --primary: #A8D600;
+  --primary-foreground: #0F0F12;
 
-  --secondary: oklch(0.14 0 0);
-  --secondary-foreground: oklch(0.93 0 0);
+  --secondary: #06060A;
+  --secondary-foreground: #FFFFFF;
 
-  --muted: oklch(0.14 0 0);
-  --muted-foreground: oklch(0.55 0 0);
+  --muted: #06060A;
+  --muted-foreground: #A1A1AA;
 
-  --accent: oklch(0.15 0 0);
-  --accent-foreground: oklch(0.93 0 0);
+  --accent: #18181C;
+  --accent-foreground: #FFFFFF;
 
-  --destructive: oklch(0.63 0.22 25);
-  --destructive-foreground: oklch(0.95 0 0);
+  --destructive: #F87171;
+  --destructive-foreground: #FFFFFF;
 
-  --success: oklch(0.72 0.17 148);
-  --warning: oklch(0.85 0.16 80);
+  --success: #34D399;
+  --warning: #F59E0B;
 
-  --border: oklch(1 0 0 / 0.06);
-  --input: oklch(1 0 0 / 0.08);
-  --ring: oklch(0.72 0.17 148);
+  --border: #222228;
+  --input: #222228;
+  --ring: #A8D600;
 
-  /* Charts — carefully curated palette, balanced saturation */
-  --chart-1: oklch(0.72 0.17 148);
-  --chart-2: oklch(0.65 0.14 230);
-  --chart-3: oklch(0.60 0.15 300);
-  --chart-4: oklch(0.75 0.14 80);
-  --chart-5: oklch(0.55 0.12 170);
+  /* === CDR Design System v2.1 — Extended Tokens (Dark) === */
+  --bg-outer: #020204;
+  --bg-primary: #06060A;
+  --bg-card: #0F0F12;
+  --bg-hover: #18181C;
+  --accent-color: #A8D600;
+  --accent-hover: #C2F000;
+  --accent-surface: rgba(168, 214, 0, 0.08);
+  --text-primary: #FFFFFF;
+  --text-secondary: #A1A1AA;
+  --text-tertiary: #71717A;
+  --border-strong: #2E2E34;
+  --success-surface: rgba(16, 185, 129, 0.10);
+  --danger-surface: rgba(239, 68, 68, 0.10);
+  --shadow-sm: none;
+  --shadow-md: none;
 
-  /* Sidebar — deeper than page background for visual anchoring */
-  --sidebar-bg: oklch(0.055 0 0);
-  --sidebar-text: oklch(0.65 0 0);
-  --sidebar-hover: oklch(1 0 0 / 0.04);
-  --sidebar-active: oklch(1 0 0 / 0.06);
-  --sidebar-border: oklch(1 0 0 / 0.05);
+  /* === Chart Color Scale — monocromatic accent (Dark) === */
+  --chart-100: rgba(168, 214, 0, 0.08);
+  --chart-200: rgba(168, 214, 0, 0.20);
+  --chart-300: rgba(168, 214, 0, 0.45);
+  --chart-400: rgba(168, 214, 0, 0.75);
+  --chart-500: #A8D600;
 
-  --sidebar: oklch(0.065 0 0);
-  --sidebar-foreground: oklch(0.93 0 0);
-  --sidebar-primary: oklch(0.72 0.17 148);
-  --sidebar-primary-foreground: oklch(0.065 0 0);
-  --sidebar-accent: oklch(0.14 0 0);
-  --sidebar-accent-foreground: oklch(0.93 0 0);
-  --sidebar-ring: oklch(0.72 0.17 148);
+  /* Charts — shadcn compat */
+  --chart-1: #A8D600;
+  --chart-2: rgba(168, 214, 0, 0.55);
+  --chart-3: rgba(168, 214, 0, 0.30);
+  --chart-4: #F59E0B;
+  --chart-5: #F97316;
 
-  /* === SURFACES (neutral rgba overlays) === */
-  --surface-hover: rgba(255, 255, 255, 0.035);
-  --surface-elevated: rgba(255, 255, 255, 0.04);
-  --surface-glass: rgba(255, 255, 255, 0.06);
-  --surface-active: rgba(255, 255, 255, 0.08);
-  --surface-button: rgba(255, 255, 255, 0.10);
+  /* Sidebar — Dark (part of dark container) */
+  --sidebar-bg: #0F0F12;
+  --sidebar-text: #A1A1AA;
+  --sidebar-hover: #18181C;
+  --sidebar-active: rgba(168, 214, 0, 0.08);
+  --sidebar-border: #222228;
+  --sidebar-foreground-text: #FFFFFF;
 
-  /* === BORDERS === */
-  --border-subtle: rgba(255, 255, 255, 0.04);
-  --border-glass: rgba(255, 255, 255, 0.06);
-  --border-default: rgba(255, 255, 255, 0.08);
-  --border-visible: rgba(255, 255, 255, 0.14);
-
-  /* === SHADOWS (deeper for true dark mode) === */
-  --shadow-xs: none;
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.5);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.6);
-  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.7);
-  --shadow-xl: 0 24px 56px rgba(0, 0, 0, 0.8);
-  --shadow-floating: 0 16px 48px rgba(0, 0, 0, 0.6);
-  --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.4);
-  --shadow-glow: 0 0 24px oklch(0.72 0.17 148 / 0.12);
+  --sidebar: #0F0F12;
+  --sidebar-foreground: #FFFFFF;
+  --sidebar-primary: #A8D600;
+  --sidebar-primary-foreground: #0F0F12;
+  --sidebar-accent: #18181C;
+  --sidebar-accent-foreground: #FFFFFF;
+  --sidebar-ring: #A8D600;
 }
 
 @theme inline {
@@ -256,33 +235,25 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  /* Apple HIG Semantic Colors */
-  --color-system-blue: var(--system-blue);
-  --color-system-green: var(--system-green);
-  --color-system-orange: var(--system-orange);
-  --color-system-red: var(--system-red);
-  --color-system-yellow: var(--system-yellow);
-  --color-system-purple: var(--system-purple);
+  /* CDR Design System v2.1 — Custom tokens in Tailwind */
+  --color-bg-outer: var(--bg-outer);
+  --color-bg-primary: var(--bg-primary);
+  --color-bg-card: var(--bg-card);
+  --color-bg-hover: var(--bg-hover);
+  --color-accent-surface: var(--accent-surface);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-border-strong: var(--border-strong);
+  --color-success-surface: var(--success-surface);
+  --color-danger-surface: var(--danger-surface);
 
-  /* Surface Colors */
-  --color-surface-hover: var(--surface-hover);
-  --color-surface-elevated: var(--surface-elevated);
-  --color-surface-glass: var(--surface-glass);
-  --color-surface-active: var(--surface-active);
-
-  /* Easing (Academia Lendaria Motion) */
+  /* Easing */
   --ease-apple: cubic-bezier(0.25, 0.1, 0.25, 1);
   --ease-apple-fast: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-smooth: cubic-bezier(0, 0, 0.2, 1);
-  --spring-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
 
   --animate-accordion-down: accordion-down 0.2s ease-out;
   --animate-accordion-up: accordion-up 0.2s ease-out;
-  --animate-fade-in: fade-in 0.5s var(--ease-smooth);
-  --animate-slide-up: slide-up 0.6s var(--ease-smooth);
-  --animate-slide-down: slide-down 0.4s var(--ease-smooth);
-  --animate-scale-in: scale-in 0.3s var(--spring-bounce);
-  --animate-glow-pulse: glow-pulse 3s ease-in-out infinite;
+  --animate-fade-in: fade-in 0.4s var(--ease-smooth);
 
   @keyframes accordion-down {
     from { height: 0; }
@@ -299,41 +270,14 @@
     to { opacity: 1; transform: translateY(0); }
   }
 
-  @keyframes slide-up {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  @keyframes slide-down {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  @keyframes scale-in {
-    from { opacity: 0; transform: scale(0.95); }
-    to { opacity: 1; transform: scale(1); }
-  }
-
-  @keyframes glow-pulse {
-    0%, 100% { box-shadow: 0 0 20px oklch(0.72 0.17 148 / 0.1); }
-    50% { box-shadow: 0 0 30px oklch(0.72 0.17 148 / 0.2); }
-  }
-
   @keyframes scroll-infinite {
     0% { transform: translateX(0); }
     100% { transform: translateX(-50%); }
   }
-
-  @keyframes shimmer {
-    0% { transform: scaleX(0); opacity: 0.5; }
-    50% { transform: scaleX(1); opacity: 1; }
-    100% { transform: scaleX(0); opacity: 0.5; }
-  }
-
 }
 
 /* ============================================================================
-   BASE LAYER
+   BASE LAYER — CDR Design System v2.1
    ============================================================================ */
 
 @layer base {
@@ -342,273 +286,127 @@
   }
 
   body {
-    @apply bg-background text-foreground antialiased selection:bg-primary/20 selection:text-foreground;
-    font-feature-settings: "ss01", "ss02", "cv01", "cv02";
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "ss01", "ss02";
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* === TIPOGRAFIA HEADINGS (Academia Lendaria Scale) === */
   h1 {
-    font-size: var(--text-title-1);
-    font-weight: 600;
+    font-size: 30px;
+    font-weight: 700;
     line-height: 1.2;
-    letter-spacing: var(--tracking-tight);
+    letter-spacing: -0.02em;
   }
 
   h2 {
-    font-size: var(--text-title-2);
-    font-weight: 600;
+    font-size: 20px;
+    font-weight: 700;
     line-height: 1.25;
-    letter-spacing: var(--tracking-tight);
+    letter-spacing: -0.01em;
   }
 
   h3 {
-    font-size: var(--text-title-3);
-    font-weight: 600;
+    font-size: 16px;
+    font-weight: 500;
     line-height: 1.3;
-  }
-
-  h4 {
-    font-size: var(--text-headline);
-    font-weight: 600;
-    line-height: 1.4;
   }
 }
 
 /* ============================================================================
-   COMPONENT LAYER - Academia Lendaria Design System
+   COMPONENT LAYER — CDR Design System v2.1
+   Key rule: ZERO glassmorphism, ZERO hover animations on cards
    ============================================================================ */
 
 @layer components {
-
-  /* === GLASSMORPHISM (Core Academy Effect) === */
-  .glass {
-    background: var(--surface-glass);
-    backdrop-filter: blur(12px) saturate(1.8);
-    -webkit-backdrop-filter: blur(12px) saturate(1.8);
-    border: 1px solid var(--border);
-  }
-
-  .glass-heavy {
-    background: var(--surface-glass);
-    backdrop-filter: blur(24px) saturate(2.2);
-    -webkit-backdrop-filter: blur(24px) saturate(2.2);
-    border: 1px solid var(--border);
-  }
-
-  .glass-card {
-    background: var(--surface-glass);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-  }
-
-  .glass-subtle {
-    background: var(--surface-elevated);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border: 1px solid var(--border);
-  }
-
-  /* === SURFACE SYSTEM === */
-  .surface-elevated {
-    background: var(--surface-elevated);
-  }
-
-  .surface-hover {
-    @apply transition-all duration-300;
-  }
-  .surface-hover:hover {
-    background: var(--surface-hover);
-  }
-
-  .surface-active {
-    background: var(--surface-active);
-  }
-
-  /* === CARD VARIANTS (Academia Premium) === */
-  .card-premium {
-    @apply bg-card border border-border/20 shadow-sm;
-    border-radius: 16px;
-    transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
-  }
-  .card-premium:hover {
-    border-color: var(--primary);
-    box-shadow: var(--shadow-md);
-  }
-
-  .card-glass {
-    background: var(--surface-glass);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    transition: all 0.44s cubic-bezier(0.25, 0.1, 0.25, 1);
-  }
-  .card-glass:hover {
-    background: var(--surface-active);
-    border-color: rgba(255, 255, 255, 0.12);
-  }
-
-  /* === BUTTON VARIANTS (Academia Style) === */
-  .btn-glass {
-    background: var(--surface-glass);
-    backdrop-filter: blur(24px) saturate(2.2);
-    -webkit-backdrop-filter: blur(24px) saturate(2.2);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 12px 24px;
-    font-weight: 600;
-    transition: transform 0.44s cubic-bezier(0.25, 0.1, 0.25, 1),
-                border-color 0.8s cubic-bezier(0.25, 0.1, 0.25, 1),
-                background 0.4s cubic-bezier(0.25, 0.1, 0.25, 1);
-  }
-  .btn-glass:hover {
-    background: var(--surface-active);
-    transform: translateY(-1px);
-  }
-
-  .btn-pill {
-    border-radius: 200px;
-    padding: 8px 8px 8px 12px;
-    border: 1px solid var(--border);
-    background: transparent;
-    transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
-  }
-  .btn-pill:hover {
-    background: var(--surface-hover);
-  }
-
-  /* === METRIC CARD === */
+  /* === KPI / METRIC CARD (Design System v2.1 §5) === */
   .metric-card {
-    @apply bg-card border border-border/20 shadow-sm p-6;
-    border-radius: 16px;
-    transition: all 0.3s ease;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 28px;
   }
-  .metric-card:hover {
-    box-shadow: var(--shadow-md);
-  }
+
   .metric-value {
-    font-size: 30px;
+    font-size: 48px;
     font-weight: 700;
-    line-height: 36px;
-    letter-spacing: -0.75px;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-primary);
   }
+
   .metric-change-positive {
-    @apply text-success;
-    font-size: 12px;
-    font-weight: 500;
-  }
-  .metric-change-negative {
-    @apply text-destructive;
-    font-size: 12px;
-    font-weight: 500;
-  }
-  .metric-label {
-    @apply text-muted-foreground;
     font-size: 14px;
+    font-weight: 600;
+    color: var(--success);
+    background: var(--success-surface);
+    padding: 2px 8px;
+    border-radius: 6px;
+  }
+
+  .metric-change-negative {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--destructive);
+    background: var(--danger-surface);
+    padding: 2px 8px;
+    border-radius: 6px;
+  }
+
+  .metric-label {
+    font-size: 16px;
     font-weight: 500;
+    color: var(--text-primary);
   }
 
-  /* === SECTION LABELS (Academia Style) === */
+  .metric-comparison {
+    font-size: 14px;
+    font-weight: 400;
+    color: var(--text-tertiary);
+  }
+
+  /* === SECTION LABELS (Design System v2.1 §4.3) === */
   .section-label {
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    @apply text-muted-foreground;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    color: var(--text-tertiary);
+    /* Sentence case — NOT uppercase */
   }
+
   .section-label-accent {
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    @apply text-primary/70;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    color: var(--text-tertiary);
   }
 
-  /* === TRANSITIONS (Academia Motion System) === */
-  .transition-default {
-    transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+  /* === ICON CIRCLE (Design System v2.1 §5.3) === */
+  .icon-circle {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: var(--accent-surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary);
   }
 
-  .transition-fast {
-    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  /* === CHART CARD CONTAINER (Design System v2.1 §9.4) === */
+  .chart-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 28px;
   }
 
-  .transition-slow {
-    transition: all 0.44s cubic-bezier(0.25, 0.1, 0.25, 1);
-  }
-
-  .transition-color {
-    transition: color 0.8s cubic-bezier(0.25, 0.1, 0.25, 1);
-  }
-
-  /* === HOVER EFFECTS (Academy Premium) === */
-  .hover-lift {
-    transition: transform 0.3s cubic-bezier(0.25, 0.1, 0.25, 1),
-                box-shadow 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
-  }
-  .hover-lift:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-lg);
-  }
-
-  .hover-glow {
-    transition: box-shadow 0.4s ease;
-  }
-  .hover-glow:hover {
-    box-shadow: 0 0 20px oklch(0.72 0.17 148 / 0.15);
-  }
-
-  .hover-scale {
-    transition: transform 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
-  }
-  .hover-scale:hover {
-    transform: scale(1.02);
-  }
-  .hover-scale:active {
-    transform: scale(0.98);
-  }
-
-  /* === GRADIENT ACCENTS === */
-  .gradient-primary {
-    background: linear-gradient(135deg, oklch(0.53 0.2 142), oklch(0.62 0.19 145));
-  }
-
-  .gradient-glow {
-    background: linear-gradient(135deg, oklch(0.72 0.17 148 / 0.1), oklch(0.72 0.17 148 / 0.05));
-  }
-
-  .text-gradient {
-    background: linear-gradient(135deg, oklch(0.72 0.17 148), oklch(0.62 0.19 145));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-
-  /* === DIVIDERS === */
-  .divider-subtle {
-    height: 1px;
-    background: var(--border);
-  }
-
-  .divider-glow {
-    height: 1px;
-    background: linear-gradient(90deg, transparent, oklch(0.72 0.17 148 / 0.3), transparent);
-  }
-
-  /* === SCROLL REVEAL ANIMATION (Academia) === */
-  .reveal {
-    opacity: 0;
-    transform: translateY(20px);
-    transition: opacity 0.6s cubic-bezier(0, 0, 0.2, 1),
-                transform 0.6s cubic-bezier(0, 0, 0.2, 1);
-  }
-  .reveal.visible {
-    opacity: 1;
-    transform: translateY(0);
+  .chart-card-title {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
   }
 
   /* === DATE FILTER PILLS === */
@@ -618,31 +416,47 @@
     padding: 0 12px;
     height: 28px;
     border-radius: 9999px;
-    @apply text-foreground;
+    color: var(--foreground);
     background: transparent;
     border: none;
-    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: background 0.15s ease;
     cursor: pointer;
   }
   .date-pill:hover {
-    background: var(--surface-hover);
+    background: var(--bg-hover);
   }
   .date-pill-active {
     font-weight: 600;
     @apply bg-primary text-primary-foreground;
   }
 
-  /* === LOGO CAROUSEL (Academia Infinite Scroll) === */
+  /* === FLOATING APP SHELL (Design System v2.1 §2) === */
+  .app-shell {
+    min-height: calc(100vh - 24px);
+    background: var(--bg-card);
+    border-radius: 20px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .app-content {
+    background: var(--bg-primary);
+    flex: 1;
+    padding: 32px;
+  }
+
+  /* === FOCUS RING === */
+  .focus-ring {
+    @apply outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
+
+  /* === CAROUSEL === */
   .carousel-scroll {
     animation: scroll-infinite 30s linear infinite;
   }
   .carousel-scroll:hover {
     animation-play-state: paused;
-  }
-
-  /* === FOCUS RING (Apple HIG) === */
-  .focus-ring {
-    @apply outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
   }
 }
 
@@ -665,7 +479,6 @@
    SCROLLBAR
    ============================================================================ */
 
-/* Safe area for bottom nav on iOS */
 .safe-area-bottom {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -679,7 +492,6 @@
   scrollbar-width: none;
 }
 
-/* Custom scrollbar (Academia premium) */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -696,39 +508,48 @@
 }
 
 /* ============================================================================
-   RECHARTS OVERRIDES (Academia Premium)
+   RECHARTS OVERRIDES — CDR Design System v2.1 (§11)
+   Tooltip: ALWAYS dark bg, white text, radius 8px
    ============================================================================ */
 
 .recharts-default-tooltip {
-  background: var(--card) !important;
-  backdrop-filter: blur(20px) saturate(1.5) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(1.5) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: 12px !important;
-  box-shadow: var(--shadow-lg) !important;
+  background: #1F2937 !important;
+  border: none !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
   padding: 10px 14px !important;
 }
 
 .recharts-tooltip-label {
-  @apply !text-foreground !font-semibold !mb-1.5 !text-xs;
+  color: #FFFFFF !important;
+  font-weight: 400 !important;
+  font-size: 12px !important;
+  margin-bottom: 4px !important;
 }
 
 .recharts-tooltip-item {
-  @apply !text-[13px] !font-medium !py-0.5;
+  color: #FFFFFF !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  padding: 2px 0 !important;
 }
 
-.recharts-cartesian-grid-horizontal line,
-.recharts-cartesian-grid-vertical line {
+.recharts-cartesian-grid-horizontal line {
   stroke: var(--border) !important;
-  opacity: 0.3;
+  stroke-dasharray: 4 4 !important;
+}
+
+.recharts-cartesian-grid-vertical line {
+  display: none !important;
 }
 
 .recharts-legend-item-text {
-  @apply !text-muted-foreground !text-[13px];
+  color: var(--text-secondary) !important;
+  font-size: 13px !important;
 }
 
 /* ============================================================================
-   PLANO DE AÇÃO v2 — CDR Premium Presentation
+   PLANO DE ACAO v2 — CDR Premium Presentation
    Design system: cdrgroup.com.br exact match
    Font: Clash Display | Green: #BEFF0A | Background: #000
    ============================================================================ */

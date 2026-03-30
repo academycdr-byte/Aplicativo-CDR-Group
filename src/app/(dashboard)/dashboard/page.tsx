@@ -364,8 +364,8 @@ export default function DashboardPage() {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-foreground">Visão Geral</h2>
-          <p className="text-muted-foreground mt-1 text-[15px]">
+          <h2 className="text-[30px] font-bold tracking-[-0.02em] text-foreground">Visão Geral</h2>
+          <p className="text-muted-foreground mt-1 text-[14px]">
             Performance das suas campanhas em tempo real.
           </p>
         </div>
@@ -378,8 +378,8 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+      {/* KPI Cards — Design System v2.1 §5 */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <KPICard
           label="FATURAMENTO"
           value={fmtRevenue(stats?.generatedRevenue || 0)}
@@ -440,7 +440,7 @@ export default function DashboardPage() {
       {/* Main Chart + Calendar Section */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Performance Chart */}
-        <Card className="xl:col-span-2 border-border/40">
+        <Card className="xl:col-span-2 border-border rounded-[20px] shadow-none">
           <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between space-y-0 pb-4">
             <div className="space-y-1">
               <CardTitle>Performance</CardTitle>
@@ -637,7 +637,7 @@ export default function DashboardPage() {
         </Card>
 
         {/* Profit Calendar */}
-        <Card className="border-border/40">
+        <Card className="border-border rounded-[20px] shadow-none">
           <CardHeader>
             <CardTitle>Lucro Estimado</CardTitle>
             <CardDescription>{getMonthLabel()}</CardDescription>
@@ -658,8 +658,8 @@ export default function DashboardPage() {
       {/* Row: Funnel + Rates */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         {/* Funnel Visual */}
-        <Card className="border-border/40 overflow-hidden">
-          <CardHeader className="border-b border-border/40 bg-muted/20">
+        <Card className="border-border rounded-[20px] shadow-none overflow-hidden">
+          <CardHeader className="border-b border-border rounded-[20px] shadow-none bg-muted/20">
             <div className="flex items-center justify-between">
               <div className="space-y-1">
                 <CardTitle>Funil de Conversão</CardTitle>
@@ -743,38 +743,52 @@ function KPICard({ label, value, change, icon: Icon, trend, action, tag }: {
 }) {
   const isPositive = change && (change.startsWith("+") || trend === "up");
   const isNegative = change && (change.startsWith("-") || trend === "down");
+  const changeNum = change?.replace(/[^0-9.-]/g, "") || "0";
 
   return (
-    <Card className="border-border/40 hover:border-border/60 transition-colors duration-300" role="status" aria-label={`${label}${tag ? ` (${tag})` : ''}: ${value}`}>
-      <CardContent className="p-3 sm:p-5">
-        <div className="flex items-center justify-between mb-2 sm:mb-3">
+    <div
+      className="bg-card border border-border rounded-[20px] p-5 sm:p-7"
+      role="status"
+      aria-label={`${label}${tag ? ` (${tag})` : ""}: ${value}`}
+    >
+      {/* Row 1: icon + label + action */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: "var(--accent-surface)" }}>
+            <Icon className="w-[22px] h-[22px] text-primary" strokeWidth={1.8} />
+          </div>
           <div className="flex items-center gap-1.5">
-            <p className="text-[10px] sm:text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
+            <span className="text-[16px] font-medium text-foreground">{label}</span>
             {tag && (
-              <span className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500">
-                <CheckCircle className="w-2.5 h-2.5" aria-hidden="true" />
-                <span className="text-[9px] font-semibold uppercase tracking-wide leading-none">{tag}</span>
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wide" style={{ background: "var(--success-surface)", color: "var(--success)" }}>
+                <CheckCircle className="w-2.5 h-2.5" />
+                {tag}
               </span>
             )}
           </div>
-          {action}
         </div>
-        <h3 className="text-lg sm:text-[28px] font-bold tracking-tight text-foreground leading-none">{value}</h3>
-        <div className="flex items-center gap-1.5 mt-1.5 sm:mt-2">
-          {change && change !== "0%" && (
-            <span className={cn(
-              "text-[10px] sm:text-xs font-medium",
-              isPositive && "text-emerald-500",
-              isNegative && "text-red-400",
-              !isPositive && !isNegative && "text-muted-foreground"
-            )}>
-              {change}
-            </span>
-          )}
-          <span className="text-[10px] sm:text-xs text-muted-foreground/60 hidden sm:inline">vs período anterior</span>
-        </div>
-      </CardContent>
-    </Card>
+        {action}
+      </div>
+      {/* Row 2: KPI Value + Badge */}
+      <div className="flex items-end gap-3">
+        <h3 className="text-[28px] sm:text-[48px] font-bold leading-none tracking-[-0.02em] text-foreground" style={{ fontVariantNumeric: "tabular-nums" }}>
+          {value}
+        </h3>
+        {change && change !== "0%" && changeNum !== "0" && (
+          <span
+            className="text-[14px] font-semibold px-2 py-0.5 rounded-md mb-1 sm:mb-2"
+            style={{
+              background: isPositive ? "var(--success-surface)" : isNegative ? "var(--danger-surface)" : undefined,
+              color: isPositive ? "var(--success)" : isNegative ? "var(--destructive)" : "var(--muted-foreground)",
+            }}
+          >
+            {isPositive ? "↑" : isNegative ? "↓" : ""} {change}
+          </span>
+        )}
+      </div>
+      {/* Row 3: Comparison text */}
+      <p className="text-[14px] mt-2" style={{ color: "var(--text-tertiary)" }}>vs período anterior</p>
+    </div>
   );
 }
 
@@ -787,14 +801,14 @@ function RateCard({ title, value, subtext, progress, colorClass, icon: Icon }: {
   icon: React.ComponentType<{ className?: string }>;
 }) {
   return (
-    <Card className="border-border/40 flex flex-col justify-between p-5 sm:p-6" role="status" aria-label={`${title}: ${value}`}>
+    <Card className="border-border rounded-[20px] shadow-none flex flex-col justify-between p-5 sm:p-7" role="status" aria-label={`${title}: ${value}`}>
       <div className="flex items-center justify-between mb-4">
         <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{title}</span>
         <Icon className="w-4 h-4 text-muted-foreground/40" aria-hidden="true" />
       </div>
 
       <div className="space-y-3">
-        <div className="text-2xl sm:text-[28px] font-bold tracking-tight leading-none">{value}</div>
+        <div className="text-2xl sm:text-[36px] font-bold tracking-tight leading-none" style={{ fontVariantNumeric: "tabular-nums" }}>{value}</div>
 
         <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden" role="progressbar" aria-valuenow={Math.min(progress, 100)} aria-valuemin={0} aria-valuemax={100} aria-label={`${title} progresso`}>
           <div className={`h-full rounded-full transition-all duration-700 ease-out ${colorClass}`} style={{ width: `${Math.min(progress, 100)}%` }} />

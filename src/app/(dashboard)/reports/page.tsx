@@ -252,7 +252,7 @@ export default function ReportsPage() {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Relatórios</h2>
+          <h2 className="text-[30px] font-bold tracking-[-0.02em]">Relatórios</h2>
           <p className="text-muted-foreground text-sm mt-1">
             Envie relatórios de performance via WhatsApp para seus clientes.
           </p>
@@ -484,7 +484,7 @@ function CreateReportTab({ clients, onRefresh }: { clients: Client[]; onRefresh:
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
       {/* Left: Preview */}
-      <Card className="order-2 lg:order-1">
+      <Card className="order-2 lg:order-1 rounded-[20px] shadow-none border border-border">
         <CardHeader className="pb-3 sm:pb-6">
           <CardTitle className="text-base">Pré-visualização</CardTitle>
           <CardDescription className="hidden sm:block">Como a mensagem aparecerá no WhatsApp</CardDescription>
@@ -511,7 +511,7 @@ function CreateReportTab({ clients, onRefresh }: { clients: Client[]; onRefresh:
       </Card>
 
       {/* Right: Configuration */}
-      <Card className="order-1 lg:order-2">
+      <Card className="order-1 lg:order-2 rounded-[20px] shadow-none border border-border">
         <CardHeader className="pb-3 sm:pb-6">
           <CardTitle className="text-base">Configuração de Envio</CardTitle>
         </CardHeader>
@@ -1038,7 +1038,7 @@ function ClientsTab({ clients, onRefresh }: { clients: Client[]; onRefresh: () =
       </div>
 
       {/* Table */}
-      <Card>
+      <Card className="rounded-[20px] shadow-none border border-border">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
           <Table className="min-w-[700px]" aria-label="Lista de clientes">
@@ -1552,7 +1552,7 @@ function WhatsAppTab({ status: initialStatus, onRefresh }: { status: string; onR
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <Card>
+      <Card className="rounded-[20px] shadow-none border border-border">
         <CardHeader className="text-center">
           <CardTitle>Conexão WhatsApp Business</CardTitle>
           <CardDescription>
@@ -1705,7 +1705,7 @@ function SchedulesTab({
         </Dialog>
       </div>
 
-      <Card>
+      <Card className="rounded-[20px] shadow-none border border-border">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
           <Table className="min-w-[600px]" aria-label="Agendamentos de envio">
@@ -1857,7 +1857,7 @@ function HistoryTab({
         </div>
       </div>
 
-      <Card>
+      <Card className="rounded-[20px] shadow-none border border-border">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
           <Table className="min-w-[600px]" aria-label="Histórico de envios">

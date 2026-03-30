@@ -140,7 +140,7 @@ export default function FinancePage() {
         <div className="space-y-5 sm:space-y-6 animate-in fade-in duration-500">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h2 className="text-2xl font-bold tracking-tight">Financeiro</h2>
+                    <h2 className="text-[30px] font-bold tracking-[-0.02em]">Financeiro</h2>
                     <p className="text-muted-foreground text-sm mt-0.5">
                         Gestão de lucro líquido e unit economics.
                     </p>
@@ -155,7 +155,7 @@ export default function FinancePage() {
                 <div className="space-y-6">
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                         {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => (
-                            <Card key={i} className="border border-border/30 shadow-none rounded-lg p-5">
+                            <Card key={i} className="border border-border shadow-none rounded-[20px] p-5">
                                 <div className="animate-pulse space-y-3">
                                     <div className="h-3 w-20 bg-muted/40 rounded" />
                                     <div className="h-8 w-28 bg-muted/40 rounded" />
@@ -165,7 +165,7 @@ export default function FinancePage() {
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         {[1, 2, 3].map((i) => (
-                            <Card key={i} className="border border-border/30 shadow-none rounded-lg p-5">
+                            <Card key={i} className="border border-border shadow-none rounded-[20px] p-5">
                                 <div className="animate-pulse space-y-3">
                                     <div className="h-3 w-20 bg-muted/40 rounded" />
                                     <div className="h-8 w-28 bg-muted/40 rounded" />
@@ -256,7 +256,7 @@ export default function FinancePage() {
                             title="Lucro Líquido"
                             value={fmt(metrics.netProfit)}
                             icon={PieChart}
-                            className={metrics.netProfit >= 0 ? "border-emerald-500/20 bg-emerald-500/5" : "border-red-500/20 bg-red-500/5"}
+                            className={metrics.netProfit >= 0 ? "border-emerald-500/30 bg-emerald-500/5" : "border-red-500/30 bg-red-500/5"}
                             iconClass={metrics.netProfit >= 0 ? "bg-emerald-500/20 text-emerald-500" : "bg-red-500/20 text-red-500"}
                             valueClass={metrics.netProfit >= 0 ? "text-emerald-600" : "text-red-600"}
                         />
@@ -278,7 +278,7 @@ export default function FinancePage() {
                     </div>
 
                     {/* Profit Breakdown Bar */}
-                    <Card className="border border-border/40 shadow-none rounded-lg p-4 sm:p-6">
+                    <Card className="border border-border shadow-none rounded-[20px] p-4 sm:p-6">
                         <h3 className="text-sm font-medium text-muted-foreground mb-3 sm:mb-4">Composição da Receita</h3>
                         <div className="w-full h-7 sm:h-8 flex rounded-md overflow-hidden bg-secondary">
                             {cogsPct > 0 && (
@@ -335,7 +335,7 @@ export default function FinancePage() {
                     </Card>
 
                     {/* CMV Management Section - conditional based on cmvMethod */}
-                    <Card className="border border-border/40 shadow-none rounded-lg p-4 sm:p-6">
+                    <Card className="border border-border shadow-none rounded-[20px] p-4 sm:p-6">
                         {config.cmvMethod === "supplier_payments" ? (
                             <SupplierPaymentTable
                                 payments={supplierPayments}
@@ -371,7 +371,7 @@ export default function FinancePage() {
                     </Card>
 
                     {/* Manual Financial Entries Section */}
-                    <Card className="border border-border/40 shadow-none rounded-lg p-4 sm:p-6">
+                    <Card className="border border-border shadow-none rounded-[20px] p-4 sm:p-6">
                         <FinancialEntryTable
                             entries={financialEntries}
                             onUpdate={loadData}
@@ -393,7 +393,7 @@ function FinancialCard({ title, value, icon: Icon, className, iconClass, valueCl
     subText?: string;
 }) {
     return (
-        <Card className={cn("border border-border/40 shadow-none rounded-lg p-3 sm:p-5 transition-colors duration-300 hover:border-border/60", className)}>
+        <Card className={cn("border border-border rounded-[20px] shadow-none p-3 sm:p-5", className)}>
             <div className="flex items-center justify-between mb-1.5 sm:mb-2">
                 <span className="text-[10px] sm:text-[11px] uppercase tracking-wider font-medium text-muted-foreground leading-tight">{title}</span>
                 <div className={cn("w-5 h-5 sm:w-7 sm:h-7 rounded-full flex items-center justify-center shrink-0", iconClass)}>
@@ -401,7 +401,7 @@ function FinancialCard({ title, value, icon: Icon, className, iconClass, valueCl
                 </div>
             </div>
             <div>
-                <div className={cn("text-lg sm:text-2xl font-bold tracking-tight", valueClass)}>{value}</div>
+                <div className={cn("text-xl sm:text-2xl font-bold tracking-tight", valueClass)} style={{ fontVariantNumeric: "tabular-nums" }}>{value}</div>
                 {subText && <p className="text-[10px] sm:text-xs text-muted-foreground/60 mt-0.5 sm:mt-1">{subText}</p>}
             </div>
         </Card>

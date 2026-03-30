@@ -15,7 +15,7 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div>
-        <h2 className="text-2xl font-bold tracking-tight">Configurações</h2>
+        <h2 className="text-[30px] font-bold tracking-[-0.02em]">Configurações</h2>
         <p className="text-muted-foreground text-sm mt-1">
           Gerencie as configurações da sua conta e organização.
         </p>
@@ -24,7 +24,7 @@ export default function SettingsPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {settingsItems.map((item) => (
           <Link key={item.href} href={item.href}>
-            <Card className="h-full border-border/40 hover:border-border/60 transition-colors duration-300">
+            <Card className="h-full border border-border shadow-none rounded-[20px]">
               <CardContent className="pt-6">
                 <div className="flex items-start gap-4">
                   <div className="p-2.5 bg-secondary rounded-xl">

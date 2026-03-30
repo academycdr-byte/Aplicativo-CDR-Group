@@ -127,7 +127,7 @@ export default function OrdersPage() {
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Pedidos</h2>
+          <h2 className="text-[30px] font-bold tracking-[-0.02em]">Pedidos</h2>
           <p className="text-muted-foreground text-sm mt-0.5">
             Gerencie e acompanhe todos os pedidos.
           </p>
@@ -138,7 +138,7 @@ export default function OrdersPage() {
       </div>
 
       {/* Filters */}
-      <Card className="border border-border/40 hover:border-border/60 transition-colors duration-300 shadow-none rounded-lg">
+      <Card className="border border-border shadow-none rounded-[20px]">
         <CardContent className="p-4">
           <div className="flex flex-col lg:flex-row gap-4 items-end">
             <form onSubmit={handleSearch} className="flex gap-2 w-full lg:w-auto flex-1">
@@ -216,7 +216,7 @@ export default function OrdersPage() {
         </CardContent>
       </Card>
 
-      <Card className="border border-border/40 hover:border-border/60 transition-colors duration-300 shadow-none rounded-lg overflow-hidden">
+      <Card className="border border-border shadow-none rounded-[20px] overflow-hidden">
         {loading ? (
           <div className="p-6 space-y-4">
             {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
@@ -291,7 +291,7 @@ export default function OrdersPage() {
                         </TableCell>
                         <TableCell className="font-medium text-right relative">
                           <span className="text-xs text-muted-foreground absolute top-1/2 -translate-y-1/2 right-full mr-1">R$</span>
-                          {formatCurrency(order.totalAmount, order.currency).replace("R$", "").trim()}
+                          <span style={{ fontVariantNumeric: "tabular-nums" }}>{formatCurrency(order.totalAmount, order.currency).replace("R$", "").trim()}</span>
                         </TableCell>
                       </TableRow>
                     );

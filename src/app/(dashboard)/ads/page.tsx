@@ -512,7 +512,7 @@ export default function AdsPage() {
       : value;
 
     return (
-      <Card className="border border-border/40 shadow-none rounded-xl p-4 sm:p-5 hover:border-primary/30 transition-colors overflow-hidden">
+      <Card className="border border-border shadow-none rounded-[20px] p-4 sm:p-5 overflow-hidden">
         <div className="flex items-center justify-between mb-3">
           <span className="text-[10px] sm:text-[11px] uppercase tracking-wider font-medium text-muted-foreground truncate mr-2">{title}</span>
           <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center shrink-0 ${iconClass}`}>
@@ -520,7 +520,7 @@ export default function AdsPage() {
           </div>
         </div>
         <div className="min-w-0">
-          <div className="text-xl sm:text-2xl font-bold tracking-tight text-foreground truncate">
+          <div className="text-xl sm:text-2xl font-bold tracking-tight text-foreground truncate" style={{ fontVariantNumeric: "tabular-nums" }}>
             {prefix === "R$" ? displayValue : `${prefix}${displayValue}${suffix}`}
           </div>
           {prevTotals && (
@@ -559,7 +559,7 @@ export default function AdsPage() {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Anúncios</h2>
+          <h2 className="text-[30px] font-bold tracking-[-0.02em]">Anúncios</h2>
           <p className="text-muted-foreground text-sm mt-0.5">
             Gestão de performance Mídia Paga.
           </p>
@@ -600,7 +600,7 @@ export default function AdsPage() {
         <div className="space-y-6">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
             {[1, 2, 3, 4, 5, 6, 7].map((i) => (
-              <Card key={i} className="h-[110px] rounded-xl">
+              <Card key={i} className="h-[110px] rounded-[20px]">
                 <CardContent className="pt-5">
                   <div className="animate-pulse space-y-3">
                     <div className="h-3 w-16 bg-muted/40 rounded" />
@@ -610,8 +610,8 @@ export default function AdsPage() {
               </Card>
             ))}
           </div>
-          <Card className="h-80 rounded-xl">
-            <div className="animate-pulse h-full w-full bg-muted/10 rounded-xl" />
+          <Card className="h-80 rounded-[20px]">
+            <div className="animate-pulse h-full w-full bg-muted/10 rounded-[20px]" />
           </Card>
         </div>
       ) : (
@@ -631,8 +631,8 @@ export default function AdsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
         {/* Funnel - Left Side (or Top on mobile) */}
         <div className="lg:col-span-5 xl:col-span-4">
-          <Card className="h-full border border-border/40 shadow-none rounded-xl">
-            <CardHeader className="border-b border-border/50 px-4 sm:px-5 py-3 sm:py-4">
+          <Card className="h-full border border-border shadow-none rounded-[20px]">
+            <CardHeader className="border-b border-border px-4 sm:px-5 py-3 sm:py-4">
               <CardTitle className="text-base font-semibold">Funil de Vendas</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
@@ -652,8 +652,8 @@ export default function AdsPage() {
 
         {/* Main Chart - Right Side */}
         <div className="lg:col-span-7 xl:col-span-8">
-          <Card className="h-full flex flex-col border border-border/40 shadow-none rounded-xl">
-            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/50 px-4 sm:px-5 py-3 sm:py-4">
+          <Card className="h-full flex flex-col border border-border shadow-none rounded-[20px]">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border px-4 sm:px-5 py-3 sm:py-4">
               <CardTitle className="text-base font-semibold">Evolução Temporal</CardTitle>
               <Select value={chartMetric} onValueChange={(v) => setChartMetric(v as typeof chartMetric)}>
                 <SelectTrigger className="w-full sm:w-[180px] h-8 text-xs">
@@ -671,7 +671,7 @@ export default function AdsPage() {
               {dayData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%" aria-label="Gráfico de evolução temporal dos anúncios">
                   <LineChart data={dayData} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} opacity={0.15} />
+                    <CartesianGrid strokeDasharray="4 4" stroke="var(--border)" vertical={false} opacity={0.15} />
                     <XAxis
                       dataKey="date"
                       tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
@@ -808,7 +808,7 @@ export default function AdsPage() {
             .map((c) => (
               <Card
                 key={c.adId}
-                className={`group overflow-hidden cursor-pointer transition-colors duration-300 border border-border/40 hover:border-border/60 shadow-none rounded-xl border-l-4 ${c.roas >= 3 ? "border-l-emerald-500" : c.roas >= 1 ? "border-l-amber-500" : "border-l-red-500"
+                className={`group overflow-hidden cursor-pointer transition-colors duration-300 border border-border shadow-none rounded-[20px] border-l-4 ${c.roas >= 3 ? "border-l-emerald-500" : c.roas >= 1 ? "border-l-amber-500" : "border-l-red-500"
                   }`}
                 onClick={() => {
                   setSelectedCreative(c);
@@ -827,7 +827,7 @@ export default function AdsPage() {
               >
                 {/* Thumbnail */}
                 <div className="relative aspect-video bg-muted flex items-center justify-center overflow-hidden">
-                  <AdThumbnail src={c.thumbnailUrl || ""} alt="" fill className="object-cover transition-transform group-hover:scale-105" sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw" adId={c.adId} />
+                  <AdThumbnail src={c.thumbnailUrl || ""} alt="" fill className="object-cover" sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw" adId={c.adId} />
 
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex flex-col items-center justify-center gap-2">
                     <div className="w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm">
@@ -862,7 +862,7 @@ export default function AdsPage() {
                   </div>
 
                   {/* Primary Metrics */}
-                  <div className="flex items-end justify-between border-b border-border/50 pb-2">
+                  <div className="flex items-end justify-between border-b border-border pb-2">
                     <div className="min-w-0">
                       <p className="text-[10px] text-muted-foreground uppercase">Gasto</p>
                       <p className="font-semibold text-sm truncate">{fmt(c.spend)}</p>
@@ -890,7 +890,7 @@ export default function AdsPage() {
                       <p className="font-medium">{c.ctr.toFixed(2)}%</p>
                     </div>
 
-                    <div className="col-span-3 pt-1.5 flex justify-between border-t border-border/50 mt-1">
+                    <div className="col-span-3 pt-1.5 flex justify-between border-t border-border mt-1">
                       <span className="text-muted-foreground text-[11px]">Receita: <span className="text-foreground font-medium">{fmt(c.revenue)}</span></span>
                       <span className="text-muted-foreground text-[11px]">Conv: <span className="text-foreground font-medium">{c.conversions}</span></span>
                     </div>
@@ -916,8 +916,8 @@ export default function AdsPage() {
 
       {/* AdSet Performance Section */}
       {sortedAdSets.length > 0 && (
-      <Card className="border border-border/40 shadow-none rounded-xl">
-        <CardHeader className="flex flex-row items-center justify-between border-b border-border/50 px-5 py-4">
+      <Card className="border border-border shadow-none rounded-[20px]">
+        <CardHeader className="flex flex-row items-center justify-between border-b border-border px-5 py-4">
           <div className="flex items-center gap-2">
             <Users className="w-4 h-4 text-muted-foreground" />
             <CardTitle className="text-base font-semibold">Performance por Públicos</CardTitle>
@@ -927,7 +927,7 @@ export default function AdsPage() {
         <CardContent className="p-0 overflow-x-auto">
           <Table aria-label="Performance por públicos">
             <TableHeader>
-              <TableRow className="hover:bg-transparent border-b border-border/50">
+              <TableRow className="hover:bg-transparent border-b border-border">
                 <TableHead scope="col" className="w-[280px]">Público</TableHead>
                 <TableHead scope="col">Status</TableHead>
                 <TableHead scope="col" className="text-center">Anúncios</TableHead>
@@ -944,7 +944,7 @@ export default function AdsPage() {
               {sortedAdSets
                 .slice((adSetsPage - 1) * adSetsPerPage, adSetsPage * adSetsPerPage)
                 .map((s) => (
-                  <TableRow key={s.adSetId} className={`hover:bg-muted/30 border-b border-border/50 ${s.roas >= 3 ? "bg-emerald-500/5 hover:bg-emerald-500/10" : ""}`}>
+                  <TableRow key={s.adSetId} className={`hover:bg-muted/30 border-b border-border ${s.roas >= 3 ? "bg-emerald-500/5 hover:bg-emerald-500/10" : ""}`}>
                     <TableCell>
                       <div className="min-w-0 max-w-[260px]">
                         <p className="text-sm font-medium truncate" title={s.adSetName || ""}>{s.adSetName || "Sem Nome"}</p>
@@ -976,7 +976,7 @@ export default function AdsPage() {
           </Table>
 
           {sortedAdSets.length > adSetsPerPage && (
-            <div className="flex items-center justify-between px-4 py-4 border-t border-border/50">
+            <div className="flex items-center justify-between px-4 py-4 border-t border-border">
               <p className="text-xs text-muted-foreground">
                 Página {adSetsPage} de {Math.ceil(sortedAdSets.length / adSetsPerPage)}
               </p>
@@ -991,8 +991,8 @@ export default function AdsPage() {
       )}
 
       {/* Top Performers Section */}
-      <Card className="border border-border/40 shadow-none rounded-xl">
-        <CardHeader className="flex flex-row items-center justify-between border-b border-border/50 px-5 py-4">
+      <Card className="border border-border shadow-none rounded-[20px]">
+        <CardHeader className="flex flex-row items-center justify-between border-b border-border px-5 py-4">
           <CardTitle className="text-base font-semibold">Top 5 Anúncios (ROAS)</CardTitle>
           <div className="flex items-center space-x-2">
             <Label htmlFor="worst-mode" className="text-xs">Ver Piores</Label>
@@ -1000,7 +1000,7 @@ export default function AdsPage() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="space-y-0 divide-y divide-border/50">
+          <div className="space-y-0 divide-y divide-border">
             {(showWorstPerformers ? topCreatives.worst : topCreatives.best).map((c, idx) => (
               <div key={c.adId} className="flex items-center p-3 hover:bg-muted/30 transition-colors">
                 <span className="w-6 text-center text-muted-foreground text-sm font-medium mr-2">{idx + 1}</span>
@@ -1035,8 +1035,8 @@ export default function AdsPage() {
       </Card>
 
       {/* Detailed Table */}
-      <Card className="border border-border/40 shadow-none rounded-xl">
-        <CardHeader className="flex flex-row items-center justify-between border-b border-border/50 px-5 py-4">
+      <Card className="border border-border shadow-none rounded-[20px]">
+        <CardHeader className="flex flex-row items-center justify-between border-b border-border px-5 py-4">
           <CardTitle className="text-base font-semibold">Detalhamento Completo</CardTitle>
           <div className="flex items-center gap-2">
             <Switch
@@ -1050,7 +1050,7 @@ export default function AdsPage() {
         <CardContent className="p-0 overflow-x-auto">
           <Table aria-label="Detalhamento completo dos anúncios">
             <TableHeader>
-              <TableRow className="hover:bg-transparent border-b border-border/50">
+              <TableRow className="hover:bg-transparent border-b border-border">
                 <TableHead scope="col" className="w-[300px]">Anúncio</TableHead>
                 <TableHead scope="col">Status</TableHead>
                 <TableHead scope="col" className="text-right cursor-pointer hover:bg-muted/50" onClick={() => toggleSort("spend", metricsSortKey, metricsSortDir, setMetricsSortKey, setMetricsSortDir)} role="button" aria-label="Ordenar por gasto">Gasto <ArrowUpDown className="inline w-3 h-3 ml-1" aria-hidden="true" /></TableHead>
@@ -1066,7 +1066,7 @@ export default function AdsPage() {
               {sortedMetrics
                 .slice((metricsPage - 1) * metricsPerPage, metricsPage * metricsPerPage)
                 .map((m) => (
-                  <TableRow key={m.id} className={`hover:bg-muted/30 border-b border-border/50 ${m.roas >= 3 ? "bg-emerald-500/5 hover:bg-emerald-500/10" : ""}`}>
+                  <TableRow key={m.id} className={`hover:bg-muted/30 border-b border-border ${m.roas >= 3 ? "bg-emerald-500/5 hover:bg-emerald-500/10" : ""}`}>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         {m.thumbnailUrl && <AdThumbnail src={m.thumbnailUrl} alt="" width={32} height={32} className="rounded object-cover" />}
@@ -1091,7 +1091,7 @@ export default function AdsPage() {
 
           {/* Pagination */}
           {sortedMetrics.length > metricsPerPage && (
-            <div className="flex items-center justify-between px-4 py-4 border-t border-border/50">
+            <div className="flex items-center justify-between px-4 py-4 border-t border-border">
               <p className="text-xs text-muted-foreground">
                 Página {metricsPage} de {Math.ceil(sortedMetrics.length / metricsPerPage)}
               </p>

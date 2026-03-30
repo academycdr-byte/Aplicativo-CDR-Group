@@ -45,14 +45,14 @@ function KPICard({
   return (
     <Card
       className={cn(
-        "border border-border/40 hover:border-border/60 shadow-none rounded-lg p-3 sm:p-5 transition-colors duration-300",
+        "border border-border shadow-none rounded-[20px] p-3 sm:p-5",
         className
       )}
     >
       <span className="text-[10px] sm:text-[11px] uppercase tracking-wider font-medium text-muted-foreground leading-tight">
         {title}
       </span>
-      <div className={cn("text-lg sm:text-2xl font-bold tracking-tight mt-1", valueClass)}>
+      <div className={cn("text-lg sm:text-2xl font-bold tracking-tight mt-1", valueClass)} style={{ fontVariantNumeric: "tabular-nums" }}>
         {value}
       </div>
       {subText && (
@@ -136,7 +136,7 @@ export default function DREPerformancePage() {
     <div className="space-y-6 sm:space-y-8 animate-in fade-in duration-500">
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold tracking-tight text-foreground">Simulador de Rentabilidade</h2>
+        <h2 className="text-[30px] font-bold tracking-[-0.02em] text-foreground">Simulador de Rentabilidade</h2>
         <p className="text-muted-foreground mt-1 text-[15px]">
           Descubra sua margem real, o ROAS mínimo para lucrar e simule diferentes cenários de investimento.
         </p>
@@ -147,7 +147,7 @@ export default function DREPerformancePage() {
 
       {/* Hero Insight Banner - Apple HIG Alert Style */}
       <Card className={cn(
-        "border border-border/40 hover:border-border/60 shadow-none rounded-lg p-4 sm:p-5 backdrop-blur-sm transition-colors duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)]",
+        "border shadow-none rounded-[20px] p-4 sm:p-5",
         isHealthy
           ? "border-emerald-500/20 bg-emerald-500/[0.04]"
           : isWarning
@@ -199,7 +199,7 @@ export default function DREPerformancePage() {
               metrics.margemContribUnit >= 0
                 ? "text-emerald-600 dark:text-emerald-400"
                 : "text-red-600 dark:text-red-400"
-            )}>
+            )} style={{ fontVariantNumeric: "tabular-nums" }}>
               {formatBRL(metrics.margemContribUnit)}
             </p>
           </div>

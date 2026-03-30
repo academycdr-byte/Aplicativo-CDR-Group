@@ -89,10 +89,10 @@ export default function AdminPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <h2 className="text-2xl font-bold tracking-tight">Administração</h2>
+        <h2 className="text-[30px] font-bold tracking-[-0.02em]">Administração</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
-            <Card key={i}>
+            <Card key={i} className="rounded-[20px] shadow-none border border-border">
               <CardContent className="pt-5">
                 <div className="animate-pulse space-y-3">
                   <div className="h-4 w-24 bg-muted rounded" />
@@ -109,8 +109,8 @@ export default function AdminPage() {
   if (!stats) {
     return (
       <div className="space-y-6">
-        <h2 className="text-2xl font-bold tracking-tight">Administração</h2>
-        <Card>
+        <h2 className="text-[30px] font-bold tracking-[-0.02em]">Administração</h2>
+        <Card className="rounded-[20px] shadow-none border border-border">
           <CardContent className="py-16 text-center">
             <p className="text-muted-foreground">
               Você não tem permissão para acessar esta página.
@@ -124,7 +124,7 @@ export default function AdminPage() {
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div>
-        <h2 className="text-2xl font-bold tracking-tight">Administração</h2>
+        <h2 className="text-[30px] font-bold tracking-[-0.02em]">Administração</h2>
         <p className="text-muted-foreground text-sm mt-1">
           Visão geral do sistema e monitoramento de sincronizações.
         </p>
@@ -132,40 +132,40 @@ export default function AdminPage() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
+        <Card className="rounded-[20px] shadow-none border border-border">
           <CardContent className="pt-5">
             <div className="flex items-center justify-between mb-2">
               <p className="text-sm text-muted-foreground">Usuários</p>
               <Users className="w-4 h-4 text-muted-foreground" />
             </div>
-            <p className="text-2xl font-bold">{stats.totalUsers}</p>
+            <p className="text-2xl font-bold" style={{ fontVariantNumeric: "tabular-nums" }}>{stats.totalUsers}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="rounded-[20px] shadow-none border border-border">
           <CardContent className="pt-5">
             <div className="flex items-center justify-between mb-2">
               <p className="text-sm text-muted-foreground">Organizações</p>
               <Building2 className="w-4 h-4 text-muted-foreground" />
             </div>
-            <p className="text-2xl font-bold">{stats.totalOrganizations}</p>
+            <p className="text-2xl font-bold" style={{ fontVariantNumeric: "tabular-nums" }}>{stats.totalOrganizations}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="rounded-[20px] shadow-none border border-border">
           <CardContent className="pt-5">
             <div className="flex items-center justify-between mb-2">
               <p className="text-sm text-muted-foreground">Pedidos Totais</p>
               <ShoppingBag className="w-4 h-4 text-muted-foreground" />
             </div>
-            <p className="text-2xl font-bold">{stats.totalOrders}</p>
+            <p className="text-2xl font-bold" style={{ fontVariantNumeric: "tabular-nums" }}>{stats.totalOrders}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="rounded-[20px] shadow-none border border-border">
           <CardContent className="pt-5">
             <div className="flex items-center justify-between mb-2">
               <p className="text-sm text-muted-foreground">Integrações Ativas</p>
               <Link2 className="w-4 h-4 text-muted-foreground" />
             </div>
-            <p className="text-2xl font-bold">
+            <p className="text-2xl font-bold" style={{ fontVariantNumeric: "tabular-nums" }}>
               {stats.connectedIntegrations}/{stats.totalIntegrations}
             </p>
           </CardContent>
@@ -174,7 +174,7 @@ export default function AdminPage() {
 
       {/* Failed Syncs Alert */}
       {failedSyncs.length > 0 && (
-        <Card className="border-destructive/50">
+        <Card className="border-destructive/50 rounded-[20px] shadow-none">
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2 text-destructive">
               <AlertTriangle className="w-5 h-5" />
@@ -213,7 +213,7 @@ export default function AdminPage() {
       )}
 
       {/* Recent Sync Logs */}
-      <Card>
+      <Card className="rounded-[20px] shadow-none border border-border">
         <CardHeader>
           <CardTitle className="text-base">Histórico de sincronizações recentes</CardTitle>
         </CardHeader>

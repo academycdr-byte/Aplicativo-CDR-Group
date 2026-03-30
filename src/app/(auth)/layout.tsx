@@ -6,21 +6,17 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-background">
-      {/* Subtle Gradient Background */}
-      <div className="absolute inset-0 z-0">
-        <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-primary/10 blur-[160px]" />
-        <div className="absolute bottom-[-20%] right-[-10%] w-[40%] h-[40%] rounded-full bg-primary/5 blur-[160px]" />
-      </div>
-
-      <div className="w-full max-w-md relative z-10 px-6">
+    <div className="min-h-screen flex items-center justify-center bg-background px-4">
+      <div className="w-full max-w-md">
+        {/* Logo — CDR Design System v2.1 */}
         <div className="text-center mb-8 flex flex-col items-center">
-          <div className="relative w-16 h-16 mb-5">
+          <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center mb-4">
             <Image
-              src="/logo.png.png"
+              src="/logo-cdr.png"
               alt="CDR Group"
-              fill
-              className="object-contain"
+              width={32}
+              height={32}
+              className="rounded"
               priority
             />
           </div>

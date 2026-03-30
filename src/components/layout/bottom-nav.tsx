@@ -31,7 +31,7 @@ export function BottomNav() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 md:hidden border-t border-border/40 bg-background/80 backdrop-blur-xl safe-area-bottom"
+      className="fixed bottom-3 left-3 right-3 z-50 md:hidden border border-border bg-card rounded-2xl safe-area-bottom"
       aria-label="Navegação rápida"
     >
       <div className="flex items-center justify-around h-14 px-1">

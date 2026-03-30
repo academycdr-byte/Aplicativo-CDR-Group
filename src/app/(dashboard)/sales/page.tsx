@@ -76,7 +76,7 @@ export default function SalesPage() {
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Vendas</h2>
+          <h2 className="text-[30px] font-bold tracking-[-0.02em]">Vendas</h2>
           <p className="text-muted-foreground text-sm mt-1">
             Analise suas vendas em todas as plataformas.
           </p>
@@ -88,7 +88,7 @@ export default function SalesPage() {
         <div className="space-y-6">
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {[1, 2, 3].map((i) => (
-              <Card key={i} className="border-border/30">
+              <Card key={i} className="border-border rounded-[20px] shadow-none">
                 <CardContent className="p-3 sm:p-5">
                   <div className="animate-pulse space-y-3">
                     <div className="h-3 w-20 bg-muted/30 rounded" />
@@ -98,7 +98,7 @@ export default function SalesPage() {
               </Card>
             ))}
           </div>
-          <Card className="h-80 border-border/30">
+          <Card className="h-80 border-border rounded-[20px] shadow-none">
             <div className="animate-pulse h-full w-full bg-muted/10 rounded-lg" />
           </Card>
         </div>
@@ -106,28 +106,28 @@ export default function SalesPage() {
       <>
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-        <Card className="border-border/40 hover:border-border/60 transition-colors duration-300">
+        <Card className="border-border rounded-[20px] shadow-none">
           <CardContent className="p-3 sm:p-5">
             <p className="text-[10px] sm:text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-2 sm:mb-3">Receita Total</p>
-            <p className="text-lg sm:text-2xl font-bold tracking-tight">{fmt(stats?.totalRevenue || 0)}</p>
+            <p className="text-xl sm:text-[28px] font-bold tracking-tight" style={{ fontVariantNumeric: "tabular-nums" }}>{fmt(stats?.totalRevenue || 0)}</p>
           </CardContent>
         </Card>
-        <Card className="border-border/40 hover:border-border/60 transition-colors duration-300">
+        <Card className="border-border rounded-[20px] shadow-none">
           <CardContent className="p-3 sm:p-5">
             <p className="text-[10px] sm:text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-2 sm:mb-3">Total de Pedidos</p>
-            <p className="text-lg sm:text-2xl font-bold tracking-tight">{stats?.totalOrders || 0}</p>
+            <p className="text-xl sm:text-[28px] font-bold tracking-tight" style={{ fontVariantNumeric: "tabular-nums" }}>{stats?.totalOrders || 0}</p>
           </CardContent>
         </Card>
-        <Card className="border-border/40 hover:border-border/60 transition-colors duration-300">
+        <Card className="border-border rounded-[20px] shadow-none">
           <CardContent className="p-3 sm:p-5">
             <p className="text-[10px] sm:text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-2 sm:mb-3">Ticket Médio</p>
-            <p className="text-lg sm:text-2xl font-bold tracking-tight">{fmt(stats?.avgTicket || 0)}</p>
+            <p className="text-xl sm:text-[28px] font-bold tracking-tight" style={{ fontVariantNumeric: "tabular-nums" }}>{fmt(stats?.avgTicket || 0)}</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Revenue Over Time */}
-      <Card className="border-border/40">
+      <Card className="border-border rounded-[20px] shadow-none">
         <CardHeader>
           <CardTitle className="text-base">Receita ao longo do tempo</CardTitle>
         </CardHeader>
@@ -141,7 +141,7 @@ export default function SalesPage() {
                     <stop offset="100%" stopColor="var(--primary)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} opacity={0.3} />
+                <CartesianGrid strokeDasharray="4 4" stroke="var(--border)" vertical={false} opacity={0.3} />
                 <XAxis
                   dataKey="date"
                   tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
@@ -197,7 +197,7 @@ export default function SalesPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* By Platform */}
-        <Card>
+        <Card className="rounded-[20px] shadow-none border-border">
           <CardHeader>
             <CardTitle className="text-base">Vendas por plataforma</CardTitle>
           </CardHeader>
@@ -205,7 +205,7 @@ export default function SalesPage() {
             {stats && stats.byPlatform.length > 0 ? (
               <ResponsiveContainer width="100%" height={256} aria-label="Gráfico de vendas por plataforma">
                 <BarChart data={stats.byPlatform}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} opacity={0.3} />
+                  <CartesianGrid strokeDasharray="4 4" stroke="var(--border)" vertical={false} opacity={0.3} />
                   <XAxis
                     dataKey="platform"
                     tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
@@ -243,7 +243,7 @@ export default function SalesPage() {
         </Card>
 
         {/* By Status */}
-        <Card>
+        <Card className="rounded-[20px] shadow-none border-border">
           <CardHeader>
             <CardTitle className="text-base">Pedidos por status</CardTitle>
           </CardHeader>
@@ -251,7 +251,7 @@ export default function SalesPage() {
             {statusData.length > 0 ? (
               <ResponsiveContainer width="100%" height={256} aria-label="Gráfico de pedidos por status">
                 <BarChart data={statusData} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} opacity={0.3} />
+                  <CartesianGrid strokeDasharray="4 4" stroke="var(--border)" horizontal={false} opacity={0.3} />
                   <XAxis
                     type="number"
                     tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}

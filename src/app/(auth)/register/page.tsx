@@ -50,9 +50,9 @@ export default function RegisterPage() {
   }
 
   return (
-    <Card className="w-full border-white/10 bg-white/5 backdrop-blur-2xl shadow-2xl">
+    <Card className="w-full border-border rounded-[20px] shadow-none">
       <CardHeader className="text-center space-y-2 pb-6">
-        <div className="mx-auto w-12 h-12 rounded-2xl bg-secondary/30 flex items-center justify-center mb-2 ring-1 ring-white/10 shadow-glow">
+        <div className="mx-auto w-12 h-12 rounded-xl flex items-center justify-center mb-2" style={{ background: "var(--accent-surface)" }}>
           <UserPlus className="w-6 h-6 text-foreground" />
         </div>
         <CardTitle className="text-2xl font-bold tracking-tight">Crie sua conta</CardTitle>
@@ -119,7 +119,7 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          <Button type="submit" size="lg" className="w-full text-base font-semibold shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all duration-300" disabled={loading}>
+          <Button type="submit" size="lg" className="w-full text-base font-semibold rounded-[10px] shadow-none transition-colors duration-200" disabled={loading}>
             {loading ? (
               <>
                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />

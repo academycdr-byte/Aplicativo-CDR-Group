@@ -159,14 +159,14 @@ export default function ProfilePage() {
   return (
     <div className="space-y-6 max-w-2xl animate-in fade-in duration-500">
       <div>
-        <h2 className="text-2xl font-bold tracking-tight">Meu Perfil</h2>
+        <h2 className="text-[30px] font-bold tracking-[-0.02em]">Meu Perfil</h2>
         <p className="text-muted-foreground text-sm mt-1">
           Gerencie suas informações pessoais e senha.
         </p>
       </div>
 
       {/* Avatar Upload Card */}
-      <Card>
+      <Card className="rounded-[20px] shadow-none border border-border">
         <CardHeader>
           <CardTitle>Foto de perfil</CardTitle>
           <CardDescription>
@@ -230,7 +230,7 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="rounded-[20px] shadow-none border border-border">
         <CardHeader>
           <CardTitle>Informações pessoais</CardTitle>
           <CardDescription>Atualize seu nome e email.</CardDescription>
@@ -273,7 +273,7 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="rounded-[20px] shadow-none border border-border">
         <CardHeader>
           <CardTitle>Alterar senha</CardTitle>
           <CardDescription>

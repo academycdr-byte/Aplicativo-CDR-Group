@@ -143,14 +143,14 @@ export default function OrganizationPage() {
   return (
     <div className="space-y-6 max-w-3xl animate-in fade-in duration-500">
       <div>
-        <h2 className="text-2xl font-bold tracking-tight">Organização</h2>
+        <h2 className="text-[30px] font-bold tracking-[-0.02em]">Organização</h2>
         <p className="text-muted-foreground text-sm mt-1">
           Gerencie sua organização e equipe.
         </p>
       </div>
 
       {/* Organization Info */}
-      <Card>
+      <Card className="rounded-[20px] shadow-none border border-border">
         <CardHeader>
           <CardTitle>Dados da organização</CardTitle>
           <CardDescription>Nome e identificador da sua organização.</CardDescription>
@@ -193,7 +193,7 @@ export default function OrganizationPage() {
       </Card>
 
       {/* Members */}
-      <Card>
+      <Card className="rounded-[20px] shadow-none border border-border">
         <CardHeader>
           <CardTitle>Membros da equipe</CardTitle>
           <CardDescription>

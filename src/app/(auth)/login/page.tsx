@@ -107,7 +107,7 @@ export default function LoginPage() {
   }
 
   return (
-    <Card className="w-full border-border/40 backdrop-blur-xl shadow-xl">
+    <Card className="w-full border-border rounded-[20px] shadow-none">
       <CardHeader className="text-center space-y-2 pb-6">
         <CardTitle className="text-xl font-bold tracking-tight">Bem-vindo de volta</CardTitle>
         <CardDescription>
@@ -192,7 +192,7 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <Button type="submit" size="lg" className="w-full text-base font-semibold shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all duration-300" disabled={loading}>
+          <Button type="submit" size="lg" className="w-full text-base font-semibold rounded-[10px] shadow-none transition-colors duration-200" disabled={loading}>
             {loading ? (
               <>
                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />
