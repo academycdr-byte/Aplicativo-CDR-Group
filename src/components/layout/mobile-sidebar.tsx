@@ -104,9 +104,7 @@ export function MobileSidebar() {
       <SheetContent side="left" className="w-[85vw] max-w-72 p-0 bg-card text-foreground flex flex-col">
         <SheetHeader className="px-6 py-5">
           <SheetTitle className="flex items-center gap-3 text-foreground">
-            <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shrink-0">
-              <Image src="/logo-cdr.png" alt="CDR Group" width={24} height={24} className="rounded" />
-            </div>
+            <Image src="/logo-cdr.png" alt="CDR Group" width={36} height={36} className="rounded-xl shrink-0" />
             <p className="font-bold text-[15px]">CDR Group</p>
           </SheetTitle>
         </SheetHeader>

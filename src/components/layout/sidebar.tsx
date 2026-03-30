@@ -104,16 +104,14 @@ export function Sidebar() {
     >
       {/* Brand — Design System v2.1 §4.1 */}
       <div className="flex items-center gap-3 px-6 pt-6 pb-4">
-        <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shrink-0">
-          <Image
-            src="/logo-cdr.png"
-            alt="CDR Group"
-            width={24}
-            height={24}
-            className="rounded"
-            priority
-          />
-        </div>
+        <Image
+          src="/logo-cdr.png"
+          alt="CDR Group"
+          width={36}
+          height={36}
+          className="rounded-xl shrink-0"
+          priority
+        />
         <p className="font-bold text-[15px] text-foreground">CDR Group</p>
       </div>
 
