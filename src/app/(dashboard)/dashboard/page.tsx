@@ -378,63 +378,73 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* KPI Cards — 3+2 layout for readability */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <KPICard
-          label="FATURAMENTO"
-          value={fmtRevenue(stats?.generatedRevenue || 0)}
-          change={stats?.generatedRevenueChange || "0%"}
-          icon={BarChart}
-          trend="up"
-          tag="Gerado"
-          action={
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full -mr-1">
-                  <span className="sr-only">Trocar moeda</span>
-                  <span className="text-xs font-bold text-muted-foreground">{CURRENCIES[currency].symbol}</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {(Object.keys(CURRENCIES) as Currency[]).map((c) => (
-                  <DropdownMenuItem key={c} onClick={() => setCurrency(c)}>
-                    {CURRENCIES[c].label}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          }
-        />
-        <KPICard
-          label="FATURAMENTO"
-          value={fmtRevenue(stats?.revenue || 0)}
-          change={stats?.revenueChange || "0%"}
-          icon={TrendingUp}
-          trend="up"
-          tag="Pagos"
-        />
-        <KPICard
-          label="INVESTIMENTO"
-          value={fmtStandard(stats?.adSpend || 0)}
-          change={stats?.adSpendChange || "0%"}
-          icon={DollarSign}
-          trend="down"
-        />
-        <KPICard
-          label="PEDIDOS"
-          value={String(stats?.totalOrders || 0)}
-          change={stats?.ordersChange || "0%"}
-          icon={ShoppingBag}
-          trend="up"
-          tag="Pagos"
-        />
-        <KPICard
-          label="ROAS"
-          value={`${(stats?.roas || 0).toFixed(2)}x`}
-          change="0%" // TODO: Add real daily change if available
-          icon={Target}
-          trend="neutral"
-        />
+      {/* KPI Cards — Row 1: 3 cards, Row 2: 2 cards (50/50) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+        <div className="lg:col-span-2">
+          <KPICard
+            label="FATURAMENTO"
+            value={fmtRevenue(stats?.generatedRevenue || 0)}
+            change={stats?.generatedRevenueChange || "0%"}
+            icon={BarChart}
+            trend="up"
+            tag="Gerado"
+            action={
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full -mr-1">
+                    <span className="sr-only">Trocar moeda</span>
+                    <span className="text-xs font-bold text-muted-foreground">{CURRENCIES[currency].symbol}</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {(Object.keys(CURRENCIES) as Currency[]).map((c) => (
+                    <DropdownMenuItem key={c} onClick={() => setCurrency(c)}>
+                      {CURRENCIES[c].label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            }
+          />
+        </div>
+        <div className="lg:col-span-2">
+          <KPICard
+            label="FATURAMENTO"
+            value={fmtRevenue(stats?.revenue || 0)}
+            change={stats?.revenueChange || "0%"}
+            icon={TrendingUp}
+            trend="up"
+            tag="Pagos"
+          />
+        </div>
+        <div className="lg:col-span-2">
+          <KPICard
+            label="INVESTIMENTO"
+            value={fmtStandard(stats?.adSpend || 0)}
+            change={stats?.adSpendChange || "0%"}
+            icon={DollarSign}
+            trend="down"
+          />
+        </div>
+        <div className="lg:col-span-3">
+          <KPICard
+            label="PEDIDOS"
+            value={String(stats?.totalOrders || 0)}
+            change={stats?.ordersChange || "0%"}
+            icon={ShoppingBag}
+            trend="up"
+            tag="Pagos"
+          />
+        </div>
+        <div className="lg:col-span-3">
+          <KPICard
+            label="ROAS"
+            value={`${(stats?.roas || 0).toFixed(2)}x`}
+            change="0%"
+            icon={Target}
+            trend="neutral"
+          />
+        </div>
       </div>
 
       {/* Main Chart + Calendar Section */}
@@ -747,7 +757,7 @@ function KPICard({ label, value, change, icon: Icon, trend, action, tag }: {
 
   return (
     <div
-      className="bg-card border border-border rounded-[20px] p-4 sm:p-5"
+      className="bg-card border border-border rounded-[20px] p-4 sm:p-5 h-full"
       role="status"
       aria-label={`${label}${tag ? ` (${tag})` : ""}: ${value}`}
     >
