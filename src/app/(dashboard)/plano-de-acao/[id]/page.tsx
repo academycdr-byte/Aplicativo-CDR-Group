@@ -275,8 +275,6 @@ function TreeNodeEditor({
 
 // ─── Gap/Lever Section ────────────────────────────
 
-const FUNNEL_STAGES = ["Alcance", "Consideração", "Conversão", "Retenção", "Pós-venda"];
-
 function GapLeverSection({
   title,
   icon: Icon,
@@ -399,16 +397,13 @@ function GapLeverSection({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div>
                       <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1 block">Ponto do Funil</label>
-                      <select
+                      <input
+                        type="text"
                         value={item.funnelStage || ""}
                         onChange={(e) => updateItem(i, { ...item, funnelStage: e.target.value || undefined })}
-                        className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
-                      >
-                        <option value="">Selecione (opcional)</option>
-                        {FUNNEL_STAGES.map((s) => (
-                          <option key={s} value={s}>{s}</option>
-                        ))}
-                      </select>
+                        placeholder="Ex: Topo de Funil"
+                        className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm placeholder:text-muted-foreground/50"
+                      />
                     </div>
                     <div>
                       <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1 block">{impactLabel}</label>
