@@ -596,6 +596,9 @@ model ActionPlan {
   nextSteps      Json             @default("[]")
   sectionNotes   Json             @default("{}")
 
+  // Previous Plan's Next Steps (review/accountability)
+  previousSteps  Json             @default("[]")
+
   createdById    String
   createdBy      User             @relation(fields: [createdById], references: [id])
   organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)

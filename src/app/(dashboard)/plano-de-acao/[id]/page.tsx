@@ -51,6 +51,7 @@ import {
   type LeverNode,
   type TreeNode,
   type NextStep,
+  type PreviousStep,
   type SectionNotes,
 } from "@/actions/action-plan";
 
@@ -856,6 +857,146 @@ function NextStepsSection({
   );
 }
 
+// ─── Previous Steps Section (Review) ─────────────
+
+const COMPLETED_CONFIG = {
+  true: { label: "Concluído", icon: CheckCircle2, color: "text-emerald-400" },
+  false: { label: "Não Concluído", icon: Circle, color: "text-red-400" },
+};
+
+function PreviousStepsSection({
+  items,
+  onChange,
+  editable,
+}: {
+  items: PreviousStep[];
+  onChange: (items: PreviousStep[]) => void;
+  editable: boolean;
+}) {
+  const updateStep = (index: number, updated: PreviousStep) => {
+    const newItems = [...items];
+    newItems[index] = updated;
+    onChange(newItems);
+  };
+
+  if (items.length === 0) return null;
+
+  const completedCount = items.filter((s) => s.completed).length;
+
+  return (
+    <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-amber-500/5">
+        <div className="flex items-center gap-2">
+          <ClipboardList className="w-5 h-5 text-amber-400" />
+          <h3 className="font-semibold">Revisão do Plano Anterior</h3>
+          <span className="text-xs text-muted-foreground ml-1">
+            ({completedCount}/{items.length} concluídos)
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div
+            className="h-2 rounded-full bg-muted overflow-hidden"
+            style={{ width: "80px" }}
+          >
+            <div
+              className="h-full rounded-full bg-emerald-400 transition-all"
+              style={{
+                width: `${items.length > 0 ? (completedCount / items.length) * 100 : 0}%`,
+              }}
+            />
+          </div>
+          <span className="text-xs text-muted-foreground">
+            {items.length > 0 ? Math.round((completedCount / items.length) * 100) : 0}%
+          </span>
+        </div>
+      </div>
+
+      <div className="p-5 space-y-3">
+        {items.map((step, i) => (
+          <div
+            key={step.id}
+            className={`rounded-lg border p-4 transition-all ${
+              step.completed
+                ? "border-emerald-500/20 bg-emerald-500/5"
+                : "border-red-500/20 bg-red-500/5"
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              {editable ? (
+                <button
+                  onClick={() => updateStep(i, { ...step, completed: !step.completed })}
+                  className="mt-0.5 shrink-0"
+                  title={step.completed ? "Marcar como não concluído" : "Marcar como concluído"}
+                >
+                  {step.completed ? (
+                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                  ) : (
+                    <Circle className="w-5 h-5 text-red-400/50 hover:text-red-400 transition-colors" />
+                  )}
+                </button>
+              ) : (
+                step.completed ? (
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                ) : (
+                  <Circle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+                )
+              )}
+              <div className="flex-1 min-w-0">
+                <p
+                  className={`text-sm font-medium ${
+                    step.completed ? "text-emerald-300/80" : ""
+                  }`}
+                >
+                  {step.action}
+                </p>
+                <div className="flex flex-wrap items-center gap-3 mt-1.5">
+                  {step.responsible && (
+                    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                      <User className="w-3 h-3" />
+                      {step.responsible}
+                    </span>
+                  )}
+                  {step.deadline && (
+                    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                      <Calendar className="w-3 h-3" />
+                      {new Date(step.deadline + "T12:00:00").toLocaleDateString("pt-BR")}
+                    </span>
+                  )}
+                  <span
+                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border ${PRIORITY_CONFIG[step.priority]?.color || PRIORITY_CONFIG.media.color}`}
+                  >
+                    {PRIORITY_CONFIG[step.priority]?.label || "Média"}
+                  </span>
+                </div>
+                {/* Comment field */}
+                {editable ? (
+                  <div className="mt-3">
+                    <div className="relative">
+                      <MessageSquare className="absolute left-3 top-3 w-3.5 h-3.5 text-muted-foreground/40" />
+                      <textarea
+                        value={step.comment}
+                        onChange={(e) => updateStep(i, { ...step, comment: e.target.value })}
+                        placeholder="Adicionar comentário sobre este item..."
+                        rows={2}
+                        className="w-full pl-8 pr-3 py-2 rounded-lg border border-border bg-background text-sm placeholder:text-muted-foreground/50 resize-none"
+                      />
+                    </div>
+                  </div>
+                ) : step.comment ? (
+                  <div className="mt-2 flex items-start gap-2">
+                    <MessageSquare className="w-3.5 h-3.5 text-muted-foreground/40 shrink-0 mt-0.5" />
+                    <p className="text-xs text-muted-foreground italic">{step.comment}</p>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Top Items Table ──────────────────────────────
 
 function TopItemsTable<T extends Record<string, unknown>>({
@@ -1012,6 +1153,7 @@ export default function ActionPlanEditorPage() {
         gaps: plan.gaps,
         levers: plan.levers,
         nextSteps: plan.nextSteps,
+        previousSteps: plan.previousSteps,
         sectionNotes: plan.sectionNotes,
       });
       setHasChanges(false);
@@ -1061,6 +1203,9 @@ export default function ActionPlanEditorPage() {
         topCreatives: plan.topCreatives ?? undefined,
         gaps: plan.gaps,
         levers: plan.levers,
+        nextSteps: plan.nextSteps,
+        previousSteps: plan.previousSteps,
+        sectionNotes: plan.sectionNotes,
         status: "FINALIZED",
       });
       setPlan((prev) => (prev ? { ...prev, status: "FINALIZED" } : prev));
@@ -1639,6 +1784,15 @@ export default function ActionPlanEditorPage() {
         editable={!!canEdit}
         colorClass="bg-emerald-500/5"
       />
+
+      {/* Previous Steps Review */}
+      {(plan.previousSteps?.length ?? 0) > 0 && (
+        <PreviousStepsSection
+          items={plan.previousSteps || []}
+          onChange={(items) => update("previousSteps", items)}
+          editable={!!canEdit}
+        />
+      )}
 
       {/* Next Steps */}
       <NextStepsSection

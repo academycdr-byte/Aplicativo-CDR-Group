@@ -76,6 +76,16 @@ export type NextStep = {
   done: boolean;
 };
 
+export type PreviousStep = {
+  id: string;
+  action: string;
+  responsible: string;
+  deadline: string;
+  priority: "alta" | "media" | "baixa";
+  completed: boolean;
+  comment: string;
+};
+
 export type SectionNotes = {
   products?: string;
   collections?: string;
@@ -96,6 +106,7 @@ export type ActionPlanFull = {
   gaps: GapNode[];
   levers: LeverNode[];
   nextSteps: NextStep[];
+  previousSteps: PreviousStep[];
   sectionNotes: SectionNotes;
   createdAt: Date;
   updatedAt: Date;
@@ -185,6 +196,7 @@ export async function getActionPlan(planId: string) {
     gaps: (plan.gaps as GapNode[]) || [],
     levers: (plan.levers as LeverNode[]) || [],
     nextSteps: (plan.nextSteps as NextStep[]) || [],
+    previousSteps: (plan.previousSteps as PreviousStep[]) || [],
     sectionNotes: (plan.sectionNotes as SectionNotes) || {},
   } as ActionPlanFull;
 }
@@ -589,6 +601,31 @@ export async function createActionPlan(data: {
     periodEnd
   );
 
+  // Fetch previous plan's nextSteps for accountability review
+  let previousSteps: PreviousStep[] = [];
+  const previousPlan = await prisma.actionPlan.findFirst({
+    where: {
+      organizationId: ctx.organization.id,
+    },
+    orderBy: { createdAt: "desc" },
+    select: { nextSteps: true },
+  });
+
+  if (previousPlan && previousPlan.nextSteps) {
+    const prevNextSteps = previousPlan.nextSteps as NextStep[];
+    if (Array.isArray(prevNextSteps) && prevNextSteps.length > 0) {
+      previousSteps = prevNextSteps.map((step) => ({
+        id: step.id || Math.random().toString(36).substring(2, 9),
+        action: step.action,
+        responsible: step.responsible,
+        deadline: step.deadline,
+        priority: step.priority,
+        completed: step.done || false,
+        comment: "",
+      }));
+    }
+  }
+
   const plan = await prisma.actionPlan.create({
     data: {
       title: data.title,
@@ -600,6 +637,7 @@ export async function createActionPlan(data: {
       topProducts: topProducts as unknown as Prisma.JsonArray,
       topCollections: topCollections as unknown as Prisma.JsonArray,
       topCreatives: topCreatives as unknown as Prisma.JsonArray,
+      previousSteps: previousSteps as unknown as Prisma.JsonArray,
     },
   });
 
@@ -620,6 +658,7 @@ export async function updateActionPlan(
     gaps?: GapNode[];
     levers?: LeverNode[];
     nextSteps?: NextStep[];
+    previousSteps?: PreviousStep[];
     sectionNotes?: SectionNotes;
     status?: "DRAFT" | "FINALIZED";
   }
@@ -648,6 +687,8 @@ export async function updateActionPlan(
     updateData.levers = data.levers as unknown as Prisma.JsonArray;
   if (data.nextSteps !== undefined)
     updateData.nextSteps = data.nextSteps as unknown as Prisma.JsonArray;
+  if (data.previousSteps !== undefined)
+    updateData.previousSteps = data.previousSteps as unknown as Prisma.JsonArray;
   if (data.sectionNotes !== undefined)
     updateData.sectionNotes = data.sectionNotes as unknown as Prisma.JsonObject;
 
@@ -752,6 +793,7 @@ export async function getActionPlanByToken(token: string) {
     gaps: (plan.gaps as GapNode[]) || [],
     levers: (plan.levers as LeverNode[]) || [],
     nextSteps: (plan.nextSteps as NextStep[]) || [],
+    previousSteps: (plan.previousSteps as PreviousStep[]) || [],
     sectionNotes: (plan.sectionNotes as SectionNotes) || {},
     organization: plan.organization,
     createdBy: plan.createdBy,

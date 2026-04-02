@@ -10,6 +10,7 @@ import type {
   LeverNode,
   TreeNode,
   NextStep,
+  PreviousStep,
   SectionNotes,
 } from "@/actions/action-plan";
 import { CreativesSection } from "./creatives-section";
@@ -71,6 +72,7 @@ export default async function PublicPlanPage({ params }: PageProps) {
   const gaps = plan.gaps || [];
   const levers = plan.levers || [];
   const nextSteps = plan.nextSteps || [];
+  const previousSteps = (plan.previousSteps || []) as PreviousStep[];
   const sectionNotes = plan.sectionNotes || {};
 
   let sectionNum = 0;
@@ -559,10 +561,154 @@ export default async function PublicPlanPage({ params }: PageProps) {
         )}
 
         {/* ════════════════════════════════════════
+            SECTION — Revisão do Plano Anterior
+            ════════════════════════════════════════ */}
+        {previousSteps.length > 0 && (
+          <>
+            <div className="plan-divider" />
+            <ScrollReveal>
+              <section className="py-20 md:py-28 relative overflow-hidden">
+                <SectionGlow position="center" intensity={0.04} />
+                <div className="relative max-w-[960px] mx-auto px-6">
+                  <SectionHead
+                    num={`0${++sectionNum}`}
+                    title="Revisão do Plano Anterior"
+                  />
+                  <p
+                    className="-mt-4 mb-10"
+                    style={{ fontSize: "15px", color: `${MUTED}55` }}
+                  >
+                    Acompanhamento das ações definidas no último plano
+                  </p>
+
+                  {/* Progress bar */}
+                  {(() => {
+                    const completedCount = previousSteps.filter((s) => s.completed).length;
+                    const pct = Math.round((completedCount / previousSteps.length) * 100);
+                    return (
+                      <div className="mb-8">
+                        <div className="flex items-center justify-between mb-3">
+                          <span style={{ fontSize: "12px", fontWeight: 600, color: `${MUTED}66`, letterSpacing: "0.5px" }}>
+                            {completedCount} de {previousSteps.length} concluídos
+                          </span>
+                          <span
+                            style={{
+                              fontSize: "20px",
+                              fontWeight: 700,
+                              fontFamily: CLASH,
+                              color: pct >= 80 ? "#4ade80" : pct >= 50 ? "#fbbf24" : "#f87171",
+                            }}
+                          >
+                            {pct}%
+                          </span>
+                        </div>
+                        <div
+                          className="h-2 rounded-full overflow-hidden"
+                          style={{ background: "rgba(255,255,255,0.06)" }}
+                        >
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{
+                              width: `${pct}%`,
+                              background: pct >= 80 ? "#4ade80" : pct >= 50 ? "#fbbf24" : "#f87171",
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  <div className="space-y-4">
+                    {previousSteps.map((step: PreviousStep, i: number) => (
+                      <div
+                        key={step.id || i}
+                        className="plan-glow-card p-6"
+                        style={{
+                          borderLeft: `3px solid ${step.completed ? "#4ade80" : "#f87171"}`,
+                        }}
+                      >
+                        <div className="flex items-start gap-4">
+                          {step.completed ? (
+                            <svg className="w-5 h-5 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          ) : (
+                            <svg className="w-5 h-5 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <circle cx="12" cy="12" r="10" />
+                              <line x1="15" y1="9" x2="9" y2="15" />
+                              <line x1="9" y1="9" x2="15" y2="15" />
+                            </svg>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p style={{
+                              fontSize: "15px",
+                              fontWeight: 500,
+                              color: step.completed ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.6)",
+                              fontFamily: CLASH,
+                            }}>
+                              {step.action}
+                            </p>
+                            <div className="flex flex-wrap items-center gap-4 mt-2">
+                              {step.responsible && (
+                                <span style={{ fontSize: "12px", color: `${MUTED}66` }}>
+                                  👤 {step.responsible}
+                                </span>
+                              )}
+                              {step.deadline && (
+                                <span style={{ fontSize: "12px", color: `${MUTED}66` }}>
+                                  📅 {new Date(step.deadline + "T12:00:00").toLocaleDateString("pt-BR")}
+                                </span>
+                              )}
+                              <span
+                                className="inline-flex items-center px-2.5 py-0.5 rounded-full"
+                                style={{
+                                  fontSize: "10px",
+                                  fontWeight: 700,
+                                  letterSpacing: "0.5px",
+                                  textTransform: "uppercase" as const,
+                                  background: step.completed ? "rgba(74,222,128,0.12)" : "rgba(248,113,113,0.12)",
+                                  color: step.completed ? "#4ade80" : "#f87171",
+                                  border: `1px solid ${step.completed ? "rgba(74,222,128,0.2)" : "rgba(248,113,113,0.2)"}`,
+                                }}
+                              >
+                                {step.completed ? "Concluído" : "Pendente"}
+                              </span>
+                            </div>
+                            {step.comment && (
+                              <div
+                                className="mt-3 p-3 rounded-lg"
+                                style={{
+                                  background: "rgba(255,255,255,0.03)",
+                                  border: "1px solid rgba(255,255,255,0.06)",
+                                }}
+                              >
+                                <div className="flex items-start gap-2">
+                                  <svg className="w-3.5 h-3.5 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke={`${MUTED}55`} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                                  </svg>
+                                  <p style={{ fontSize: "13px", color: `${MUTED}77`, lineHeight: "1.5", fontStyle: "italic" }}>
+                                    {step.comment}
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </section>
+            </ScrollReveal>
+          </>
+        )}
+
+        {/* ════════════════════════════════════════
             SECTION — Próximos Passos
             ════════════════════════════════════════ */}
         {nextSteps.length > 0 && (
           <>
+            <div className="plan-divider" />
             <ScrollReveal>
               <section className="py-20 md:py-28 relative overflow-hidden">
                 <SectionGlow position="right" intensity={0.05} />
