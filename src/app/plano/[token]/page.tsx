@@ -255,7 +255,8 @@ export default async function PublicPlanPage({ params }: PageProps) {
                             : "Atenção"
                       }
                       accent={m.roas >= 3}
-                      change={m.changes?.roas}
+                      pointChange={m.changes?.roas != null ? m.roas - m.roas / (1 + m.changes.roas / 100) : null}
+                      pointSuffix="x"
                       icon="target"
                     />
                     <MC
@@ -277,7 +278,8 @@ export default async function PublicPlanPage({ params }: PageProps) {
                       value={`${fmtN(m.taxaPagamento ?? 0, 1)}%`}
                       sub={`${m.totalPedidos ?? 0} de ${m.totalPedidosGerados ?? 0} pedidos`}
                       accent={(m.taxaPagamento ?? 0) >= 70}
-                      change={m.changes?.taxaPagamento}
+                      pointChange={m.changes?.taxaPagamento != null ? (m.taxaPagamento ?? 0) - (m.taxaPagamento ?? 0) / (1 + m.changes.taxaPagamento / 100) : null}
+                      pointSuffix="pp"
                       icon="payment"
                     />
                   </div>
@@ -899,6 +901,8 @@ function MC({
   change,
   icon,
   invertChange,
+  pointChange,
+  pointSuffix,
 }: {
   label: string;
   value: string;
@@ -907,13 +911,27 @@ function MC({
   change?: number | null;
   icon?: string;
   invertChange?: boolean;
+  /** Absolute point change (e.g. +3.34 for ROAS, -10.7 for Taxa de Pagamento). When provided, shows this instead of % change. */
+  pointChange?: number | null;
+  /** Suffix for point change display (e.g. "x" for ROAS, "pp" for percentage points) */
+  pointSuffix?: string;
 }) {
-  const hasChange = change !== undefined && change !== null;
-  const wentUp = hasChange && change > 0;
-  const wentDown = hasChange && change < 0;
+  /* Use pointChange if provided, otherwise fall back to % change */
+  const displayChange = pointChange ?? change;
+  const hasChange = displayChange !== undefined && displayChange !== null;
+  const wentUp = hasChange && displayChange > 0;
+  const wentDown = hasChange && displayChange < 0;
   /* Color: for CPA, going UP is bad (red), going DOWN is good (green) */
   const isGood = invertChange ? wentDown : wentUp;
   const isBad = invertChange ? wentUp : wentDown;
+
+  /* Format the badge text */
+  const usePoints = pointChange !== undefined && pointChange !== null;
+  const badgeText = hasChange
+    ? usePoints
+      ? `${Math.abs(displayChange).toFixed(2)}${pointSuffix || ""}`
+      : `${Math.abs(displayChange).toFixed(1)}%`
+    : "";
 
   return (
     <div className="plan-metric">
@@ -947,7 +965,7 @@ function MC({
             }}
           >
             {wentUp ? "↑" : wentDown ? "↓" : "–"}
-            {Math.abs(change).toFixed(1)}%
+            {badgeText}
           </span>
         )}
       </div>
