@@ -411,16 +411,18 @@ async function aggregateMetrics(
 
   const topProductIds = sortedById.map(([id]) => id);
 
-  // Fetch product details from platform API (images + vendor)
+  // Fetch product details from platform API (images + vendor + collections)
   const productDetailsMap = new Map<string, { imageUrl: string; vendor: string; title: string }>();
+  const productCollectionsMap = new Map<string, string[]>();
 
   if (integration && topProductIds.length > 0) {
     try {
       if (integration.platform === "SHOPIFY" && integration.accessToken && integration.externalStoreId) {
         const accessToken = decrypt(integration.accessToken);
         const shop = integration.externalStoreId;
+        const apiVersion = process.env.SHOPIFY_API_VERSION || "2025-01";
         const idsParam = topProductIds.join(",");
-        const url = `https://${shop}/admin/api/${process.env.SHOPIFY_API_VERSION || "2025-01"}/products.json?ids=${idsParam}&fields=id,title,vendor,image,images`;
+        const url = `https://${shop}/admin/api/${apiVersion}/products.json?ids=${idsParam}&fields=id,title,vendor,image,images`;
         const response = await fetch(url, {
           headers: { "X-Shopify-Access-Token": accessToken, "Content-Type": "application/json" },
         });
@@ -434,14 +436,65 @@ async function aggregateMetrics(
             });
           }
         }
+
+        // Fetch REAL collections via Shopify GraphQL (handles both smart + custom)
+        try {
+          const gids = topProductIds.map(id => `"gid://shopify/Product/${id}"`).join(",");
+          const gqlRes = await fetch(
+            `https://${shop}/admin/api/${apiVersion}/graphql.json`,
+            {
+              method: "POST",
+              headers: {
+                "X-Shopify-Access-Token": accessToken,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                query: `{ nodes(ids: [${gids}]) { ... on Product { id collections(first: 10) { nodes { title } } } } }`,
+              }),
+            }
+          );
+          if (gqlRes.ok) {
+            const gqlData = await gqlRes.json();
+            for (const node of gqlData.data?.nodes || []) {
+              if (node?.id && node?.collections?.nodes) {
+                const numericId = String(node.id).replace("gid://shopify/Product/", "");
+                const names = (node.collections.nodes as { title: string }[])
+                  .map((c) => c.title)
+                  .filter(Boolean);
+                if (names.length > 0) {
+                  productCollectionsMap.set(numericId, names);
+                }
+              }
+            }
+          }
+        } catch (gqlErr) {
+          console.error("Failed to fetch Shopify collections via GraphQL:", gqlErr);
+        }
       } else if (integration.platform === "NUVEMSHOP") {
-        const products = await fetchNuvemshopProductsByIds(integration.id, topProductIds);
-        for (const p of products as NuvemshopProduct[]) {
+        const nuvemProducts = await fetchNuvemshopProductsByIds(integration.id, topProductIds);
+        for (const p of nuvemProducts as NuvemshopProduct[]) {
           productDetailsMap.set(String(p.id), {
             imageUrl: extractNuvemshopImageUrl(p.images?.[0]),
             vendor: p.brand || "",
             title: extractI18nName(p.name),
           });
+
+          // Extract REAL categories from Nuvemshop product data
+          const cats = (p as Record<string, unknown>).categories;
+          if (Array.isArray(cats) && cats.length > 0) {
+            const names = cats
+              .map((c: Record<string, unknown>) => {
+                if (typeof c === "object" && c !== null && c.name) {
+                  return extractI18nName(c.name);
+                }
+                if (typeof c === "string") return c;
+                return "";
+              })
+              .filter(Boolean);
+            if (names.length > 0) {
+              productCollectionsMap.set(String(p.id), names);
+            }
+          }
         }
       }
     } catch (err) {
@@ -478,23 +531,24 @@ async function aggregateMetrics(
     }
   }
 
-  // Build top 3 collections from vendor grouping
-  const vendorMap = new Map<string, { quantity: number; revenue: number }>();
+  // Build top 3 collections from REAL collection/category data
+  const collectionAggMap = new Map<string, { quantity: number; revenue: number }>();
   for (const [pid, sales] of salesById) {
-    const details = productDetailsMap.get(pid);
-    const vendor = details?.vendor;
-    if (vendor) {
-      const existing = vendorMap.get(vendor);
-      if (existing) {
-        existing.quantity += sales.quantity;
-        existing.revenue += sales.revenue;
-      } else {
-        vendorMap.set(vendor, { quantity: sales.quantity, revenue: sales.revenue });
+    const colNames = productCollectionsMap.get(pid);
+    if (colNames && colNames.length > 0) {
+      for (const name of colNames) {
+        const existing = collectionAggMap.get(name);
+        if (existing) {
+          existing.quantity += sales.quantity;
+          existing.revenue += sales.revenue;
+        } else {
+          collectionAggMap.set(name, { quantity: sales.quantity, revenue: sales.revenue });
+        }
       }
     }
   }
 
-  const topCollections: TopCollection[] = Array.from(vendorMap.entries())
+  const topCollections: TopCollection[] = Array.from(collectionAggMap.entries())
     .map(([name, data]) => ({ name, ...data }))
     .sort((a, b) => b.quantity - a.quantity)
     .slice(0, 3);
