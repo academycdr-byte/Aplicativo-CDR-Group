@@ -275,6 +275,8 @@ function TreeNodeEditor({
 
 // ─── Gap/Lever Section ────────────────────────────
 
+const FUNNEL_STAGES = ["Alcance", "Consideração", "Conversão", "Retenção", "Pós-venda"];
+
 function GapLeverSection({
   title,
   icon: Icon,
@@ -282,7 +284,7 @@ function GapLeverSection({
   onChange,
   editable,
   colorClass,
-  showSolutions = false,
+  type,
 }: {
   title: string;
   icon: React.ElementType;
@@ -290,8 +292,12 @@ function GapLeverSection({
   onChange: (items: (GapNode | LeverNode)[]) => void;
   editable: boolean;
   colorClass: string;
-  showSolutions?: boolean;
+  type: "gap" | "lever";
 }) {
+  const isGap = type === "gap";
+  const impactLabel = isGap ? "Custando (perda de receita)" : "Gerando a mais (receita)";
+  const impactPlaceholder = isGap ? "Ex: -R$ 8k/mês" : "Ex: +R$ 15k/mês";
+
   const addItem = () => {
     onChange([
       ...items,
@@ -356,6 +362,7 @@ function GapLeverSection({
         ) : (
           items.map((item, i) => (
             <div key={item.id} className="rounded-lg border border-border/50 p-4">
+              {/* Title row */}
               <div className="flex items-center gap-2 mb-3 group">
                 {editable && (
                   <GripVertical className="w-4 h-4 text-muted-foreground/30 shrink-0" />
@@ -371,7 +378,7 @@ function GapLeverSection({
                     <button
                       onClick={() => addRootToItem(i)}
                       className="p-1 rounded hover:bg-muted"
-                      title="Adicionar raiz"
+                      title="Adicionar sub-item"
                     >
                       <Plus className="w-3.5 h-3.5 text-muted-foreground" />
                     </button>
@@ -386,51 +393,81 @@ function GapLeverSection({
                 )}
               </div>
 
-              {/* Metrics fields */}
-              {editable && (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
-                  <input
-                    type="text"
-                    value={(item as GapNode).currentMetric || ""}
-                    onChange={(e) => updateItem(i, { ...item, currentMetric: e.target.value })}
-                    placeholder="Métrica atual (ex: CTR 1.2%)"
-                    className="px-3 py-2 rounded-lg border border-border bg-background text-sm placeholder:text-muted-foreground/50"
-                  />
-                  <input
-                    type="text"
-                    value={(item as GapNode).targetMetric || ""}
-                    onChange={(e) => updateItem(i, { ...item, targetMetric: e.target.value })}
-                    placeholder="Meta (ex: CTR 2.5%)"
-                    className="px-3 py-2 rounded-lg border border-border bg-background text-sm placeholder:text-muted-foreground/50"
-                  />
-                  <input
-                    type="text"
-                    value={(item as GapNode).financialImpact || ""}
-                    onChange={(e) => updateItem(i, { ...item, financialImpact: e.target.value })}
-                    placeholder="Impacto (ex: +R$ 15k/mês)"
-                    className="px-3 py-2 rounded-lg border border-border bg-background text-sm placeholder:text-muted-foreground/50"
-                  />
-                </div>
-              )}
-              {editable && (
-                <ImageUploadField
-                  value={(item as GapNode).imageUrl || ""}
-                  onChange={(url) => updateItem(i, { ...item, imageUrl: url })}
-                />
-              )}
+              {editable ? (
+                <div className="space-y-3">
+                  {/* Ponto do Funil + Impacto Financeiro */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1 block">Ponto do Funil</label>
+                      <select
+                        value={item.funnelStage || ""}
+                        onChange={(e) => updateItem(i, { ...item, funnelStage: e.target.value || undefined })}
+                        className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+                      >
+                        <option value="">Selecione (opcional)</option>
+                        {FUNNEL_STAGES.map((s) => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1 block">{impactLabel}</label>
+                      <input
+                        type="text"
+                        value={item.financialImpact || ""}
+                        onChange={(e) => updateItem(i, { ...item, financialImpact: e.target.value })}
+                        placeholder={impactPlaceholder}
+                        className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm placeholder:text-muted-foreground/50"
+                      />
+                    </div>
+                  </div>
 
-              {/* Solutions (gaps only) */}
-              {showSolutions && (editable || ((item as GapNode).solutions || []).filter(Boolean).length > 0) && (
-                <div className="mb-3">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Lightbulb className="w-4 h-4 text-amber-400" />
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      Soluções
-                    </span>
-                    {editable && (
+                  {/* Métrica Atual + Meta */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1 block">Métrica Atual</label>
+                      <input
+                        type="text"
+                        value={item.currentMetric || ""}
+                        onChange={(e) => updateItem(i, { ...item, currentMetric: e.target.value })}
+                        placeholder="Ex: CTR 1.2%"
+                        className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm placeholder:text-muted-foreground/50"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1 block">Métrica Meta</label>
+                      <input
+                        type="text"
+                        value={item.targetMetric || ""}
+                        onChange={(e) => updateItem(i, { ...item, targetMetric: e.target.value })}
+                        placeholder="Ex: CTR 2.5%"
+                        className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm placeholder:text-muted-foreground/50"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Descrição */}
+                  <div>
+                    <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1 block">Descrição</label>
+                    <textarea
+                      value={item.description || ""}
+                      onChange={(e) => updateItem(i, { ...item, description: e.target.value })}
+                      placeholder={isGap ? "Descreva o gap identificado..." : "Descreva a oportunidade de crescimento..."}
+                      rows={2}
+                      className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm placeholder:text-muted-foreground/50 resize-none"
+                    />
+                  </div>
+
+                  {/* Soluções Propostas */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Lightbulb className="w-4 h-4 text-amber-400" />
+                      <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                        Soluções Propostas
+                      </span>
                       <button
                         onClick={() => {
-                          const solutions = (item as GapNode).solutions || [];
+                          const solutions = item.solutions || [];
                           updateItem(i, { ...item, solutions: [...solutions, ""] });
                         }}
                         className="ml-auto p-1 rounded hover:bg-muted"
@@ -438,50 +475,77 @@ function GapLeverSection({
                       >
                         <Plus className="w-3.5 h-3.5 text-muted-foreground" />
                       </button>
-                    )}
-                  </div>
-                  {((item as GapNode).solutions || []).length === 0 ? (
-                    editable ? (
+                    </div>
+                    {(item.solutions || []).length === 0 ? (
                       <button
                         onClick={() => updateItem(i, { ...item, solutions: [""] })}
                         className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-dashed border-border text-xs text-muted-foreground hover:bg-muted/50 hover:border-muted-foreground/30 transition-colors"
                       >
                         <Lightbulb className="w-3.5 h-3.5" />
-                        Adicionar solução para este gap
+                        Adicionar solução proposta
                       </button>
-                    ) : null
-                  ) : (
-                    <div className="space-y-2">
-                      {((item as GapNode).solutions || []).map((sol, si) => (
-                        <div key={si} className="flex items-start gap-2 group/sol">
-                          <span className="mt-2.5 w-1.5 h-1.5 rounded-full bg-amber-400/60 shrink-0" />
-                          {editable ? (
-                            <>
-                              <input
-                                type="text"
-                                value={sol}
-                                onChange={(e) => {
-                                  const solutions = [...((item as GapNode).solutions || [])];
-                                  solutions[si] = e.target.value;
-                                  updateItem(i, { ...item, solutions });
-                                }}
-                                placeholder={`Solução ${si + 1}`}
-                                className="flex-1 px-3 py-2 rounded-lg border border-border bg-background text-sm placeholder:text-muted-foreground/50"
-                              />
-                              <button
-                                onClick={() => {
-                                  const solutions = ((item as GapNode).solutions || []).filter((_, k) => k !== si);
-                                  updateItem(i, { ...item, solutions });
-                                }}
-                                className="mt-1.5 p-1 rounded hover:bg-red-500/10 opacity-0 group-hover/sol:opacity-100 transition-opacity"
-                                title="Remover solução"
-                              >
-                                <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                              </button>
-                            </>
-                          ) : (
-                            <span className="text-sm py-1">{sol}</span>
-                          )}
+                    ) : (
+                      <div className="space-y-2">
+                        {(item.solutions || []).map((sol: string, si: number) => (
+                          <div key={si} className="flex items-start gap-2 group/sol">
+                            <span className="mt-2.5 w-1.5 h-1.5 rounded-full bg-amber-400/60 shrink-0" />
+                            <input
+                              type="text"
+                              value={sol}
+                              onChange={(e) => {
+                                const solutions = [...(item.solutions || [])];
+                                solutions[si] = e.target.value;
+                                updateItem(i, { ...item, solutions });
+                              }}
+                              placeholder={`Solução ${si + 1}`}
+                              className="flex-1 px-3 py-2 rounded-lg border border-border bg-background text-sm placeholder:text-muted-foreground/50"
+                            />
+                            <button
+                              onClick={() => {
+                                const solutions = (item.solutions || []).filter((_: string, k: number) => k !== si);
+                                updateItem(i, { ...item, solutions });
+                              }}
+                              className="mt-1.5 p-1 rounded hover:bg-red-500/10 opacity-0 group-hover/sol:opacity-100 transition-opacity"
+                              title="Remover solução"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Image */}
+                  <ImageUploadField
+                    value={item.imageUrl || ""}
+                    onChange={(url) => updateItem(i, { ...item, imageUrl: url })}
+                  />
+                </div>
+              ) : (
+                /* Read-only view */
+                <div className="space-y-2">
+                  {item.funnelStage && (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold border border-border bg-muted/50">
+                      {item.funnelStage}
+                    </span>
+                  )}
+                  {item.description && (
+                    <p className="text-sm text-muted-foreground">{item.description}</p>
+                  )}
+                  {(item.currentMetric || item.targetMetric || item.financialImpact) && (
+                    <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                      {item.currentMetric && <span>Atual: {item.currentMetric}</span>}
+                      {item.targetMetric && <span>→ Meta: {item.targetMetric}</span>}
+                      {item.financialImpact && <span className="text-primary font-medium">| {item.financialImpact}</span>}
+                    </div>
+                  )}
+                  {(item.solutions || []).filter(Boolean).length > 0 && (
+                    <div className="space-y-1">
+                      {(item.solutions || []).filter(Boolean).map((sol: string, si: number) => (
+                        <div key={si} className="flex items-start gap-2">
+                          <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-400/60 shrink-0" />
+                          <span className="text-sm">{sol}</span>
                         </div>
                       ))}
                     </div>
@@ -489,14 +553,7 @@ function GapLeverSection({
                 </div>
               )}
 
-              {!editable && ((item as GapNode).currentMetric || (item as GapNode).targetMetric) && (
-                <div className="flex items-center gap-3 mb-3 text-sm text-muted-foreground">
-                  {(item as GapNode).currentMetric && <span>Atual: {(item as GapNode).currentMetric}</span>}
-                  {(item as GapNode).targetMetric && <span>→ Meta: {(item as GapNode).targetMetric}</span>}
-                  {(item as GapNode).financialImpact && <span className="text-primary font-medium">| {(item as GapNode).financialImpact}</span>}
-                </div>
-              )}
-
+              {/* Tree children */}
               {item.children.map((child, j) => (
                 <TreeNodeEditor
                   key={child.id}
@@ -1780,7 +1837,7 @@ export default function ActionPlanEditorPage() {
         onChange={(items) => update("gaps", items as GapNode[])}
         editable={!!canEdit}
         colorClass="bg-red-500/5"
-        showSolutions
+        type="gap"
       />
 
       {/* Levers */}
@@ -1791,6 +1848,7 @@ export default function ActionPlanEditorPage() {
         onChange={(items) => update("levers", items as LeverNode[])}
         editable={!!canEdit}
         colorClass="bg-emerald-500/5"
+        type="lever"
       />
 
       {/* Previous Steps Review */}

@@ -1012,6 +1012,7 @@ function TC({
   const c = isGap ? "#FF4D4D" : G;
   const medal = MEDALS[index];
   const hasMetrics = item.currentMetric || item.targetMetric || item.financialImpact;
+  const hasSolutions = (item.solutions || []).filter(Boolean).length > 0;
 
   return (
     <div
@@ -1021,8 +1022,8 @@ function TC({
         background: `${c}06`,
       }}
     >
-      {/* Header: medal/number + title */}
-      <div className="flex items-center gap-4 mb-5">
+      {/* Header: medal/number + title + funnel badge */}
+      <div className="flex items-center gap-4 mb-3">
         {medal ? (
           <span className="text-2xl shrink-0">{medal}</span>
         ) : (
@@ -1039,30 +1040,75 @@ function TC({
             {String(index + 1).padStart(2, "0")}
           </span>
         )}
-        <h4
-          style={{
-            fontFamily: CLASH,
-            fontSize: "16px",
-            fontWeight: 500,
-            color: c,
-          }}
-        >
-          {item.title || `${isGap ? "Gap" : "Alavanca"} ${index + 1}`}
-        </h4>
+        <div className="flex-1 min-w-0">
+          <h4
+            style={{
+              fontFamily: CLASH,
+              fontSize: "16px",
+              fontWeight: 500,
+              color: c,
+            }}
+          >
+            {item.title || `${isGap ? "Gap" : "Alavanca"} ${index + 1}`}
+          </h4>
+        </div>
+        {item.funnelStage && (
+          <span
+            className="inline-flex items-center px-3 py-1 rounded-full shrink-0"
+            style={{
+              fontSize: "10px",
+              fontWeight: 700,
+              letterSpacing: "0.5px",
+              textTransform: "uppercase" as const,
+              background: `${c}12`,
+              color: `${c}CC`,
+              border: `1px solid ${c}25`,
+            }}
+          >
+            {item.funnelStage}
+          </span>
+        )}
       </div>
 
-      {/* Metrics bar: atual → meta → impacto */}
-      {hasMetrics && (
+      {/* Financial impact highlight */}
+      {item.financialImpact && (
         <div
-          className="grid gap-3 mb-5 p-4 rounded-xl"
+          className="flex items-center gap-2 mb-4 px-4 py-2.5 rounded-lg"
           style={{
-            gridTemplateColumns: item.financialImpact ? "1fr auto 1fr auto 1fr" : "1fr auto 1fr",
+            background: isGap ? "rgba(248,113,113,0.08)" : "rgba(74,222,128,0.08)",
+            border: `1px solid ${isGap ? "rgba(248,113,113,0.15)" : "rgba(74,222,128,0.15)"}`,
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={isGap ? "#f87171" : "#4ade80"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+          </svg>
+          <span style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "1px", textTransform: "uppercase" as const, color: `${MUTED}66` }}>
+            {isGap ? "Custando" : "Gerando a mais"}
+          </span>
+          <span style={{ fontSize: "16px", fontWeight: 700, color: isGap ? "#f87171" : "#4ade80", fontFamily: CLASH, marginLeft: "auto" }}>
+            {item.financialImpact}
+          </span>
+        </div>
+      )}
+
+      {/* Description */}
+      {item.description && (
+        <p className="mb-4" style={{ fontSize: "14px", lineHeight: "1.6", color: "rgba(255,255,255,0.65)" }}>
+          {item.description}
+        </p>
+      )}
+
+      {/* Metrics bar: atual → meta */}
+      {(item.currentMetric || item.targetMetric) && (
+        <div
+          className="flex items-center gap-3 mb-5 p-4 rounded-xl"
+          style={{
             background: "rgba(255,255,255,0.03)",
             border: `1px solid ${c}15`,
           }}
         >
           {item.currentMetric && (
-            <div className="text-center">
+            <div className="text-center flex-1">
               <p style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "1px", textTransform: "uppercase" as const, color: `${MUTED}55` }}>Atual</p>
               <p className="mt-1" style={{ fontSize: "15px", fontWeight: 600, color: "rgba(255,255,255,0.85)", fontFamily: CLASH }}>{item.currentMetric}</p>
             </div>
@@ -1075,27 +1121,16 @@ function TC({
             </div>
           )}
           {item.targetMetric && (
-            <div className="text-center">
+            <div className="text-center flex-1">
               <p style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "1px", textTransform: "uppercase" as const, color: `${c}88` }}>Meta</p>
               <p className="mt-1" style={{ fontSize: "15px", fontWeight: 700, color: c, fontFamily: CLASH }}>{item.targetMetric}</p>
-            </div>
-          )}
-          {item.financialImpact && item.targetMetric && (
-            <div className="flex items-center justify-center px-1">
-              <div style={{ width: "1px", height: "28px", background: `${c}20` }} />
-            </div>
-          )}
-          {item.financialImpact && (
-            <div className="text-center">
-              <p style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "1px", textTransform: "uppercase" as const, color: `${MUTED}55` }}>Impacto</p>
-              <p className="mt-1" style={{ fontSize: "15px", fontWeight: 700, color: isGap ? "#f87171" : "#4ade80", fontFamily: CLASH }}>{item.financialImpact}</p>
             </div>
           )}
         </div>
       )}
 
-      {/* Solutions (gaps only) */}
-      {isGap && (item as GapNode).solutions && (item as GapNode).solutions!.length > 0 && (
+      {/* Solutions (both gaps and levers) */}
+      {hasSolutions && (
         <div
           className="mb-5 p-4 rounded-xl"
           style={{
@@ -1120,7 +1155,7 @@ function TC({
             </p>
           </div>
           <div className="space-y-2">
-            {(item as GapNode).solutions!.filter(Boolean).map((sol, si) => (
+            {(item.solutions || []).filter(Boolean).map((sol, si) => (
               <div key={si} className="flex items-start gap-3">
                 <svg className="shrink-0 mt-1" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="20 6 9 17 4 12" />

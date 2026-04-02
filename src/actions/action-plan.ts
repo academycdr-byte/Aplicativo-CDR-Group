@@ -126,6 +126,8 @@ export type GapNode = {
   id: string;
   title: string;
   children: TreeNode[];
+  funnelStage?: string;
+  description?: string;
   currentMetric?: string;
   targetMetric?: string;
   financialImpact?: string;
@@ -137,10 +139,13 @@ export type LeverNode = {
   id: string;
   title: string;
   children: TreeNode[];
+  funnelStage?: string;
+  description?: string;
   currentMetric?: string;
   targetMetric?: string;
   financialImpact?: string;
   imageUrl?: string;
+  solutions?: string[];
 };
 
 // ─── List Action Plans ────────────────────────────
