@@ -1445,6 +1445,14 @@ export default function ActionPlanEditorPage() {
               editable={!!canEdit}
               onChange={(v) => updateMetric("ticketMedio", v)}
             />
+            <MetricCard
+              label="Taxa de Pagamento"
+              value={metrics.taxaPagamento ?? 0}
+              icon={CheckCircle2}
+              format="decimal"
+              editable={!!canEdit}
+              onChange={(v) => updateMetric("taxaPagamento", v)}
+            />
           </div>
         </motion.div>
       )}

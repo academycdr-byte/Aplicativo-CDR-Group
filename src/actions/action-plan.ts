@@ -29,7 +29,9 @@ export type PlanMetrics = {
   roas: number;
   cpa: number;
   ticketMedio: number;
+  taxaPagamento: number;
   totalPedidos: number;
+  totalPedidosGerados: number;
   totalConversoes: number;
   /** % change vs previous period (same duration) — optional for backwards compat */
   changes?: {
@@ -39,6 +41,7 @@ export type PlanMetrics = {
     roas: number | null;
     cpa: number | null;
     ticketMedio: number | null;
+    taxaPagamento: number | null;
   };
 };
 
@@ -242,10 +245,11 @@ async function aggregateMetrics(
   topCollections: TopCollection[];
   topCreatives: TopCreative[];
 }> {
-  // 1. Order metrics (Faturamento, Ticket Médio)
-  type OrderAgg = { paid_count: bigint; paid_revenue: number };
+  // 1. Order metrics (Faturamento, Ticket Médio, Taxa de Pagamento)
+  type OrderAgg = { paid_count: bigint; paid_revenue: number; total_count: bigint };
   const [orderAgg] = await prisma.$queryRaw<OrderAgg[]>`
     SELECT
+      COUNT(*) as total_count,
       COUNT(*) FILTER (WHERE status IN ('paid','partially_refunded')) as paid_count,
       COALESCE(SUM("totalAmount") FILTER (WHERE status IN ('paid','partially_refunded')), 0) as paid_revenue
     FROM orders
@@ -273,12 +277,14 @@ async function aggregateMetrics(
 
   const faturamento = Number(orderAgg?.paid_revenue || 0);
   const totalPedidos = Number(orderAgg?.paid_count || 0);
+  const totalPedidosGerados = Number(orderAgg?.total_count || 0);
   const investido = Number(adAgg?.total_spend || 0);
   const convertido = Number(adAgg?.total_revenue || 0);
   const totalConversoes = Number(adAgg?.total_conversions || 0);
   const roas = investido > 0 ? convertido / investido : 0;
   const cpa = totalConversoes > 0 ? investido / totalConversoes : 0;
   const ticketMedio = totalPedidos > 0 ? faturamento / totalPedidos : 0;
+  const taxaPagamento = totalPedidosGerados > 0 ? (totalPedidos / totalPedidosGerados) * 100 : 0;
 
   // ── Previous period (same duration, shifted back) ──
   const durationMs = periodEnd.getTime() - periodStart.getTime();
@@ -289,6 +295,7 @@ async function aggregateMetrics(
 
   const [prevOrderAgg] = await prisma.$queryRaw<OrderAgg[]>`
     SELECT
+      COUNT(*) as total_count,
       COUNT(*) FILTER (WHERE status IN ('paid','partially_refunded')) as paid_count,
       COALESCE(SUM("totalAmount") FILTER (WHERE status IN ('paid','partially_refunded')), 0) as paid_revenue
     FROM orders
@@ -310,12 +317,14 @@ async function aggregateMetrics(
 
   const pFat = Number(prevOrderAgg?.paid_revenue || 0);
   const pPed = Number(prevOrderAgg?.paid_count || 0);
+  const pPedGerados = Number(prevOrderAgg?.total_count || 0);
   const pInv = Number(prevAdAgg?.total_spend || 0);
   const pConv = Number(prevAdAgg?.total_revenue || 0);
   const pConvs = Number(prevAdAgg?.total_conversions || 0);
   const pRoas = pInv > 0 ? pConv / pInv : 0;
   const pCpa = pConvs > 0 ? pInv / pConvs : 0;
   const pTkt = pPed > 0 ? pFat / pPed : 0;
+  const pTxPag = pPedGerados > 0 ? (pPed / pPedGerados) * 100 : 0;
 
   const pct = (cur: number, prev: number) => prev > 0 ? ((cur - prev) / prev) * 100 : null;
 
@@ -326,7 +335,9 @@ async function aggregateMetrics(
     roas,
     cpa,
     ticketMedio,
+    taxaPagamento,
     totalPedidos,
+    totalPedidosGerados,
     totalConversoes,
     changes: {
       faturamento: pct(faturamento, pFat),
@@ -335,6 +346,7 @@ async function aggregateMetrics(
       roas: pct(roas, pRoas),
       cpa: pct(cpa, pCpa),
       ticketMedio: pct(ticketMedio, pTkt),
+      taxaPagamento: pct(taxaPagamento, pTxPag),
     },
   };
 
