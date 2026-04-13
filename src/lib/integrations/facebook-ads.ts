@@ -613,13 +613,12 @@ export async function syncFacebookAdsMetrics(
     };
 
     // PHASE 0: MANDATORY FRESHNESS (Today only — fast)
-    // Only fetch today for speed. Phase 1 re-syncs last 7 days (including yesterday).
-    // This keeps Phase 0 lightweight so Phase 1 can run within the time budget.
-    // OPTIMIZATION: Skip Phase 0 when resuming mid-Phase 1 (startDay > 1 or accountIndex > 0)
-    // to maximize time for completing the stuck phase.
-    // Skip Phase 0 freshness when resuming mid-phase to maximize time for completing the stuck phase
+    // ALWAYS runs regardless of cursor phase, except when resuming mid-Phase 1.
+    // FIX: Old condition `currentPhase <= 1` caused Phase 0 to be skipped entirely
+    // when cursor was at Phase 2+, leaving recent days with zero spend data.
     const isResuming = (startAccountIndex !== undefined && startAccountIndex > 0) || (startDay !== undefined && startDay > 1);
-    if (currentPhase <= 1 && !isResuming) {
+    const skipPhase0 = currentPhase === 1 && isResuming;
+    if (!skipPhase0) {
       console.log(`[Facebook Ads] Phase 0: Fetching today's data for freshness`);
 
       let tokenExpiredDetected = false;
@@ -710,6 +709,37 @@ export async function syncFacebookAdsMetrics(
       }
       return { error: errMsg, synced: totalSynced, hasMore: false };
     };
+
+    // ── FRESHNESS GUARD: When cursor is at Phase 2+, also sync last 7 days ──
+    // Phase 1 only runs when currentPhase <= 1. If cursor saved Phase 2/3/4/5,
+    // recent days (yesterday to 7 days ago) would never refresh until the full
+    // sync cycle completes — causing zero spend on the dashboard for recent days.
+    // This block prevents that data gap with a limited 15s time budget.
+    if (currentPhase > 1 && hasTimeLeft()) {
+      console.log(`[Facebook Ads] Freshness guard: syncing last 7 days (cursor at Phase ${currentPhase})`);
+      const freshnessStart = Date.now();
+      const freshnessBudgetMs = 15_000;
+      const hasFreshnessTime = () => Date.now() - freshnessStart < freshnessBudgetMs && hasTimeLeft();
+
+      for (const accountId of accountIds) {
+        if (!hasFreshnessTime()) break;
+        for (let d = 1; d <= 7; d++) {
+          if (!hasFreshnessTime()) break;
+          try {
+            const dayStr = daysAgo(d);
+            const result = await fetchAndSavePageByPage(
+              buildUrl(accountId, dayStr, dayStr),
+              accountId,
+              getBRLRate(accountId),
+            );
+            if (result.tokenExpired) return abortTokenExpired();
+            totalSynced += result.synced;
+          } catch {
+            // Non-fatal for freshness sync
+          }
+        }
+      }
+    }
 
     // PHASE 1: Last 7 days for ALL accounts (highest priority history)
     // Fetch DAY-BY-DAY instead of 7-day range to ensure each day completes
