@@ -1246,3 +1246,90 @@ export async function fetchShopifyCollections(integrationId: string): Promise<Sh
 
   return collections;
 }
+
+/**
+ * Busca o documento (CPF/CNPJ) de pedidos direto na Shopify.
+ *
+ * Existe porque a API REST usada no sync NÃO devolve esse dado: em loja
+ * brasileira o CPF fica em `localizationExtensions`, que só aparece no GraphQL.
+ * Sem ele a etiqueta não pode ser emitida.
+ *
+ * Recebe e devolve IDs numéricos (os mesmos guardados em `Order.externalOrderId`).
+ */
+export async function fetchShopifyOrderDocuments(
+  organizationId: string,
+  externalOrderIds: string[]
+): Promise<Map<string, string>> {
+  const encontrados = new Map<string, string>();
+  if (externalOrderIds.length === 0) return encontrados;
+
+  const integration = await prisma.integration.findUnique({
+    where: { organizationId_platform: { organizationId, platform: "SHOPIFY" } },
+  });
+
+  if (!integration?.accessToken || !integration.externalStoreId) return encontrados;
+
+  const accessToken = decrypt(integration.accessToken);
+  const shop = integration.externalStoreId;
+
+  // a Shopify limita o lote de nós por consulta; 20 é folgado e seguro
+  const lotes: string[][] = [];
+  for (let i = 0; i < externalOrderIds.length; i += 20) {
+    lotes.push(externalOrderIds.slice(i, i + 20));
+  }
+
+  for (const lote of lotes) {
+    const gids = lote.map((id) => `gid://shopify/Order/${id}`);
+    const query = `
+      query($ids: [ID!]!) {
+        nodes(ids: $ids) {
+          ... on Order {
+            id
+            localizationExtensions(first: 5) {
+              nodes { purpose value }
+            }
+          }
+        }
+      }`;
+
+    try {
+      const resposta = await fetch(
+        `https://${shop}/admin/api/${SHOPIFY_API_VERSION}/graphql.json`,
+        {
+          method: "POST",
+          headers: {
+            "X-Shopify-Access-Token": accessToken,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ query, variables: { ids: gids } }),
+          cache: "no-store",
+        }
+      );
+
+      if (!resposta.ok) {
+        console.warn("[shopify] falha ao buscar documentos:", resposta.status);
+        continue;
+      }
+
+      const dados = await resposta.json();
+      const nos = dados?.data?.nodes;
+      if (!Array.isArray(nos)) continue;
+
+      for (const no of nos) {
+        if (!no?.id) continue;
+        const numero = String(no.id).split("/").pop() ?? "";
+        const extensoes = no.localizationExtensions?.nodes ?? [];
+        const doc = extensoes.find(
+          (e: { purpose?: string; value?: string }) =>
+            e?.value && /tax/i.test(String(e.purpose ?? ""))
+        );
+        const valor = (doc?.value ?? extensoes[0]?.value ?? "").replace(/\D/g, "");
+        if (numero && valor) encontrados.set(numero, valor);
+      }
+    } catch (e) {
+      console.warn("[shopify] erro ao buscar documentos", e);
+    }
+  }
+
+  return encontrados;
+}

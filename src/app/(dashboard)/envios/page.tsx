@@ -33,6 +33,7 @@ import {
   Truck,
   X,
 } from "lucide-react";
+import { EditarEntrega } from "./editar-entrega";
 import {
   cotarPedidos,
   enviarPedidoParaMelhorEnvio,
@@ -70,6 +71,7 @@ export default function EnviosPage() {
   const [cotacoes, setCotacoes] = useState<Map<string, CotacaoDoPedido>>(new Map());
   const [cotando, setCotando] = useState(false);
   const [erroCotacao, setErroCotacao] = useState<string | null>(null);
+  const [editando, setEditando] = useState<PedidoParaEnvio | null>(null);
   const [enviando, setEnviando] = useState<string | null>(null);
   const [enviados, setEnviados] = useState<Map<string, string>>(new Map());
 
@@ -387,9 +389,15 @@ export default function EnviosPage() {
 
                             <TableCell>
                               <p className="font-medium">{pedido.cliente.nome ?? "Sem nome"}</p>
-                              <p className="text-xs text-muted-foreground">
+                              <button
+                                type="button"
+                                onClick={() => setEditando(pedido)}
+                                className="text-xs text-muted-foreground hover:text-foreground underline decoration-dotted underline-offset-2"
+                                title="Corrigir os dados de entrega"
+                              >
                                 {pedido.cliente.documento ?? "sem CPF"}
-                              </p>
+                                {pedido.corrigido ? " · corrigido" : ""}
+                              </button>
                             </TableCell>
 
                             <TableCell className="max-w-[260px]">
@@ -616,6 +624,14 @@ export default function EnviosPage() {
             </CardContent>
           </Card>
         </>
+      )}
+      {editando && (
+        <EditarEntrega
+          pedido={editando}
+          aberto={editando !== null}
+          onFechar={() => setEditando(null)}
+          onSalvo={carregar}
+        />
       )}
     </div>
   );
