@@ -150,8 +150,9 @@ export default function EnviosPage() {
             mensagem: r.mensagem,
             servico: `${opcao.transportadora} ${opcao.servico}`,
             preco: opcao.preco,
-            motivo: "escolhido por você",
+            motivo: "foi você que escolheu",
             protocolo: r.protocolo ?? null,
+            jaEstava: false,
           },
         ]);
         // o aviso de saldo zerado vem junto da confirmação e precisa aparecer
@@ -191,20 +192,30 @@ export default function EnviosPage() {
     }
   };
 
+  /**
+   * A sincronia com a Shopify leva dezenas de segundos. Se o lojista digitar
+   * uma busca no meio, a resposta atrasada não pode sobrescrever o resultado
+   * filtrado, então só a requisição mais nova tem permissão de escrever.
+   */
+  const requisicao = useRef(0);
+
   const carregar = useCallback(async () => {
+    const minhaVez = ++requisicao.current;
     setCarregando(true);
     try {
       const resultado = await getPedidosParaEnvio({ busca: buscaAplicada || undefined });
+      if (minhaVez !== requisicao.current) return;
       setPedidos(resultado.pedidos);
       setErro(resultado.erro);
       setSemIntegracao(resultado.semIntegracao);
       setSelecionados(new Set());
     } catch {
       // queda de rede ou deploy novo no meio da chamada
+      if (minhaVez !== requisicao.current) return;
       setPedidos([]);
       setErro("Não foi possível falar com o servidor. Tente atualizar.");
     } finally {
-      setCarregando(false);
+      if (minhaVez === requisicao.current) setCarregando(false);
     }
   }, [buscaAplicada]);
 
@@ -214,20 +225,24 @@ export default function EnviosPage() {
    * repetido para uma coisa só.
    */
   const atualizar = useCallback(async () => {
+    const minhaVez = ++requisicao.current;
     setSincronizando(true);
     setAvisoSincronia(null);
     try {
       const resultado = await atualizarPedidosParaEnvio({ busca: buscaAplicada || undefined });
+      if (minhaVez !== requisicao.current) return;
       setPedidos(resultado.pedidos);
       setErro(resultado.erro);
       setSemIntegracao(resultado.semIntegracao);
       setAvisoSincronia(resultado.avisoDeSincronia);
       setSelecionados(new Set());
     } catch {
-      setErro("Não foi possível falar com o servidor. Tente de novo.");
+      if (minhaVez === requisicao.current) {
+        setErro("Não foi possível falar com o servidor. Tente de novo.");
+      }
     } finally {
       setSincronizando(false);
-      setCarregando(false);
+      if (minhaVez === requisicao.current) setCarregando(false);
     }
   }, [buscaAplicada]);
 
@@ -604,7 +619,7 @@ export default function EnviosPage() {
                             <TableCell className="text-right">
                               {resultados.get(pedido.id)?.ok ? (
                                 <span className="text-xs text-muted-foreground">
-                                  {resultados.get(pedido.id)!.servico}
+                                  {resultados.get(pedido.id)!.servico ?? "já estava lá"}
                                 </span>
                               ) : pedido.pendencias.length > 0 ? (
                                 <TooltipProvider>
@@ -655,7 +670,9 @@ export default function EnviosPage() {
                                         : "border-destructive/40 bg-destructive/10 text-destructive"
                                     }`}
                                   >
-                                    {resultados.get(pedido.id)!.ok ? (
+                                    {resultados.get(pedido.id)!.jaEstava ? (
+                                      resultados.get(pedido.id)!.mensagem
+                                    ) : resultados.get(pedido.id)!.ok ? (
                                       <>
                                         Enviado para o carrinho do Melhor Envio por{" "}
                                         <strong>{resultados.get(pedido.id)!.servico}</strong>
@@ -667,7 +684,9 @@ export default function EnviosPage() {
                                           : ""}
                                         .{" "}
                                         <span className="text-muted-foreground">
-                                          Escolhido por ser o {resultados.get(pedido.id)!.motivo}.
+                                          {resultados.get(pedido.id)!.motivo
+                                            ? `Escolhido porque ${resultados.get(pedido.id)!.motivo}. `
+                                            : ""}
                                           Pague e imprima lá, junto com os outros pedidos do dia.
                                         </span>
                                       </>

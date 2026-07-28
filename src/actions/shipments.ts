@@ -531,7 +531,27 @@ const MAXIMO_POR_COTACAO = 20;
  * Teto por clique no despacho. Cada pedido custa uma cotação mais um envio,
  * então o lote é menor que o da cotação para caber no tempo da requisição.
  */
-const MAXIMO_POR_DESPACHO = 10;
+const MAXIMO_POR_DESPACHO = 8;
+
+/**
+ * Quantos pedidos despachar ao mesmo tempo. Cada um faz três ou quatro
+ * chamadas ao Melhor Envio, e disparar tudo de uma vez é pedir bloqueio por
+ * excesso de requisição.
+ */
+const CONCORRENCIA_DESPACHO = 4;
+
+/** Roda a tarefa em grupos, para não disparar tudo de uma vez contra a API. */
+async function emLotes<T, R>(
+  itens: T[],
+  tamanho: number,
+  tarefa: (item: T) => Promise<R>
+): Promise<R[]> {
+  const saida: R[] = [];
+  for (let i = 0; i < itens.length; i += tamanho) {
+    saida.push(...(await Promise.all(itens.slice(i, i + tamanho).map(tarefa))));
+  }
+  return saida;
+}
 
 /**
  * Cota o frete dos pedidos escolhidos. Cotação não gasta saldo: só consulta preço.
@@ -695,19 +715,39 @@ function escolherFrete(
   const maisBarato = opcoes.reduce((a, b) => (b.preco < a.preco ? b : a));
 
   const titulo = fretePago?.titulo;
-  if (titulo) {
-    const alvo = chaveDeTexto(titulo);
-    // do nome mais específico para o mais genérico, para "Correios PAC Mini"
-    // não ser confundido com "Correios PAC"
+  const alvo = titulo ? chaveDeTexto(titulo) : "";
+
+  // Alvo curto demais ("a", "ok") casaria com qualquer coisa por acaso.
+  if (alvo.length >= 3) {
+    /**
+     * O nome do frete na loja pode ser maior ou menor que o do Melhor Envio:
+     * "Correios PAC (Melhor Envio) (0.5 kg)" contém o serviço inteiro, mas
+     * "PAC" está contido nele. Os dois valem, com preferência nesta ordem:
+     * nome idêntico, depois título que contém o serviço (do mais específico
+     * para o mais genérico, para "PAC Mini" não virar "PAC"), e por último
+     * serviço que contém o título (do mais curto, que é o mais próximo).
+     */
+    const pontuar = (nome: string) => {
+      if (nome === alvo) return { nivel: 3, distancia: 0 };
+      if (alvo.includes(nome)) return { nivel: 2, distancia: alvo.length - nome.length };
+      if (nome.includes(alvo)) return { nivel: 1, distancia: nome.length - alvo.length };
+      return null;
+    };
+
     const candidatos = opcoes
-      .map((o) => ({ opcao: o, nome: chaveDeTexto(`${o.transportadora} ${o.servico}`) }))
-      .filter((c) => c.nome.length > 0 && alvo.includes(c.nome))
-      .sort((a, b) => b.nome.length - a.nome.length);
+      .map((o) => ({
+        opcao: o,
+        peso: pontuar(chaveDeTexto(`${o.transportadora} ${o.servico}`)),
+      }))
+      .filter((c): c is { opcao: OpcaoFrete; peso: { nivel: number; distancia: number } } =>
+        c.peso !== null
+      )
+      .sort((a, b) => b.peso.nivel - a.peso.nivel || a.peso.distancia - b.peso.distancia);
 
     if (candidatos[0]) {
       return {
         opcao: candidatos[0].opcao,
-        motivo: `mesmo serviço que o cliente escolheu no checkout (${titulo})`,
+        motivo: `é o mesmo serviço que o cliente escolheu no checkout (${titulo})`,
       };
     }
   }
@@ -715,8 +755,8 @@ function escolherFrete(
   return {
     opcao: maisBarato,
     motivo: titulo
-      ? `mais barato que atende este CEP (o "${titulo}" da loja não existe no Melhor Envio)`
-      : "mais barato que atende este CEP",
+      ? `é o mais barato que atende este CEP (o "${titulo}" da loja não tem equivalente no Melhor Envio)`
+      : "é o mais barato que atende este CEP",
   };
 }
 
@@ -748,7 +788,12 @@ export async function atualizarPedidosParaEnvio(params?: { busca?: string }): Pr
   let avisoDeSincronia: string | null = null;
   try {
     const r = await syncShopifyOrders(ctx.organization.id, { timeBudgetMs: 25_000 });
-    if (r.error) avisoDeSincronia = `A loja não respondeu agora (${r.error}). A lista abaixo é a da última sincronização.`;
+    // a mensagem de erro do sync é técnica e em inglês, não serve para o lojista
+    if (r.error) {
+      console.error("[envios] sync da Shopify voltou com erro", r.error);
+      avisoDeSincronia =
+        "Não deu para buscar as vendas mais novas agora. A lista abaixo é a da última sincronização.";
+    }
   } catch (e) {
     console.error("[envios] falha ao sincronizar com a Shopify", e);
     avisoDeSincronia =
@@ -808,23 +853,27 @@ async function colocarNoCarrinho(
   pedido: PedidoParaEnvio,
   servicoId: number,
   transportadoraId: number | null
-): Promise<{ ok: boolean; mensagem: string; protocolo: string | null }> {
+): Promise<{ ok: boolean; mensagem: string; protocolo: string | null; jaEstava: boolean }> {
   if (!pedido.destino.cep || !pedido.destino.cidade || !pedido.destino.uf) {
     return {
       ok: false,
       mensagem: "Endereço de entrega incompleto neste pedido.",
       protocolo: null,
+      jaEstava: false,
     };
   }
 
   const marca = `Pedido ${pedido.numero}`;
 
+  // Já estar no carrinho não é falha: é exatamente o resultado que se queria.
+  // Tratar como erro faria o lojista tentar de novo achando que não foi.
   const jaEnviado = await envioJaNoCarrinho(marca);
   if (jaEnviado) {
     return {
-      ok: false,
-      protocolo: null,
-      mensagem: `O pedido ${pedido.numero} já está no carrinho do Melhor Envio (${jaEnviado}). Pague por lá para não gerar etiqueta em dobro.`,
+      ok: true,
+      protocolo: jaEnviado,
+      jaEstava: true,
+      mensagem: `O pedido ${pedido.numero} já estava no carrinho do Melhor Envio (${jaEnviado}), então não foi mandado de novo.`,
     };
   }
 
@@ -858,6 +907,7 @@ async function colocarNoCarrinho(
   return {
     ok: true,
     protocolo: resultado.protocolo,
+    jaEstava: false,
     mensagem: `Pedido ${pedido.numero} enviado para o carrinho do Melhor Envio.`,
   };
 }
@@ -884,6 +934,8 @@ export type ResultadoDespacho = {
   preco: number | null;
   motivo: string | null;
   protocolo: string | null;
+  /// já estava no carrinho antes deste clique, então nada foi criado agora
+  jaEstava: boolean;
 };
 
 /**
@@ -919,8 +971,10 @@ export async function despacharPedidos(
     const pedidos = await prepararPedidos(ctx.organization.id, registros);
     const aviso = await avisoDeSaldo();
 
-    const resultados = await Promise.all(
-      pedidos.map(async (pedido): Promise<ResultadoDespacho> => {
+    const resultados = await emLotes(
+      pedidos,
+      CONCORRENCIA_DESPACHO,
+      async (pedido): Promise<ResultadoDespacho> => {
         const base = {
           pedidoId: pedido.id,
           numero: pedido.numero,
@@ -928,6 +982,7 @@ export async function despacharPedidos(
           preco: null,
           motivo: null,
           protocolo: null,
+          jaEstava: false,
         };
 
         if (pedido.pendencias.length > 0) {
@@ -967,12 +1022,14 @@ export async function despacharPedidos(
             ...base,
             ok: envio.ok,
             mensagem: envio.ok ? envio.mensagem + aviso : envio.mensagem,
-            servico: envio.ok
-              ? `${escolha.opcao.transportadora} ${escolha.opcao.servico}`
-              : null,
-            preco: envio.ok ? escolha.opcao.preco : null,
-            motivo: envio.ok ? escolha.motivo : null,
+            servico:
+              envio.ok && !envio.jaEstava
+                ? `${escolha.opcao.transportadora} ${escolha.opcao.servico}`
+                : null,
+            preco: envio.ok && !envio.jaEstava ? escolha.opcao.preco : null,
+            motivo: envio.ok && !envio.jaEstava ? escolha.motivo : null,
             protocolo: envio.protocolo,
+            jaEstava: envio.jaEstava,
           };
         } catch (e) {
           const mensagem =
@@ -980,10 +1037,30 @@ export async function despacharPedidos(
           console.error("[envios] falha ao despachar", pedido.numero, e);
           return { ...base, ok: false, mensagem };
         }
-      })
+      }
     );
 
-    return { resultados, erro: null };
+    // Pedido que não coube no lote ou que o banco não devolveu precisa voltar
+    // com resposta própria: sem isso a tela conta como sucesso o que nem foi
+    // tentado, e o lojista acha que despachou.
+    const tentados = new Set(resultados.map((r) => r.pedidoId));
+    const naoTentados: ResultadoDespacho[] = pedidoIds
+      .filter((id) => !tentados.has(id))
+      .map((id) => ({
+        pedidoId: id,
+        numero: pedidos.find((p) => p.id === id)?.numero ?? "",
+        ok: false,
+        servico: null,
+        preco: null,
+        motivo: null,
+        protocolo: null,
+        jaEstava: false,
+        mensagem: ids.includes(id)
+          ? "Este pedido não pôde ser preparado para envio. Atualize a lista e tente de novo."
+          : `Só dá para enviar ${MAXIMO_POR_DESPACHO} por vez. Este ficou de fora, é só selecionar e enviar de novo.`,
+      }));
+
+    return { resultados: [...resultados, ...naoTentados], erro: null };
   } catch (e) {
     console.error("[envios] falha geral no despacho", e);
     return { resultados: [], erro: "Não foi possível despachar agora." };
