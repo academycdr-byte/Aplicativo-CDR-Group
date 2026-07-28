@@ -29,11 +29,13 @@ import {
   PackageCheck,
   RefreshCw,
   Search,
+  Send,
   Truck,
   X,
 } from "lucide-react";
 import {
   cotarPedidos,
+  enviarPedidoParaMelhorEnvio,
   getPedidosParaEnvio,
   type CotacaoDoPedido,
   type PedidoParaEnvio,
@@ -68,6 +70,37 @@ export default function EnviosPage() {
   const [cotacoes, setCotacoes] = useState<Map<string, CotacaoDoPedido>>(new Map());
   const [cotando, setCotando] = useState(false);
   const [erroCotacao, setErroCotacao] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState<string | null>(null);
+  const [enviados, setEnviados] = useState<Map<string, string>>(new Map());
+
+  const enviarParaMelhorEnvio = async (
+    pedido: PedidoParaEnvio,
+    opcao: { id: number; transportadoraId: number | null; transportadora: string; servico: string }
+  ) => {
+    const chave = `${pedido.id}-${opcao.id}`;
+    setEnviando(chave);
+    setErroCotacao(null);
+    try {
+      const r = await enviarPedidoParaMelhorEnvio({
+        pedidoId: pedido.id,
+        servicoId: opcao.id,
+        transportadoraId: opcao.transportadoraId,
+      });
+      if (r.ok) {
+        setEnviados((atual) => {
+          const proximo = new Map(atual);
+          proximo.set(pedido.id, `${opcao.transportadora} ${opcao.servico}`);
+          return proximo;
+        });
+      } else {
+        setErroCotacao(r.mensagem);
+      }
+    } catch {
+      setErroCotacao("Não foi possível falar com o servidor.");
+    } finally {
+      setEnviando(null);
+    }
+  };
 
   const cotar = async () => {
     setCotando(true);
@@ -446,6 +479,14 @@ export default function EnviosPage() {
                                       </p>
                                     ) : (
                                       <>
+                                        {enviados.has(pedido.id) && (
+                                          <div className="mb-3 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm">
+                                            Enviado para o carrinho do Melhor Envio via{" "}
+                                            <strong>{enviados.get(pedido.id)}</strong>. Pague e
+                                            imprima lá, junto com os outros pedidos do dia.
+                                          </div>
+                                        )}
+
                                         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                                           {cotacoes.get(pedido.id)!.opcoes.map((o) => (
                                             <div
@@ -462,9 +503,25 @@ export default function EnviosPage() {
                                                     : "prazo não informado"}
                                                 </p>
                                               </div>
-                                              <p className="text-sm font-semibold whitespace-nowrap">
-                                                {formatarMoeda(o.preco)}
-                                              </p>
+                                              <div className="flex items-center gap-2 shrink-0">
+                                                <p className="text-sm font-semibold whitespace-nowrap">
+                                                  {formatarMoeda(o.preco)}
+                                                </p>
+                                                <Button
+                                                  size="sm"
+                                                  variant="outline"
+                                                  className="h-7 px-2"
+                                                  disabled={enviando !== null}
+                                                  onClick={() => enviarParaMelhorEnvio(pedido, o)}
+                                                  title="Enviar este pedido para o carrinho do Melhor Envio"
+                                                >
+                                                  {enviando === `${pedido.id}-${o.id}` ? (
+                                                    "..."
+                                                  ) : (
+                                                    <Send className="w-3.5 h-3.5" />
+                                                  )}
+                                                </Button>
+                                              </div>
                                             </div>
                                           ))}
                                         </div>

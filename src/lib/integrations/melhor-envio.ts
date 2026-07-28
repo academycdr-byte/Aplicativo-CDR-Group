@@ -34,12 +34,16 @@ export type PacoteCotacao = {
 
 export type OpcaoFrete = {
   id: number;
+  transportadoraId: number | null;
   transportadora: string;
   servico: string;
   preco: number;
   prazoDias: number | null;
   logoUrl: string | null;
 };
+
+/** Correios não aceitam agência de postagem no carrinho; as demais exigem. */
+const CORREIOS_ID = 1;
 
 export type FreteIndisponivel = {
   transportadora: string;
@@ -164,7 +168,7 @@ type RespostaCotacao = {
   name: string;
   price?: string | number;
   delivery_time?: number;
-  company?: { name?: string; picture?: string };
+  company?: { id?: number; name?: string; picture?: string };
   error?: string;
 }[];
 
@@ -223,6 +227,7 @@ export async function cotarFrete(params: {
 
     opcoes.push({
       id: item.id,
+      transportadoraId: item.company?.id ?? null,
       transportadora,
       servico: item.name,
       preco,
@@ -260,6 +265,214 @@ export async function consultarConta(): Promise<{
     cnpj: d.company?.document ?? null,
     sandbox: ehSandbox(),
   };
+}
+
+/* ------------------------------------------------------------------ *
+ * Ponte: manda o pedido para o carrinho do Melhor Envio
+ * ------------------------------------------------------------------ */
+
+export type Remetente = {
+  name: string;
+  phone: string;
+  email: string;
+  document: string;
+  address: string;
+  complement: string;
+  number: string;
+  district: string;
+  city: string;
+  state_abbr: string;
+  country_id: "BR";
+  postal_code: string;
+};
+
+type RespostaConta2 = RespostaConta & {
+  phone?: { phone?: string };
+  address?: {
+    postal_code?: string;
+    address?: string;
+    number?: string;
+    complement?: string;
+    district?: string;
+    city?: { city?: string; state?: { state_abbr?: string } };
+  };
+};
+
+/**
+ * Monta o remetente a partir do cadastro da própria conta do Melhor Envio,
+ * para não pedir de novo dados que já estão lá.
+ */
+export async function consultarRemetente(): Promise<Remetente> {
+  const d = await chamar<RespostaConta2>("/me");
+  const a = d.address ?? {};
+
+  const remetente: Remetente = {
+    name: [d.firstname, d.lastname].filter(Boolean).join(" ").trim(),
+    phone: (d.phone?.phone ?? "").replace(/\D/g, ""),
+    email: d.email ?? "",
+    document: (d.document ?? "").replace(/\D/g, ""),
+    address: a.address ?? "",
+    complement: a.complement ?? "",
+    number: a.number ?? "",
+    district: a.district ?? "",
+    city: a.city?.city ?? "",
+    state_abbr: a.city?.state?.state_abbr ?? "",
+    country_id: "BR",
+    postal_code: (a.postal_code ?? "").replace(/\D/g, ""),
+  };
+
+  const faltando = (["name", "document", "address", "number", "city", "state_abbr", "postal_code"] as const).filter(
+    (k) => !remetente[k]
+  );
+  if (faltando.length > 0) {
+    throw new MelhorEnvioError(
+      "O endereço de origem no Melhor Envio está incompleto. Complete o cadastro da loja lá antes de enviar."
+    );
+  }
+
+  return remetente;
+}
+
+export async function consultarSaldo(): Promise<{ disponivel: number; reservado: number; dividas: number }> {
+  const d = await chamar<{ balance?: number; reserved?: number; debts?: number }>("/me/balance");
+  return {
+    disponivel: (d.balance ?? 0) - (d.reserved ?? 0),
+    reservado: d.reserved ?? 0,
+    dividas: d.debts ?? 0,
+  };
+}
+
+type RespostaAgencia = { id: number; name?: string; distance?: number }[];
+
+/** Agência de postagem mais próxima. Correios não usam; as outras exigem. */
+async function buscarAgencia(
+  transportadoraId: number,
+  cidade: string,
+  uf: string
+): Promise<number | null> {
+  if (transportadoraId === CORREIOS_ID) return null;
+
+  const params = new URLSearchParams({
+    company: String(transportadoraId),
+    country: "BR",
+    state: uf,
+    city: cidade,
+  });
+
+  try {
+    const lista = await chamar<RespostaAgencia>(`/me/shipment/agencies?${params.toString()}`);
+    if (!Array.isArray(lista) || lista.length === 0) return null;
+    return lista[0].id;
+  } catch {
+    return null; // sem agência, tenta enviar assim mesmo e deixa a API decidir
+  }
+}
+
+export type DestinatarioEnvio = {
+  nome: string;
+  telefone: string | null;
+  email: string | null;
+  documento: string | null;
+  logradouro: string;
+  numero: string;
+  complemento: string | null;
+  bairro: string;
+  cidade: string;
+  uf: string;
+  cep: string;
+};
+
+export type ItemEnvio = { nome: string; quantidade: number; valorUnitario: number };
+
+/**
+ * Coloca o envio no carrinho do Melhor Envio. Não paga e não gera etiqueta:
+ * o lojista fecha tudo de uma vez lá dentro, que é onde ele já tem saldo,
+ * seleção em lote e impressão conjunta.
+ */
+export async function enviarParaCarrinho(params: {
+  servicoId: number;
+  transportadoraId: number | null;
+  destinatario: DestinatarioEnvio;
+  itens: ItemEnvio[];
+  pesoGramas: number;
+  valorSegurado: number;
+  observacao?: string;
+  comprimentoCm?: number;
+  larguraCm?: number;
+  alturaCm?: number;
+}): Promise<{ id: string; protocolo: string | null }> {
+  const remetente = await consultarRemetente();
+  const d = params.destinatario;
+
+  const documentoDestino = (d.documento ?? "").replace(/\D/g, "");
+  if (!documentoDestino) {
+    throw new MelhorEnvioError(
+      "Este pedido está sem o CPF do cliente, e ele é obrigatório na etiqueta."
+    );
+  }
+  if (documentoDestino === remetente.document) {
+    throw new MelhorEnvioError(
+      "O CPF do cliente é igual ao do remetente. O Melhor Envio não aceita envio para você mesmo."
+    );
+  }
+
+  const agencia = params.transportadoraId
+    ? await buscarAgencia(params.transportadoraId, d.cidade, d.uf)
+    : null;
+
+  const corpo: Record<string, unknown> = {
+    service: params.servicoId,
+    from: remetente,
+    to: {
+      name: d.nome,
+      phone: (d.telefone ?? "").replace(/\D/g, ""),
+      email: d.email ?? "",
+      document: documentoDestino,
+      address: d.logradouro,
+      complement: d.complemento ?? "",
+      number: d.numero,
+      district: d.bairro,
+      city: d.cidade,
+      state_abbr: d.uf,
+      country_id: "BR",
+      postal_code: d.cep.replace(/\D/g, ""),
+      note: params.observacao ?? "",
+    },
+    products: params.itens.map((i) => ({
+      name: i.nome,
+      quantity: i.quantidade,
+      unitary_value: i.valorUnitario,
+    })),
+    volumes: [
+      {
+        height: Math.max(params.alturaCm ?? MINIMO.altura, MINIMO.altura),
+        width: Math.max(params.larguraCm ?? MINIMO.largura, MINIMO.largura),
+        length: Math.max(params.comprimentoCm ?? MINIMO.comprimento, MINIMO.comprimento),
+        weight: Math.max(params.pesoGramas, 1) / 1000,
+      },
+    ],
+    options: {
+      insurance_value: params.valorSegurado,
+      receipt: false,
+      own_hand: false,
+      reverse: false,
+      non_commercial: true, // sem nota fiscal: vai com declaração de conteúdo
+      platform: "CDR Group",
+    },
+  };
+
+  if (agencia) corpo.agency = agencia;
+
+  const resposta = await chamar<{ id?: string; protocol?: string }>("/me/cart", {
+    metodo: "POST",
+    corpo,
+  });
+
+  if (!resposta?.id) {
+    throw new MelhorEnvioError("O Melhor Envio não confirmou o envio para o carrinho.");
+  }
+
+  return { id: resposta.id, protocolo: resposta.protocol ?? null };
 }
 
 export function contaConfigurada(): boolean {
