@@ -252,6 +252,8 @@ function normalizar(registro: {
   if (!endereco) pendencias.push("Pedido sem endereço de entrega");
   if (!cep) pendencias.push("Sem CEP");
   if (!texto(endereco?.address1)) pendencias.push("Sem rua e número");
+  // o Melhor Envio recusa a etiqueta sem bairro, e a Shopify não tem esse campo
+  if (!partesEndereco.bairro) pendencias.push("Sem bairro");
   if (!documento) pendencias.push("Sem CPF do destinatário");
   if (!telefone) pendencias.push("Sem telefone");
   if (peso.estimado) pendencias.push("Peso estimado (produto sem peso cadastrado)");
@@ -428,6 +430,7 @@ function recalcularPendencias(pedidos: PedidoParaEnvio[]): void {
     const lista: string[] = [];
     if (!p.destino.cep) lista.push("Sem CEP");
     if (!p.destino.logradouro) lista.push("Sem rua e número");
+    if (!p.destino.bairro) lista.push("Sem bairro");
     if (!p.cliente.documento) lista.push("Sem CPF do destinatário");
     if (!p.cliente.telefone) lista.push("Sem telefone");
     if (p.pesoEstimado) lista.push("Peso estimado (produto sem peso cadastrado)");
@@ -597,15 +600,29 @@ function separarEndereco(logradouroCompleto: string | null, complemento: string 
   const logradouro = (casamento ? casamento[1] : linha).replace(/[,\s]+$/, "").trim();
   const numero = casamento ? casamento[2] : "S/N";
 
-  // bairro: primeiro pedaço do complemento, que é onde a Shopify costuma jogar
+  // bairro: primeiro pedaço do complemento, que é onde a Shopify costuma jogar.
+  // Repetição é comum (o cliente escreve o bairro no complemento também), então
+  // tudo que só repete o bairro é descartado em vez de virar complemento.
   const partes = (complemento ?? "")
     .split(",")
     .map((p) => p.trim())
     .filter(Boolean);
   const bairro = partes[0] ?? "";
-  const resto = partes.slice(1).join(", ");
+  const resto = partes
+    .slice(1)
+    .filter((p) => !mesmoTexto(p, bairro))
+    .join(", ");
 
   return { logradouro, numero, bairro, complementoLimpo: resto };
+}
+
+/** Compara dois pedaços de endereço ignorando acento, caixa e pontuação. */
+function mesmoTexto(a: string, b: string) {
+  // NFD separa o acento da letra, e o filtro seguinte descarta tudo que não é
+  // letra ou número, então o acento sai junto.
+  const chave = (v: string) =>
+    v.normalize("NFD").replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+  return chave(a) === chave(b) && chave(a) !== "";
 }
 
 export async function enviarPedidoParaMelhorEnvio(params: {
