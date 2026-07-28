@@ -5,6 +5,9 @@ import { getSessionWithOrg } from "@/lib/session";
 import {
   cotarFrete,
   contaConfigurada,
+  consultarSaldo,
+  enviarParaCarrinho,
+  envioJaNoCarrinho,
   MelhorEnvioError,
   type OpcaoFrete,
   type FreteIndisponivel,
@@ -467,5 +470,136 @@ export async function cotarPedidos(
   } catch (e) {
     console.error("[envios] falha geral na cotação", e);
     return { cotacoes: [], erro: "Não foi possível cotar agora." };
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Ponte para o Melhor Envio
+ * ------------------------------------------------------------------ */
+
+/**
+ * A Shopify não separa número nem bairro: manda tudo em address1 e address2.
+ * O Melhor Envio exige os dois em campos próprios. Esta função quebra o
+ * endereço da forma mais confiável possível e deixa claro quando não deu.
+ */
+function separarEndereco(logradouroCompleto: string | null, complemento: string | null) {
+  const linha = (logradouroCompleto ?? "").trim();
+
+  // número costuma ser o último trecho numérico depois de vírgula ou espaço
+  const casamento = linha.match(/^(.*?)[,\s]+(\d+[A-Za-z]?)\s*$/);
+  const logradouro = (casamento ? casamento[1] : linha).replace(/[,\s]+$/, "").trim();
+  const numero = casamento ? casamento[2] : "S/N";
+
+  // bairro: primeiro pedaço do complemento, que é onde a Shopify costuma jogar
+  const partes = (complemento ?? "")
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean);
+  const bairro = partes[0] ?? "";
+  const resto = partes.slice(1).join(", ");
+
+  return { logradouro, numero, bairro, complementoLimpo: resto };
+}
+
+export async function enviarPedidoParaMelhorEnvio(params: {
+  pedidoId: string;
+  servicoId: number;
+  transportadoraId: number | null;
+}): Promise<{ ok: boolean; mensagem: string; protocolo?: string | null }> {
+  const ctx = await getSessionWithOrg();
+  if (!ctx) return { ok: false, mensagem: "Sessão expirada. Entre de novo." };
+
+  if (!contaConfigurada()) {
+    return { ok: false, mensagem: "Conta do Melhor Envio ainda não configurada." };
+  }
+
+  try {
+    const registro = await prisma.order.findFirst({
+      where: { id: params.pedidoId, organizationId: ctx.organization.id },
+      select: {
+        id: true,
+        externalOrderId: true,
+        orderDate: true,
+        customerName: true,
+        customerEmail: true,
+        totalAmount: true,
+        rawData: true,
+      },
+    });
+
+    if (!registro) return { ok: false, mensagem: "Pedido não encontrado." };
+
+    const pedido = normalizar({ ...registro, totalAmount: registro.totalAmount });
+    if (!pedido) return { ok: false, mensagem: "Pedido sem dados suficientes para envio." };
+
+    if (!pedido.destino.cep || !pedido.destino.cidade || !pedido.destino.uf) {
+      return { ok: false, mensagem: "Endereço de entrega incompleto neste pedido." };
+    }
+
+    const { logradouro, numero, bairro, complementoLimpo } = separarEndereco(
+      pedido.destino.logradouro,
+      pedido.destino.complemento
+    );
+
+    const marca = `Pedido ${pedido.numero}`;
+
+    const jaEnviado = await envioJaNoCarrinho(marca);
+    if (jaEnviado) {
+      return {
+        ok: false,
+        mensagem: `O pedido ${pedido.numero} já está no carrinho do Melhor Envio (${jaEnviado}). Pague por lá para não gerar etiqueta em dobro.`,
+      };
+    }
+
+    // O saldo é só um aviso: se a consulta falhar, o envio continua.
+    let saldoDisponivel: number | null = null;
+    try {
+      saldoDisponivel = (await consultarSaldo()).disponivel;
+    } catch {
+      saldoDisponivel = null;
+    }
+
+    const resultado = await enviarParaCarrinho({
+      servicoId: params.servicoId,
+      transportadoraId: params.transportadoraId,
+      destinatario: {
+        nome: pedido.cliente.nome ?? "Cliente",
+        telefone: pedido.cliente.telefone,
+        email: pedido.cliente.email,
+        documento: pedido.cliente.documento,
+        logradouro,
+        numero,
+        complemento: complementoLimpo || null,
+        bairro,
+        cidade: pedido.destino.cidade,
+        uf: pedido.destino.uf,
+        cep: pedido.destino.cep,
+      },
+      itens: pedido.itens.map((i) => ({
+        nome: i.titulo,
+        quantidade: i.quantidade,
+        valorUnitario: Math.max(pedido.valorTotal / Math.max(pedido.totalPecas, 1), 1),
+      })),
+      pesoGramas: pedido.pesoGramas,
+      valorSegurado: pedido.valorTotal,
+      observacao: marca,
+      ...CAIXA_PADRAO,
+    });
+
+    const aviso =
+      saldoDisponivel !== null && saldoDisponivel <= 0
+        ? " Atenção: seu saldo no Melhor Envio está zerado, então será preciso recarregar antes de pagar."
+        : "";
+
+    return {
+      ok: true,
+      protocolo: resultado.protocolo,
+      mensagem: `Pedido ${pedido.numero} enviado para o carrinho do Melhor Envio.${aviso}`,
+    };
+  } catch (e) {
+    const mensagem =
+      e instanceof MelhorEnvioError ? e.message : "Não foi possível enviar este pedido agora.";
+    console.error("[envios] falha ao enviar para o carrinho", e);
+    return { ok: false, mensagem };
   }
 }
