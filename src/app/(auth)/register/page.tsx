@@ -10,6 +10,17 @@ import { registerUser } from "@/actions/auth";
 import { validateRegisterForm } from "@/lib/validation";
 import { Loader2, ArrowRight, UserPlus } from "lucide-react";
 
+/** O redirect do Next chega ao cliente como erro com digest "NEXT_REDIRECT". */
+function ehRedirecionamento(e: unknown): boolean {
+  return (
+    typeof e === "object" &&
+    e !== null &&
+    "digest" in e &&
+    typeof (e as { digest?: unknown }).digest === "string" &&
+    (e as { digest: string }).digest.startsWith("NEXT_REDIRECT")
+  );
+}
+
 export default function RegisterPage() {
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -42,8 +53,14 @@ export default function RegisterPage() {
       if (result?.error) {
         setError(result.error);
       }
-    } catch {
-      // Automatic redirect on success in server action
+    } catch (e) {
+      // Em sucesso a server action responde com um redirect, e o Next entrega
+      // isso ao cliente como exceção. Ela PRECISA seguir adiante, senão o
+      // redirect se perde e a tela fica parada como se nada tivesse acontecido.
+      if (ehRedirecionamento(e)) throw e;
+
+      console.error("[register] falha ao criar conta", e);
+      setError("Não foi possível criar a conta agora. Tente de novo em instantes.");
     } finally {
       setLoading(false);
     }
