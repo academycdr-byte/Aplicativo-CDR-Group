@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { getSessionWithOrg } from "@/lib/session";
+import { fetchShopifyOrderDocuments } from "@/lib/integrations/shopify";
 import {
   cotarFrete,
   contaConfigurada,
@@ -47,11 +48,15 @@ export type PedidoParaEnvio = {
   };
   destino: {
     logradouro: string | null;
+    numero: string | null;
     complemento: string | null;
+    bairro: string | null;
     cidade: string | null;
     uf: string | null;
     cep: string | null;
   };
+  /// true quando os dados de entrega foram corrigidos à mão no painel
+  corrigido: boolean;
   itens: ItemDoPedido[];
   totalPecas: number;
   pesoGramas: number;
@@ -235,6 +240,10 @@ function normalizar(registro: {
   if (totalPecas === 0) return null; // nada a despachar (tudo digital ou reembolsado)
 
   const peso = extrairPeso(pedido, itens, totalPecas);
+  const partesEndereco = separarEndereco(
+    texto(endereco?.address1),
+    texto(endereco?.address2)
+  );
   const documento = extrairDocumento(pedido);
   const telefone = extrairTelefone(pedido);
   const cep = texto(endereco?.zip);
@@ -260,13 +269,17 @@ function normalizar(registro: {
     },
     destino: {
       // A Shopify não tem campo de bairro nem de número: o número costuma vir
-      // colado no address1 e o bairro/complemento no address2.
-      logradouro: texto(endereco?.address1),
-      complemento: texto(endereco?.address2),
+      // colado no address1 e o bairro no address2. Separamos aqui, e o painel
+      // permite corrigir quando a separação não acerta.
+      logradouro: partesEndereco.logradouro || texto(endereco?.address1),
+      numero: partesEndereco.numero,
+      complemento: partesEndereco.complementoLimpo || null,
+      bairro: partesEndereco.bairro || null,
       cidade: texto(endereco?.city),
       uf: texto(endereco?.province_code) ?? texto(endereco?.province),
       cep,
     },
+    corrigido: false,
     itens,
     totalPecas,
     pesoGramas: peso.gramas,
@@ -353,6 +366,10 @@ export async function getPedidosParaEnvio(params?: {
       .filter((p): p is PedidoParaEnvio => p !== null)
       .slice(0, limite);
 
+    await aplicarCorrecoes(ctx.organization.id, pedidos);
+    await completarDocumentos(ctx.organization.id, registros, pedidos);
+    recalcularPendencias(pedidos);
+
     return { pedidos, erro: null, semIntegracao: false };
   } catch (e) {
     console.error("[envios] falha ao listar pedidos para envio", e);
@@ -361,6 +378,96 @@ export async function getPedidosParaEnvio(params?: {
       erro: "Não foi possível carregar os pedidos agora.",
       semIntegracao: false,
     };
+  }
+}
+
+/**
+ * Sobrescreve os dados do pedido com o que foi corrigido à mão no painel.
+ * Roda antes de tudo: se o lojista já arrumou o CPF, não precisa nem consultar
+ * a Shopify de novo.
+ */
+async function aplicarCorrecoes(
+  organizationId: string,
+  pedidos: PedidoParaEnvio[]
+): Promise<void> {
+  if (pedidos.length === 0) return;
+
+  try {
+    const correcoes = await prisma.shipmentContact.findMany({
+      where: { organizationId, orderId: { in: pedidos.map((p) => p.id) } },
+    });
+    if (correcoes.length === 0) return;
+
+    const porPedido = new Map(correcoes.map((c) => [c.orderId, c]));
+
+    for (const pedido of pedidos) {
+      const c = porPedido.get(pedido.id);
+      if (!c) continue;
+
+      pedido.corrigido = true;
+      if (c.name) pedido.cliente.nome = c.name;
+      if (c.document) pedido.cliente.documento = c.document;
+      if (c.phone) pedido.cliente.telefone = c.phone;
+      if (c.email) pedido.cliente.email = c.email;
+      if (c.street) pedido.destino.logradouro = c.street;
+      if (c.number) pedido.destino.numero = c.number;
+      if (c.complement) pedido.destino.complemento = c.complement;
+      if (c.district) pedido.destino.bairro = c.district;
+      if (c.city) pedido.destino.cidade = c.city;
+      if (c.state) pedido.destino.uf = c.state;
+      if (c.zip) pedido.destino.cep = c.zip;
+    }
+  } catch (e) {
+    console.error("[envios] falha ao aplicar correções", e);
+  }
+}
+
+/** As pendências são recalculadas no fim, já com correção e CPF buscado. */
+function recalcularPendencias(pedidos: PedidoParaEnvio[]): void {
+  for (const p of pedidos) {
+    const lista: string[] = [];
+    if (!p.destino.cep) lista.push("Sem CEP");
+    if (!p.destino.logradouro) lista.push("Sem rua e número");
+    if (!p.cliente.documento) lista.push("Sem CPF do destinatário");
+    if (!p.cliente.telefone) lista.push("Sem telefone");
+    if (p.pesoEstimado) lista.push("Peso estimado (produto sem peso cadastrado)");
+    p.pendencias = lista;
+  }
+}
+
+/**
+ * Preenche o CPF que falta buscando na Shopify por GraphQL.
+ *
+ * O sync usa a API REST, e ela NÃO devolve o documento: em loja brasileira o
+ * CPF fica em `localizationExtensions`, que só existe no GraphQL. Sem isso todo
+ * pedido aparecia como "sem CPF" mesmo tendo o dado lá na Shopify.
+ */
+async function completarDocumentos(
+  organizationId: string,
+  registros: { id: string; externalOrderId: string }[],
+  pedidos: PedidoParaEnvio[]
+): Promise<void> {
+  const semDocumento = pedidos.filter((p) => !p.cliente.documento);
+  if (semDocumento.length === 0) return;
+
+  const porId = new Map(registros.map((r) => [r.id, r.externalOrderId]));
+  const idsExternos = semDocumento
+    .map((p) => porId.get(p.id))
+    .filter((v): v is string => Boolean(v));
+
+  try {
+    const documentos = await fetchShopifyOrderDocuments(organizationId, idsExternos);
+    if (documentos.size === 0) return;
+
+    for (const pedido of semDocumento) {
+      const externo = porId.get(pedido.id);
+      const doc = externo ? documentos.get(externo) : undefined;
+      if (!doc) continue;
+      pedido.cliente.documento = doc;
+      pedido.pendencias = pedido.pendencias.filter((p) => p !== "Sem CPF do destinatário");
+    }
+  } catch (e) {
+    console.error("[envios] falha ao completar documentos", e);
   }
 }
 
@@ -536,10 +643,15 @@ export async function enviarPedidoParaMelhorEnvio(params: {
       return { ok: false, mensagem: "Endereço de entrega incompleto neste pedido." };
     }
 
-    const { logradouro, numero, bairro, complementoLimpo } = separarEndereco(
-      pedido.destino.logradouro,
-      pedido.destino.complemento
-    );
+    // aplica a correção manual, se existir, por cima do que veio da Shopify
+    await aplicarCorrecoes(ctx.organization.id, [pedido]);
+    if (!pedido.cliente.documento) {
+      await completarDocumentos(ctx.organization.id, [registro], [pedido]);
+    }
+
+    const logradouro = pedido.destino.logradouro ?? "";
+    const numeroEndereco = pedido.destino.numero ?? "S/N";
+    const bairro = pedido.destino.bairro ?? "";
 
     const marca = `Pedido ${pedido.numero}`;
 
@@ -568,8 +680,8 @@ export async function enviarPedidoParaMelhorEnvio(params: {
         email: pedido.cliente.email,
         documento: pedido.cliente.documento,
         logradouro,
-        numero,
-        complemento: complementoLimpo || null,
+        numero: numeroEndereco,
+        complemento: pedido.destino.complemento,
         bairro,
         cidade: pedido.destino.cidade,
         uf: pedido.destino.uf,
@@ -601,5 +713,115 @@ export async function enviarPedidoParaMelhorEnvio(params: {
       e instanceof MelhorEnvioError ? e.message : "Não foi possível enviar este pedido agora.";
     console.error("[envios] falha ao enviar para o carrinho", e);
     return { ok: false, mensagem };
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Correção manual dos dados de entrega
+ * ------------------------------------------------------------------ */
+
+export type DadosEntregaEditaveis = {
+  nome: string;
+  documento: string;
+  telefone: string;
+  email: string;
+  logradouro: string;
+  numero: string;
+  complemento: string;
+  bairro: string;
+  cidade: string;
+  uf: string;
+  cep: string;
+};
+
+/** Devolve o que já foi corrigido à mão para este pedido, se houver. */
+export async function getCorrecaoEntrega(
+  pedidoId: string
+): Promise<Partial<DadosEntregaEditaveis> | null> {
+  const ctx = await getSessionWithOrg();
+  if (!ctx) return null;
+
+  const c = await prisma.shipmentContact.findFirst({
+    where: { orderId: pedidoId, organizationId: ctx.organization.id },
+  });
+  if (!c) return null;
+
+  return {
+    nome: c.name ?? "",
+    documento: c.document ?? "",
+    telefone: c.phone ?? "",
+    email: c.email ?? "",
+    logradouro: c.street ?? "",
+    numero: c.number ?? "",
+    complemento: c.complement ?? "",
+    bairro: c.district ?? "",
+    cidade: c.city ?? "",
+    uf: c.state ?? "",
+    cep: c.zip ?? "",
+  };
+}
+
+/**
+ * Salva a correção dos dados de entrega. Campo vazio significa "não corrigir",
+ * então o valor original da Shopify continua valendo para ele.
+ */
+export async function salvarCorrecaoEntrega(
+  pedidoId: string,
+  dados: Partial<DadosEntregaEditaveis>
+): Promise<{ ok: boolean; mensagem: string }> {
+  const ctx = await getSessionWithOrg();
+  if (!ctx) return { ok: false, mensagem: "Sessão expirada. Entre de novo." };
+
+  const limpar = (v: string | undefined) => {
+    const t = (v ?? "").trim();
+    return t.length > 0 ? t : null;
+  };
+
+  const documento = limpar(dados.documento)?.replace(/\D/g, "") ?? null;
+  if (documento && documento.length !== 11 && documento.length !== 14) {
+    return { ok: false, mensagem: "O CPF precisa ter 11 dígitos e o CNPJ, 14." };
+  }
+
+  const cep = limpar(dados.cep)?.replace(/\D/g, "") ?? null;
+  if (cep && cep.length !== 8) {
+    return { ok: false, mensagem: "O CEP precisa ter 8 dígitos." };
+  }
+
+  const uf = limpar(dados.uf)?.toUpperCase() ?? null;
+  if (uf && uf.length !== 2) {
+    return { ok: false, mensagem: "O estado deve ser a sigla de 2 letras, como SP." };
+  }
+
+  try {
+    const pertence = await prisma.order.findFirst({
+      where: { id: pedidoId, organizationId: ctx.organization.id },
+      select: { id: true },
+    });
+    if (!pertence) return { ok: false, mensagem: "Pedido não encontrado." };
+
+    const valores = {
+      name: limpar(dados.nome),
+      document: documento,
+      phone: limpar(dados.telefone),
+      email: limpar(dados.email),
+      street: limpar(dados.logradouro),
+      number: limpar(dados.numero),
+      complement: limpar(dados.complemento),
+      district: limpar(dados.bairro),
+      city: limpar(dados.cidade),
+      state: uf,
+      zip: cep,
+    };
+
+    await prisma.shipmentContact.upsert({
+      where: { orderId: pedidoId },
+      create: { orderId: pedidoId, organizationId: ctx.organization.id, ...valores },
+      update: valores,
+    });
+
+    return { ok: true, mensagem: "Dados de entrega atualizados." };
+  } catch (e) {
+    console.error("[envios] falha ao salvar correção de entrega", e);
+    return { ok: false, mensagem: "Não foi possível salvar agora." };
   }
 }

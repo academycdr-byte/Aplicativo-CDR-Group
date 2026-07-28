@@ -135,7 +135,41 @@ model Organization {
   // Action Plans
   actionPlans     ActionPlan[]
 
+  // Envios
+  shipmentContacts ShipmentContact[]
+
   @@map("organizations")
+}
+
+/// Correções manuais dos dados de entrega de um pedido, feitas no painel.
+/// Existe porque a Shopify nem sempre entrega tudo que a etiqueta exige:
+/// o CPF não vem na API usada no sync, e número e bairro chegam misturados
+/// no endereço. O que estiver preenchido aqui vence o que veio da loja.
+model ShipmentContact {
+  id             String   @id @default(cuid())
+  organizationId String
+  /// id do pedido na tabela orders
+  orderId        String   @unique
+
+  name       String?
+  document   String?
+  phone      String?
+  email      String?
+  street     String?
+  number     String?
+  complement String?
+  district   String?
+  city       String?
+  state      String?
+  zip        String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("shipment_contacts")
 }
 
 model ProductCost {
