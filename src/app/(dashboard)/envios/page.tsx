@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -35,11 +35,14 @@ import {
 } from "lucide-react";
 import { EditarEntrega } from "./editar-entrega";
 import {
+  atualizarPedidosParaEnvio,
   cotarPedidos,
+  despacharPedidos,
   enviarPedidoParaMelhorEnvio,
   getPedidosParaEnvio,
   type CotacaoDoPedido,
   type PedidoParaEnvio,
+  type ResultadoDespacho,
 } from "@/actions/shipments";
 
 const formatarMoeda = (valor: number) =>
@@ -73,11 +76,61 @@ export default function EnviosPage() {
   const [erroCotacao, setErroCotacao] = useState<string | null>(null);
   const [editando, setEditando] = useState<PedidoParaEnvio | null>(null);
   const [enviando, setEnviando] = useState<string | null>(null);
-  const [enviados, setEnviados] = useState<Map<string, string>>(new Map());
+  const [despachando, setDespachando] = useState<Set<string>>(new Set());
+  const [resultados, setResultados] = useState<Map<string, ResultadoDespacho>>(new Map());
+  const [sincronizando, setSincronizando] = useState(false);
+  const [avisoSincronia, setAvisoSincronia] = useState<string | null>(null);
 
+  const guardarResultados = (lista: ResultadoDespacho[]) => {
+    setResultados((atual) => {
+      const proximo = new Map(atual);
+      lista.forEach((r) => proximo.set(r.pedidoId, r));
+      return proximo;
+    });
+  };
+
+  /**
+   * O cliente da loja já escolheu o frete quando comprou, então aqui é um
+   * clique só: o app cota, repete o serviço que ele pagou e manda para o
+   * carrinho do Melhor Envio.
+   */
+  const despachar = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    setDespachando(new Set(ids));
+    setErroCotacao(null);
+    try {
+      const r = await despacharPedidos(ids);
+      if (r.erro) {
+        setErroCotacao(r.erro);
+        return;
+      }
+      guardarResultados(r.resultados);
+
+      // problema fica visível sem precisar procurar: abre a linha e avisa em cima
+      const comProblema = r.resultados.find((x) => !x.ok);
+      if (comProblema) {
+        setExpandido(comProblema.pedidoId);
+        setErroCotacao(
+          r.resultados.length === 1
+            ? comProblema.mensagem
+            : `${r.resultados.filter((x) => x.ok).length} de ${r.resultados.length} foram para o carrinho. Veja abaixo o que travou os outros.`
+        );
+      } else {
+        const aviso = r.resultados.find((x) => /atenção/i.test(x.mensagem));
+        if (aviso) setErroCotacao(aviso.mensagem);
+        setSelecionados(new Set());
+      }
+    } catch {
+      setErroCotacao("Não foi possível falar com o servidor.");
+    } finally {
+      setDespachando(new Set());
+    }
+  };
+
+  /** Envio com transportadora escolhida à mão, quando o lojista quer trocar. */
   const enviarParaMelhorEnvio = async (
     pedido: PedidoParaEnvio,
-    opcao: { id: number; transportadoraId: number | null; transportadora: string; servico: string }
+    opcao: { id: number; transportadoraId: number | null; transportadora: string; servico: string; preco: number }
   ) => {
     const chave = `${pedido.id}-${opcao.id}`;
     setEnviando(chave);
@@ -89,12 +142,18 @@ export default function EnviosPage() {
         transportadoraId: opcao.transportadoraId,
       });
       if (r.ok) {
-        setEnviados((atual) => {
-          const proximo = new Map(atual);
-          const protocolo = r.protocolo ? ` · ${r.protocolo}` : "";
-          proximo.set(pedido.id, `${opcao.transportadora} ${opcao.servico}${protocolo}`);
-          return proximo;
-        });
+        guardarResultados([
+          {
+            pedidoId: pedido.id,
+            numero: pedido.numero,
+            ok: true,
+            mensagem: r.mensagem,
+            servico: `${opcao.transportadora} ${opcao.servico}`,
+            preco: opcao.preco,
+            motivo: "escolhido por você",
+            protocolo: r.protocolo ?? null,
+          },
+        ]);
         // o aviso de saldo zerado vem junto da confirmação e precisa aparecer
         if (/atenção/i.test(r.mensagem)) setErroCotacao(r.mensagem);
       } else {
@@ -149,7 +208,42 @@ export default function EnviosPage() {
     }
   }, [buscaAplicada]);
 
+  /**
+   * Puxa as vendas novas da Shopify e já mostra a lista atualizada. É um clique
+   * só de propósito: sincronizar num lugar e recarregar noutro era trabalho
+   * repetido para uma coisa só.
+   */
+  const atualizar = useCallback(async () => {
+    setSincronizando(true);
+    setAvisoSincronia(null);
+    try {
+      const resultado = await atualizarPedidosParaEnvio({ busca: buscaAplicada || undefined });
+      setPedidos(resultado.pedidos);
+      setErro(resultado.erro);
+      setSemIntegracao(resultado.semIntegracao);
+      setAvisoSincronia(resultado.avisoDeSincronia);
+      setSelecionados(new Set());
+    } catch {
+      setErro("Não foi possível falar com o servidor. Tente de novo.");
+    } finally {
+      setSincronizando(false);
+      setCarregando(false);
+    }
+  }, [buscaAplicada]);
+
+  // ao abrir a tela já busca as vendas novas, sem esperar clique
   useEffect(() => {
+    atualizar();
+    // de propósito só na montagem: trocar a busca não precisa falar com a Shopify
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const primeiraCarga = useRef(true);
+  useEffect(() => {
+    if (primeiraCarga.current) {
+      primeiraCarga.current = false;
+      return;
+    }
     carregar();
   }, [carregar]);
 
@@ -188,9 +282,16 @@ export default function EnviosPage() {
             Pedidos pagos que ainda não foram despachados.
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={carregar} disabled={carregando}>
-          <RefreshCw className={`w-4 h-4 mr-2 ${carregando ? "animate-spin" : ""}`} />
-          Atualizar
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={atualizar}
+          disabled={sincronizando || carregando}
+        >
+          <RefreshCw
+            className={`w-4 h-4 mr-2 ${sincronizando || carregando ? "animate-spin" : ""}`}
+          />
+          {sincronizando ? "Buscando vendas novas..." : "Atualizar"}
         </Button>
       </div>
 
@@ -259,13 +360,23 @@ export default function EnviosPage() {
             </div>
 
             {selecionados.size > 0 && (
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-wrap">
                 <span className="text-sm text-muted-foreground">
                   {selecionados.size} selecionado{selecionados.size > 1 ? "s" : ""}
                 </span>
-                <Button size="sm" onClick={cotar} disabled={cotando}>
+                <Button
+                  size="sm"
+                  onClick={() => despachar(Array.from(selecionados))}
+                  disabled={despachando.size > 0 || cotando}
+                >
+                  <Send className={`w-4 h-4 mr-2 ${despachando.size > 0 ? "animate-pulse" : ""}`} />
+                  {despachando.size > 0
+                    ? "Enviando..."
+                    : `Enviar para o Melhor Envio${selecionados.size > 1 ? ` (${selecionados.size})` : ""}`}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={cotar} disabled={cotando}>
                   <Truck className={`w-4 h-4 mr-2 ${cotando ? "animate-pulse" : ""}`} />
-                  {cotando ? "Cotando..." : "Cotar frete"}
+                  {cotando ? "Cotando..." : "Ver preços antes"}
                 </Button>
               </div>
             )}
@@ -276,6 +387,12 @@ export default function EnviosPage() {
               <CardContent className="pt-6 text-sm text-destructive">
                 {erro ?? erroCotacao}
               </CardContent>
+            </Card>
+          )}
+
+          {avisoSincronia && !erro && (
+            <Card className="border-amber-500/40 shadow-none rounded-[20px]">
+              <CardContent className="pt-6 text-sm text-amber-700">{avisoSincronia}</CardContent>
             </Card>
           )}
 
@@ -307,12 +424,15 @@ export default function EnviosPage() {
                         Valor
                       </TableHead>
                       <TableHead scope="col">Situação</TableHead>
+                      <TableHead scope="col" className="text-right">
+                        Envio
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {carregando && (
                       <TableRow>
-                        <TableCell colSpan={9} className="text-center py-12 text-muted-foreground">
+                        <TableCell colSpan={10} className="text-center py-12 text-muted-foreground">
                           Carregando pedidos...
                         </TableCell>
                       </TableRow>
@@ -320,7 +440,7 @@ export default function EnviosPage() {
 
                     {!carregando && pedidos.length === 0 && !erro && (
                       <TableRow>
-                        <TableCell colSpan={9} className="text-center py-12">
+                        <TableCell colSpan={10} className="text-center py-12">
                           <PackageCheck className="w-8 h-8 mx-auto mb-3 text-muted-foreground" />
                           {buscaAplicada ? (
                             <>
@@ -427,6 +547,12 @@ export default function EnviosPage() {
 
                             <TableCell>
                               <div className="flex flex-col gap-1 items-start">
+                                {resultados.get(pedido.id)?.ok && (
+                                  <Badge className="bg-emerald-600 hover:bg-emerald-700 border-transparent">
+                                    <PackageCheck className="w-3 h-3 mr-1" />
+                                    No carrinho
+                                  </Badge>
+                                )}
                                 {cotacoes.get(pedido.id)?.opcoes[0] && (
                                   <Badge
                                     variant="secondary"
@@ -474,11 +600,83 @@ export default function EnviosPage() {
                                 )}
                               </div>
                             </TableCell>
+
+                            <TableCell className="text-right">
+                              {resultados.get(pedido.id)?.ok ? (
+                                <span className="text-xs text-muted-foreground">
+                                  {resultados.get(pedido.id)!.servico}
+                                </span>
+                              ) : pedido.pendencias.length > 0 ? (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span>
+                                        <Button size="sm" disabled className="h-8">
+                                          Enviar
+                                        </Button>
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p className="text-xs">
+                                        Complete os dados de entrega para liberar o envio.
+                                      </p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  className="h-8"
+                                  disabled={despachando.size > 0}
+                                  onClick={() => despachar([pedido.id])}
+                                  title="Cotar, escolher o frete e mandar para o carrinho do Melhor Envio"
+                                >
+                                  {despachando.has(pedido.id) ? (
+                                    "Enviando..."
+                                  ) : (
+                                    <>
+                                      <Send className="w-3.5 h-3.5 mr-1.5" />
+                                      Enviar
+                                    </>
+                                  )}
+                                </Button>
+                              )}
+                            </TableCell>
                           </TableRow>
 
                           {expandido === pedido.id && (
                             <TableRow className="bg-muted/20">
-                              <TableCell colSpan={9} className="py-4">
+                              <TableCell colSpan={10} className="py-4">
+                                {resultados.has(pedido.id) && (
+                                  <div
+                                    className={`mb-4 rounded-xl border px-3 py-2 text-sm ${
+                                      resultados.get(pedido.id)!.ok
+                                        ? "border-emerald-500/40 bg-emerald-500/10"
+                                        : "border-destructive/40 bg-destructive/10 text-destructive"
+                                    }`}
+                                  >
+                                    {resultados.get(pedido.id)!.ok ? (
+                                      <>
+                                        Enviado para o carrinho do Melhor Envio por{" "}
+                                        <strong>{resultados.get(pedido.id)!.servico}</strong>
+                                        {resultados.get(pedido.id)!.preco !== null
+                                          ? ` · ${formatarMoeda(resultados.get(pedido.id)!.preco!)}`
+                                          : ""}
+                                        {resultados.get(pedido.id)!.protocolo
+                                          ? ` · ${resultados.get(pedido.id)!.protocolo}`
+                                          : ""}
+                                        .{" "}
+                                        <span className="text-muted-foreground">
+                                          Escolhido por ser o {resultados.get(pedido.id)!.motivo}.
+                                          Pague e imprima lá, junto com os outros pedidos do dia.
+                                        </span>
+                                      </>
+                                    ) : (
+                                      resultados.get(pedido.id)!.mensagem
+                                    )}
+                                  </div>
+                                )}
+
                                 {cotacoes.has(pedido.id) && (
                                   <div className="mb-4">
                                     <p className="text-xs font-semibold text-muted-foreground mb-2">
@@ -490,13 +688,10 @@ export default function EnviosPage() {
                                       </p>
                                     ) : (
                                       <>
-                                        {enviados.has(pedido.id) && (
-                                          <div className="mb-3 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm">
-                                            Enviado para o carrinho do Melhor Envio via{" "}
-                                            <strong>{enviados.get(pedido.id)}</strong>. Pague e
-                                            imprima lá, junto com os outros pedidos do dia.
-                                          </div>
-                                        )}
+                                        <p className="text-xs text-muted-foreground mb-2">
+                                          Você não precisa escolher: o botão Enviar já usa o frete
+                                          que o cliente pagou. Isto aqui é só para trocar.
+                                        </p>
 
                                         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                                           {cotacoes.get(pedido.id)!.opcoes.map((o) => (
@@ -611,6 +806,15 @@ export default function EnviosPage() {
                                       {pedido.cliente.telefone ?? "sem telefone"}
                                       {pedido.cliente.email ? ` · ${pedido.cliente.email}` : ""}
                                     </p>
+                                    {pedido.fretePago && (
+                                      <p className="text-sm text-muted-foreground mt-2">
+                                        Frete que o cliente escolheu:{" "}
+                                        <span className="text-foreground">
+                                          {pedido.fretePago.titulo ?? "sem nome"}
+                                        </span>{" "}
+                                        · {formatarMoeda(pedido.fretePago.valor)}
+                                      </p>
+                                    )}
                                   </div>
                                 </div>
                               </TableCell>
