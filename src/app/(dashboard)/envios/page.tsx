@@ -63,12 +63,19 @@ export default function EnviosPage() {
 
   const carregar = useCallback(async () => {
     setCarregando(true);
-    const resultado = await getPedidosParaEnvio({ busca: buscaAplicada || undefined });
-    setPedidos(resultado.pedidos);
-    setErro(resultado.erro);
-    setSemIntegracao(resultado.semIntegracao);
-    setSelecionados(new Set());
-    setCarregando(false);
+    try {
+      const resultado = await getPedidosParaEnvio({ busca: buscaAplicada || undefined });
+      setPedidos(resultado.pedidos);
+      setErro(resultado.erro);
+      setSemIntegracao(resultado.semIntegracao);
+      setSelecionados(new Set());
+    } catch {
+      // queda de rede ou deploy novo no meio da chamada
+      setPedidos([]);
+      setErro("Não foi possível falar com o servidor. Tente atualizar.");
+    } finally {
+      setCarregando(false);
+    }
   }, [buscaAplicada]);
 
   useEffect(() => {
@@ -242,10 +249,28 @@ export default function EnviosPage() {
                       <TableRow>
                         <TableCell colSpan={9} className="text-center py-12">
                           <PackageCheck className="w-8 h-8 mx-auto mb-3 text-muted-foreground" />
-                          <p className="font-medium">Nenhum pedido aguardando envio</p>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            Assim que entrar uma venda paga, ela aparece aqui.
-                          </p>
+                          {buscaAplicada ? (
+                            <>
+                              <p className="font-medium">
+                                Nenhum pedido encontrado para “{buscaAplicada}”
+                              </p>
+                              <Button
+                                variant="link"
+                                size="sm"
+                                className="mt-1"
+                                onClick={() => setBusca("")}
+                              >
+                                Limpar busca
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <p className="font-medium">Nenhum pedido aguardando envio</p>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                Assim que entrar uma venda paga, ela aparece aqui.
+                              </p>
+                            </>
+                          )}
                         </TableCell>
                       </TableRow>
                     )}
@@ -398,10 +423,14 @@ export default function EnviosPage() {
                                         : ""}
                                     </p>
                                     <p className="text-sm">
-                                      {[pedido.destino.cidade, pedido.destino.uf]
+                                      {[
+                                        [pedido.destino.cidade, pedido.destino.uf]
+                                          .filter(Boolean)
+                                          .join("/"),
+                                        formatarCep(pedido.destino.cep),
+                                      ]
                                         .filter(Boolean)
-                                        .join("/")}{" "}
-                                      · {formatarCep(pedido.destino.cep)}
+                                        .join(" · ")}
                                     </p>
                                     <p className="text-sm text-muted-foreground mt-1">
                                       {pedido.cliente.telefone ?? "sem telefone"}

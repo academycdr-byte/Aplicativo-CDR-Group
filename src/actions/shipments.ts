@@ -144,8 +144,17 @@ function extrairPeso(
   itens: ItemDoPedido[],
   totalPecas: number
 ): { gramas: number; estimado: boolean } {
-  const somado = itens.reduce((acumulado, i) => acumulado + i.gramas * i.quantidade, 0);
-  if (somado > 0) return { gramas: Math.round(somado), estimado: false };
+  if (itens.length > 0) {
+    // Item sem peso cadastrado entra pelo padrão, e o pedido inteiro passa a
+    // contar como estimado: peso a menos é o que gera cobrança extra na postagem.
+    let algumSemPeso = false;
+    const somado = itens.reduce((acumulado, i) => {
+      const unitario = i.gramas > 0 ? i.gramas : ((algumSemPeso = true), PESO_PADRAO_GRAMAS);
+      return acumulado + unitario * i.quantidade;
+    }, 0);
+
+    if (somado > 0) return { gramas: Math.round(somado), estimado: algumSemPeso };
+  }
 
   const total = numero(pedido.total_weight);
   if (total > 0) return { gramas: Math.round(total), estimado: false };
@@ -275,7 +284,13 @@ export async function getPedidosParaEnvio(params?: {
     return { pedidos: [], erro: "Sessão expirada. Entre de novo.", semIntegracao: false };
   }
 
-  const limite = params?.limite ?? 100;
+  // Server action é endpoint público: o limite não pode vir cru do cliente,
+  // senão dá para pedir dezenas de milhares de pedidos com o JSON inteiro.
+  const LIMITE_MAXIMO = 200;
+  const limitePedido = Math.trunc(Number(params?.limite ?? 100));
+  const limite = Number.isFinite(limitePedido)
+    ? Math.min(Math.max(limitePedido, 1), LIMITE_MAXIMO)
+    : 100;
 
   try {
     // Sem Shopify conectada a lista viria vazia e pareceria "não tem pedido",
