@@ -2,6 +2,13 @@
 
 import { prisma } from "@/lib/prisma";
 import { getSessionWithOrg } from "@/lib/session";
+import {
+  cotarFrete,
+  contaConfigurada,
+  MelhorEnvioError,
+  type OpcaoFrete,
+  type FreteIndisponivel,
+} from "@/lib/integrations/melhor-envio";
 
 /**
  * Módulo de Envios — Etapa 1 (leitura)
@@ -351,5 +358,114 @@ export async function getPedidosParaEnvio(params?: {
       erro: "Não foi possível carregar os pedidos agora.",
       semIntegracao: false,
     };
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Cotação de frete
+ * ------------------------------------------------------------------ */
+
+export type CotacaoDoPedido = {
+  pedidoId: string;
+  numero: string;
+  opcoes: OpcaoFrete[];
+  indisponiveis: FreteIndisponivel[];
+  erro: string | null;
+};
+
+/** Uma camisa embalada. Vira configuração por loja quando houver mais de uma. */
+const CAIXA_PADRAO = { comprimentoCm: 17, larguraCm: 12, alturaCm: 4 };
+
+/** Teto de pedidos por vez, para não estourar limite de chamada da API. */
+const MAXIMO_POR_COTACAO = 20;
+
+/**
+ * Cota o frete dos pedidos escolhidos. Cotação não gasta saldo: só consulta preço.
+ * Cada pedido é cotado separadamente porque o destino muda.
+ */
+export async function cotarPedidos(
+  pedidoIds: string[]
+): Promise<{ cotacoes: CotacaoDoPedido[]; erro: string | null }> {
+  const ctx = await getSessionWithOrg();
+  if (!ctx) return { cotacoes: [], erro: "Sessão expirada. Entre de novo." };
+
+  if (!Array.isArray(pedidoIds) || pedidoIds.length === 0) {
+    return { cotacoes: [], erro: "Selecione ao menos um pedido." };
+  }
+
+  if (!contaConfigurada()) {
+    return {
+      cotacoes: [],
+      erro: "Conta do Melhor Envio ainda não configurada neste ambiente.",
+    };
+  }
+
+  const ids = pedidoIds.slice(0, MAXIMO_POR_COTACAO);
+
+  try {
+    const registros = await prisma.order.findMany({
+      where: { id: { in: ids }, organizationId: ctx.organization.id },
+      select: {
+        id: true,
+        externalOrderId: true,
+        orderDate: true,
+        customerName: true,
+        customerEmail: true,
+        totalAmount: true,
+        rawData: true,
+      },
+    });
+
+    const pedidos = registros
+      .map((r) => normalizar({ ...r, totalAmount: r.totalAmount }))
+      .filter((p): p is PedidoParaEnvio => p !== null);
+
+    const cotacoes = await Promise.all(
+      pedidos.map(async (pedido): Promise<CotacaoDoPedido> => {
+        if (!pedido.destino.cep) {
+          return {
+            pedidoId: pedido.id,
+            numero: pedido.numero,
+            opcoes: [],
+            indisponiveis: [],
+            erro: "Pedido sem CEP de entrega.",
+          };
+        }
+
+        try {
+          const { opcoes, indisponiveis } = await cotarFrete({
+            cepDestino: pedido.destino.cep,
+            pacote: {
+              pesoGramas: pedido.pesoGramas,
+              ...CAIXA_PADRAO,
+              valorSegurado: pedido.valorTotal,
+            },
+          });
+          return {
+            pedidoId: pedido.id,
+            numero: pedido.numero,
+            opcoes,
+            indisponiveis,
+            erro: null,
+          };
+        } catch (e) {
+          const mensagem =
+            e instanceof MelhorEnvioError ? e.message : "Falha ao cotar este pedido.";
+          console.error("[envios] falha ao cotar", pedido.numero, e);
+          return {
+            pedidoId: pedido.id,
+            numero: pedido.numero,
+            opcoes: [],
+            indisponiveis: [],
+            erro: mensagem,
+          };
+        }
+      })
+    );
+
+    return { cotacoes, erro: null };
+  } catch (e) {
+    console.error("[envios] falha geral na cotação", e);
+    return { cotacoes: [], erro: "Não foi possível cotar agora." };
   }
 }

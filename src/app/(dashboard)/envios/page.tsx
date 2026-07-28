@@ -32,7 +32,12 @@ import {
   Truck,
   X,
 } from "lucide-react";
-import { getPedidosParaEnvio, type PedidoParaEnvio } from "@/actions/shipments";
+import {
+  cotarPedidos,
+  getPedidosParaEnvio,
+  type CotacaoDoPedido,
+  type PedidoParaEnvio,
+} from "@/actions/shipments";
 
 const formatarMoeda = (valor: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(valor);
@@ -60,6 +65,34 @@ export default function EnviosPage() {
   const [buscaAplicada, setBuscaAplicada] = useState("");
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [expandido, setExpandido] = useState<string | null>(null);
+  const [cotacoes, setCotacoes] = useState<Map<string, CotacaoDoPedido>>(new Map());
+  const [cotando, setCotando] = useState(false);
+  const [erroCotacao, setErroCotacao] = useState<string | null>(null);
+
+  const cotar = async () => {
+    setCotando(true);
+    setErroCotacao(null);
+    try {
+      const ids = Array.from(selecionados);
+      const resultado = await cotarPedidos(ids);
+      if (resultado.erro) {
+        setErroCotacao(resultado.erro);
+      } else {
+        setCotacoes((atual) => {
+          const proximo = new Map(atual);
+          resultado.cotacoes.forEach((c) => proximo.set(c.pedidoId, c));
+          return proximo;
+        });
+        // abre o primeiro cotado para o resultado não ficar escondido
+        const primeiro = resultado.cotacoes[0];
+        if (primeiro) setExpandido(primeiro.pedidoId);
+      }
+    } catch {
+      setErroCotacao("Não foi possível falar com o servidor.");
+    } finally {
+      setCotando(false);
+    }
+  };
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -192,17 +225,19 @@ export default function EnviosPage() {
                 <span className="text-sm text-muted-foreground">
                   {selecionados.size} selecionado{selecionados.size > 1 ? "s" : ""}
                 </span>
-                <Button size="sm" disabled title="Disponível na próxima etapa">
-                  <Truck className="w-4 h-4 mr-2" />
-                  Cotar frete
+                <Button size="sm" onClick={cotar} disabled={cotando}>
+                  <Truck className={`w-4 h-4 mr-2 ${cotando ? "animate-pulse" : ""}`} />
+                  {cotando ? "Cotando..." : "Cotar frete"}
                 </Button>
               </div>
             )}
           </div>
 
-          {erro && (
+          {(erro || erroCotacao) && (
             <Card className="border-destructive/40 shadow-none rounded-[20px]">
-              <CardContent className="pt-6 text-sm text-destructive">{erro}</CardContent>
+              <CardContent className="pt-6 text-sm text-destructive">
+                {erro ?? erroCotacao}
+              </CardContent>
             </Card>
           )}
 
@@ -348,6 +383,15 @@ export default function EnviosPage() {
 
                             <TableCell>
                               <div className="flex flex-col gap-1 items-start">
+                                {cotacoes.get(pedido.id)?.opcoes[0] && (
+                                  <Badge
+                                    variant="secondary"
+                                    className="bg-primary/10 text-primary hover:bg-primary/20 font-semibold"
+                                  >
+                                    frete{" "}
+                                    {formatarMoeda(cotacoes.get(pedido.id)!.opcoes[0].preco)}
+                                  </Badge>
+                                )}
                                 {pedido.pendencias.length === 0 ? (
                                   <Badge className="bg-emerald-500 hover:bg-emerald-600 border-transparent">
                                     Pronto
@@ -391,6 +435,69 @@ export default function EnviosPage() {
                           {expandido === pedido.id && (
                             <TableRow className="bg-muted/20">
                               <TableCell colSpan={9} className="py-4">
+                                {cotacoes.has(pedido.id) && (
+                                  <div className="mb-4">
+                                    <p className="text-xs font-semibold text-muted-foreground mb-2">
+                                      Opções de frete
+                                    </p>
+                                    {cotacoes.get(pedido.id)!.erro ? (
+                                      <p className="text-sm text-destructive">
+                                        {cotacoes.get(pedido.id)!.erro}
+                                      </p>
+                                    ) : (
+                                      <>
+                                        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                                          {cotacoes.get(pedido.id)!.opcoes.map((o) => (
+                                            <div
+                                              key={o.id}
+                                              className="flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2"
+                                            >
+                                              <div className="min-w-0">
+                                                <p className="text-sm font-medium truncate">
+                                                  {o.transportadora} {o.servico}
+                                                </p>
+                                                <p className="text-xs text-muted-foreground">
+                                                  {o.prazoDias
+                                                    ? `${o.prazoDias} dia${o.prazoDias > 1 ? "s" : ""} úteis`
+                                                    : "prazo não informado"}
+                                                </p>
+                                              </div>
+                                              <p className="text-sm font-semibold whitespace-nowrap">
+                                                {formatarMoeda(o.preco)}
+                                              </p>
+                                            </div>
+                                          ))}
+                                        </div>
+
+                                        {cotacoes.get(pedido.id)!.indisponiveis.length > 0 && (
+                                          <details className="mt-2">
+                                            <summary className="text-xs text-muted-foreground cursor-pointer">
+                                              {cotacoes.get(pedido.id)!.indisponiveis.length}{" "}
+                                              transportadora
+                                              {cotacoes.get(pedido.id)!.indisponiveis.length > 1
+                                                ? "s"
+                                                : ""}{" "}
+                                              não atende
+                                            </summary>
+                                            <ul className="mt-1 space-y-0.5">
+                                              {cotacoes
+                                                .get(pedido.id)!
+                                                .indisponiveis.map((i, idx) => (
+                                                  <li
+                                                    key={`${i.transportadora}-${idx}`}
+                                                    className="text-xs text-muted-foreground"
+                                                  >
+                                                    {i.transportadora} {i.servico}: {i.motivo}
+                                                  </li>
+                                                ))}
+                                            </ul>
+                                          </details>
+                                        )}
+                                      </>
+                                    )}
+                                  </div>
+                                )}
+
                                 <div className="grid gap-4 md:grid-cols-2">
                                   <div>
                                     <p className="text-xs font-semibold text-muted-foreground mb-2">
