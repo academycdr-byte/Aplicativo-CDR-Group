@@ -16,6 +16,7 @@ import {
   Calculator,
   Layers,
   Target,
+  Truck,
   LogOut,
   type LucideIcon,
 } from "lucide-react";
@@ -76,6 +77,7 @@ export function Sidebar() {
     ];
 
     const platformNavItems: NavItem[] = [
+      { name: "Envios", href: "/envios", icon: Truck },
       { name: "Mais Vendidos", href: "/best-sellers", icon: ShoppingBag },
       { name: "Anúncios", href: "/ads", icon: Megaphone },
       { name: "Esteira Criativos", href: "/esteira-criativos", icon: Layers },

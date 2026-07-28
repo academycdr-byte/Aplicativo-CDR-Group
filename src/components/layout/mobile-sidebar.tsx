@@ -16,6 +16,7 @@ import {
   Calculator,
   Layers,
   Target,
+  Truck,
   type LucideIcon,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -54,6 +55,7 @@ export function MobileSidebar() {
   ];
 
   const platformNavItems: NavItem[] = [
+    { name: "Envios", href: "/envios", icon: Truck },
     { name: "Mais Vendidos", href: "/best-sellers", icon: ShoppingBag },
     { name: "Anúncios", href: "/ads", icon: Megaphone },
     { name: "Esteira Criativos", href: "/esteira-criativos", icon: Layers },
