@@ -7,6 +7,7 @@ import {
   contaConfigurada,
   consultarSaldo,
   enviarParaCarrinho,
+  envioJaNoCarrinho,
   MelhorEnvioError,
   type OpcaoFrete,
   type FreteIndisponivel,
@@ -540,7 +541,23 @@ export async function enviarPedidoParaMelhorEnvio(params: {
       pedido.destino.complemento
     );
 
-    const saldo = await consultarSaldo();
+    const marca = `Pedido ${pedido.numero}`;
+
+    const jaEnviado = await envioJaNoCarrinho(marca);
+    if (jaEnviado) {
+      return {
+        ok: false,
+        mensagem: `O pedido ${pedido.numero} já está no carrinho do Melhor Envio (${jaEnviado}). Pague por lá para não gerar etiqueta em dobro.`,
+      };
+    }
+
+    // O saldo é só um aviso: se a consulta falhar, o envio continua.
+    let saldoDisponivel: number | null = null;
+    try {
+      saldoDisponivel = (await consultarSaldo()).disponivel;
+    } catch {
+      saldoDisponivel = null;
+    }
 
     const resultado = await enviarParaCarrinho({
       servicoId: params.servicoId,
@@ -565,12 +582,12 @@ export async function enviarPedidoParaMelhorEnvio(params: {
       })),
       pesoGramas: pedido.pesoGramas,
       valorSegurado: pedido.valorTotal,
-      observacao: `Pedido ${pedido.numero}`,
+      observacao: marca,
       ...CAIXA_PADRAO,
     });
 
     const aviso =
-      saldo.disponivel <= 0
+      saldoDisponivel !== null && saldoDisponivel <= 0
         ? " Atenção: seu saldo no Melhor Envio está zerado, então será preciso recarregar antes de pagar."
         : "";
 

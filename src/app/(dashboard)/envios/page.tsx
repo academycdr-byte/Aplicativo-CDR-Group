@@ -89,9 +89,12 @@ export default function EnviosPage() {
       if (r.ok) {
         setEnviados((atual) => {
           const proximo = new Map(atual);
-          proximo.set(pedido.id, `${opcao.transportadora} ${opcao.servico}`);
+          const protocolo = r.protocolo ? ` · ${r.protocolo}` : "";
+          proximo.set(pedido.id, `${opcao.transportadora} ${opcao.servico}${protocolo}`);
           return proximo;
         });
+        // o aviso de saldo zerado vem junto da confirmação e precisa aparecer
+        if (/atenção/i.test(r.mensagem)) setErroCotacao(r.mensagem);
       } else {
         setErroCotacao(r.mensagem);
       }

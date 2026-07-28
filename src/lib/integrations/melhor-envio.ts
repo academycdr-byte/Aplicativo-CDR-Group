@@ -368,6 +368,28 @@ async function buscarAgencia(
   }
 }
 
+type ItemCarrinho = {
+  id?: string;
+  protocol?: string;
+  to?: { note?: string };
+};
+
+/**
+ * Procura no carrinho um envio já criado para este pedido. Sem isso, dois
+ * cliques viram duas etiquetas pagas para a mesma encomenda.
+ * A marca é a observação que gravamos no envio ("Pedido #1013").
+ */
+export async function envioJaNoCarrinho(marca: string): Promise<string | null> {
+  try {
+    const resposta = await chamar<ItemCarrinho[] | { data?: ItemCarrinho[] }>("/me/cart");
+    const itens = Array.isArray(resposta) ? resposta : (resposta?.data ?? []);
+    const achado = itens.find((i) => (i.to?.note ?? "").trim() === marca.trim());
+    return achado ? (achado.protocol ?? achado.id ?? "sim") : null;
+  } catch {
+    return null; // na dúvida, deixa seguir: melhor um aviso do que travar o envio
+  }
+}
+
 export type DestinatarioEnvio = {
   nome: string;
   telefone: string | null;
