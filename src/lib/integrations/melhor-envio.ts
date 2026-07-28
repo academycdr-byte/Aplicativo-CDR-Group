@@ -19,6 +19,9 @@ const USER_AGENT = "CDR Group Envios (dev@cdrgroup.com)";
 /** Dimensões mínimas aceitas pelos Correios, em centímetros. */
 const MINIMO = { comprimento: 16, largura: 11, altura: 2 };
 
+/** Teto por chamada, para uma indisponibilidade deles não travar a tela. */
+const TEMPO_LIMITE_MS = 20_000;
+
 export type PacoteCotacao = {
   /** peso total em gramas */
   pesoGramas: number;
@@ -101,20 +104,29 @@ async function chamar<T>(
 ): Promise<T> {
   const { metodo = "GET", corpo } = opcoes;
 
+  // Fora do try: falta de token é erro de configuração e precisa chegar com a
+  // mensagem certa, não disfarçado de "servidor fora do ar".
+  const autorizacao = `Bearer ${token()}`;
+  const url = `${baseUrl()}${caminho}`;
+
   let resposta: Response;
   try {
-    resposta = await fetch(`${baseUrl()}${caminho}`, {
+    resposta = await fetch(url, {
       method: metodo,
       headers: {
-        Authorization: `Bearer ${token()}`,
+        Authorization: autorizacao,
         Accept: "application/json",
         "Content-Type": "application/json",
         "User-Agent": USER_AGENT,
       },
       body: corpo ? JSON.stringify(corpo) : undefined,
       cache: "no-store",
+      signal: AbortSignal.timeout(TEMPO_LIMITE_MS),
     });
-  } catch {
+  } catch (e) {
+    if (e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")) {
+      throw new MelhorEnvioError("O Melhor Envio demorou demais para responder.");
+    }
     throw new MelhorEnvioError("Não foi possível falar com o Melhor Envio.");
   }
 
