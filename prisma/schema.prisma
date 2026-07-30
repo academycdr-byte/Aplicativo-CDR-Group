@@ -136,7 +136,8 @@ model Organization {
   actionPlans     ActionPlan[]
 
   // Envios
-  shipmentContacts ShipmentContact[]
+  shipmentContacts     ShipmentContact[]
+  melhorEnvioShipments MelhorEnvioShipment[]
 
   @@map("organizations")
 }
@@ -170,6 +171,33 @@ model ShipmentContact {
 
   @@index([organizationId])
   @@map("shipment_contacts")
+}
+
+/// Registro de que um pedido já foi mandado pro carrinho do Melhor Envio.
+/// Existe porque a única proteção contra duplicidade era consultar o
+/// carrinho ao vivo (GET /me/cart) — o que falha assim que o item sai de
+/// lá (pago/impresso), deixando um segundo clique criar um envio duplicado.
+/// A marca aqui sobrevive a reload e não depende do estado local da tela.
+model MelhorEnvioShipment {
+  id             String   @id @default(cuid())
+  organizationId String
+  /// id do pedido na tabela orders
+  orderId        String   @unique
+
+  /// protocolo/id devolvido pelo Melhor Envio (nem sempre presente)
+  protocolo      String?
+  servico        String
+  transportadora String?
+  preco          Decimal  @db.Decimal(10, 2)
+  enviadoEm      DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("melhor_envio_shipments")
 }
 
 model ProductCost {

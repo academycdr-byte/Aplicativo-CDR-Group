@@ -64,10 +64,21 @@ export type PedidoParaEnvio = {
   pesoGramas: number;
   pesoEstimado: boolean;
   valorTotal: number;
+  /// preenchido quando este pedido já foi mandado pro carrinho do Melhor
+  /// Envio. Vem do banco (sobrevive a reload), não do estado da tela.
+  jaEnviado: JaEnviado | null;
   /// o que impede de gerar a etiqueta
   pendencias: string[];
   /// o que merece atenção mas não impede o envio
   avisos: string[];
+};
+
+export type JaEnviado = {
+  enviadoEm: Date;
+  protocolo: string | null;
+  servico: string;
+  transportadora: string | null;
+  preco: number;
 };
 
 export type FretePago = { titulo: string | null; valor: number };
@@ -87,6 +98,16 @@ function texto(valor: unknown): string | null {
 function numero(valor: unknown): number {
   const n = typeof valor === "number" ? valor : parseFloat(String(valor ?? ""));
   return Number.isFinite(n) ? n : 0;
+}
+
+/**
+ * O Melhor Envio recusa valor monetário com mais de 2 casas decimais (ex.:
+ * 99.50666666666667, que sai de uma divisão sem resto exato). Sem isto todo
+ * pedido cujo valor total não divide certo pela quantidade de peças falha
+ * com "campo unitary_value precisa ser um valor monetário".
+ */
+function arredondarCentavos(valor: number): number {
+  return Math.round(valor * 100) / 100;
 }
 
 /**
@@ -319,6 +340,7 @@ function normalizar(registro: {
     pesoGramas: peso.gramas,
     pesoEstimado: peso.estimado,
     valorTotal: numero(registro.totalAmount),
+    jaEnviado: null,
     pendencias,
     avisos,
   };
@@ -402,6 +424,7 @@ export async function getPedidosParaEnvio(params?: {
       .slice(0, limite);
 
     await aplicarCorrecoes(ctx.organization.id, pedidos);
+    await aplicarJaEnviado(ctx.organization.id, pedidos);
     await completarDocumentos(ctx.organization.id, registros, pedidos);
     recalcularPendencias(pedidos);
 
@@ -454,6 +477,43 @@ async function aplicarCorrecoes(
     }
   } catch (e) {
     console.error("[envios] falha ao aplicar correções", e);
+  }
+}
+
+/**
+ * Marca os pedidos que já têm um envio registrado no banco. Essa marca é o
+ * que sobrevive a um F5: antes disso a única prova de "já enviado" era o
+ * estado da tela (some no reload) ou uma consulta ao vivo no carrinho do
+ * Melhor Envio (some assim que o item é pago/impresso lá dentro).
+ */
+async function aplicarJaEnviado(
+  organizationId: string,
+  pedidos: PedidoParaEnvio[]
+): Promise<void> {
+  if (pedidos.length === 0) return;
+
+  try {
+    const envios = await prisma.melhorEnvioShipment.findMany({
+      where: { organizationId, orderId: { in: pedidos.map((p) => p.id) } },
+    });
+    if (envios.length === 0) return;
+
+    const porPedido = new Map(envios.map((e) => [e.orderId, e]));
+
+    for (const pedido of pedidos) {
+      const e = porPedido.get(pedido.id);
+      if (!e) continue;
+
+      pedido.jaEnviado = {
+        enviadoEm: e.enviadoEm,
+        protocolo: e.protocolo,
+        servico: e.servico,
+        transportadora: e.transportadora,
+        preco: numero(e.preco),
+      };
+    }
+  } catch (e) {
+    console.error("[envios] falha ao aplicar marca de já enviado", e);
   }
 }
 
@@ -615,7 +675,7 @@ export async function cotarPedidos(
             pacote: {
               pesoGramas: pedido.pesoGramas,
               ...CAIXA_PADRAO,
-              valorSegurado: pedido.valorTotal,
+              valorSegurado: arredondarCentavos(pedido.valorTotal),
             },
           });
           return {
@@ -839,10 +899,51 @@ async function prepararPedidos(
     .filter((p): p is PedidoParaEnvio => p !== null);
 
   await aplicarCorrecoes(organizationId, pedidos);
+  await aplicarJaEnviado(organizationId, pedidos);
   await completarDocumentos(organizationId, registros, pedidos);
   recalcularPendencias(pedidos);
 
   return pedidos;
+}
+
+/**
+ * Grava no banco que este pedido foi mandado pro carrinho do Melhor Envio.
+ * É o que faz a marca sobreviver a um F5, em vez de depender só do estado
+ * da tela ou de uma consulta ao vivo que some assim que o item é pago.
+ */
+async function registrarEnvio(
+  organizationId: string,
+  pedido: PedidoParaEnvio,
+  opcao: OpcaoFrete,
+  protocolo: string | null
+): Promise<void> {
+  try {
+    await prisma.melhorEnvioShipment.upsert({
+      where: { orderId: pedido.id },
+      create: {
+        orderId: pedido.id,
+        organizationId,
+        protocolo,
+        servico: opcao.servico,
+        transportadora: opcao.transportadora || null,
+        preco: opcao.preco,
+      },
+      update: {
+        protocolo,
+        servico: opcao.servico,
+        transportadora: opcao.transportadora || null,
+        preco: opcao.preco,
+        enviadoEm: new Date(),
+      },
+    });
+  } catch (e) {
+    // Não travar o retorno pro lojista por causa disso: o envio já aconteceu
+    // no Melhor Envio. Mas se este upsert falhar, a marca não fica salva e
+    // o pedido volta a aparecer como não enviado na próxima listagem — a
+    // única rede que sobra aí é a consulta ao vivo envioJaNoCarrinho, que é
+    // justamente a que falha depois que o item é pago/impresso.
+    console.error("[envios] falha ao registrar envio no banco", pedido.numero, e);
+  }
 }
 
 /**
@@ -896,10 +997,12 @@ async function colocarNoCarrinho(
     itens: pedido.itens.map((i) => ({
       nome: i.titulo,
       quantidade: i.quantidade,
-      valorUnitario: Math.max(pedido.valorTotal / Math.max(pedido.totalPecas, 1), 1),
+      valorUnitario: arredondarCentavos(
+        Math.max(pedido.valorTotal / Math.max(pedido.totalPecas, 1), 1)
+      ),
     })),
     pesoGramas: pedido.pesoGramas,
-    valorSegurado: pedido.valorTotal,
+    valorSegurado: arredondarCentavos(pedido.valorTotal),
     observacao: marca,
     ...CAIXA_PADRAO,
   });
@@ -947,7 +1050,12 @@ export type ResultadoDespacho = {
  * e o motivo volta na resposta para o lojista arrumar.
  */
 export async function despacharPedidos(
-  pedidoIds: string[]
+  pedidoIds: string[],
+  opts?: {
+    /// pedidos que o lojista já confirmou reenviar mesmo já tendo um envio
+    /// registrado; qualquer id fora desta lista continua bloqueado
+    forcarReenvioIds?: string[];
+  }
 ): Promise<{ resultados: ResultadoDespacho[]; erro: string | null }> {
   const ctx = await getSessionWithOrg();
   if (!ctx) return { resultados: [], erro: "Sessão expirada. Entre de novo." };
@@ -993,13 +1101,25 @@ export async function despacharPedidos(
           };
         }
 
+        // Despacho em lote nunca reenvia sozinho um pedido que o banco já
+        // marca como enviado: isso era o buraco que deixava um segundo
+        // clique criar uma segunda etiqueta. Só passa quem o lojista marcou
+        // explicitamente para reenviar (forcarReenvioIds), depois de confirmar.
+        if (pedido.jaEnviado && !opts?.forcarReenvioIds?.includes(pedido.id)) {
+          return {
+            ...base,
+            ok: false,
+            mensagem: `Pedido ${pedido.numero} já foi enviado para o Melhor Envio (${pedido.jaEnviado.transportadora ?? ""} ${pedido.jaEnviado.servico}). Use "Reenviar" nesse pedido se quiser mandar de novo mesmo assim.`,
+          };
+        }
+
         try {
           const { opcoes } = await cotarFrete({
             cepDestino: pedido.destino.cep!,
             pacote: {
               pesoGramas: pedido.pesoGramas,
               ...CAIXA_PADRAO,
-              valorSegurado: pedido.valorTotal,
+              valorSegurado: arredondarCentavos(pedido.valorTotal),
             },
           });
 
@@ -1017,6 +1137,10 @@ export async function despacharPedidos(
             escolha.opcao.id,
             escolha.opcao.transportadoraId
           );
+
+          if (envio.ok && !envio.jaEstava) {
+            await registrarEnvio(ctx.organization.id, pedido, escolha.opcao, envio.protocolo);
+          }
 
           return {
             ...base,
@@ -1069,13 +1193,28 @@ export async function despacharPedidos(
 
 /**
  * Envio com o serviço escolhido à mão, para quando o lojista quer trocar a
- * transportadora que o app escolheria sozinho.
+ * transportadora que o app escolheria sozinho, ou para reenviar de propósito
+ * um pedido que o banco já marca como enviado (forcarReenvio).
  */
 export async function enviarPedidoParaMelhorEnvio(params: {
   pedidoId: string;
   servicoId: number;
   transportadoraId: number | null;
-}): Promise<{ ok: boolean; mensagem: string; protocolo?: string | null }> {
+  transportadoraNome?: string;
+  servicoNome?: string;
+  preco?: number;
+  /// true quando o lojista já confirmou que quer mandar de novo mesmo
+  /// sabendo que este pedido já tem um envio registrado
+  forcarReenvio?: boolean;
+}): Promise<{
+  ok: boolean;
+  mensagem: string;
+  protocolo?: string | null;
+  /// true quando a chamada foi bloqueada só porque falta a confirmação de
+  /// reenvio; a tela deve perguntar e chamar de novo com forcarReenvio: true
+  precisaConfirmarReenvio?: boolean;
+  jaEnviadoAntes?: JaEnviado;
+}> {
   const ctx = await getSessionWithOrg();
   if (!ctx) return { ok: false, mensagem: "Sessão expirada. Entre de novo." };
 
@@ -1101,8 +1240,30 @@ export async function enviarPedidoParaMelhorEnvio(params: {
       };
     }
 
+    if (pedido.jaEnviado && !params.forcarReenvio) {
+      return {
+        ok: false,
+        precisaConfirmarReenvio: true,
+        jaEnviadoAntes: pedido.jaEnviado,
+        mensagem: `Este pedido já foi enviado para o Melhor Envio (${pedido.jaEnviado.transportadora ?? ""} ${pedido.jaEnviado.servico}). Confirme se quer mandar de novo mesmo assim.`,
+      };
+    }
+
     const aviso = await avisoDeSaldo();
     const envio = await colocarNoCarrinho(pedido, params.servicoId, params.transportadoraId);
+
+    if (envio.ok && !envio.jaEstava) {
+      const opcao: OpcaoFrete = {
+        id: params.servicoId,
+        transportadoraId: params.transportadoraId,
+        transportadora: params.transportadoraNome ?? "",
+        servico: params.servicoNome ?? "Serviço escolhido manualmente",
+        preco: params.preco ?? 0,
+        prazoDias: null,
+        logoUrl: null,
+      };
+      await registrarEnvio(ctx.organization.id, pedido, opcao, envio.protocolo);
+    }
 
     return {
       ok: envio.ok,

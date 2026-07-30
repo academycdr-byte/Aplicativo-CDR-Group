@@ -102,6 +102,16 @@ function somenteDigitos(valor: string): string {
   return valor.replace(/\D/g, "");
 }
 
+/**
+ * O Melhor Envio recusa campo monetário com mais de 2 casas decimais (erro
+ * "precisa ser um valor monetário"). unitary_value é validado como string no
+ * formato "99.99"; insurance_value aceita number, mas arredondar do mesmo
+ * jeito evita depender de quem chamou já ter arredondado antes.
+ */
+function arredondarCentavos(valor: number): number {
+  return Math.round(valor * 100) / 100;
+}
+
 async function chamar<T>(
   caminho: string,
   opcoes: { metodo?: "GET" | "POST"; corpo?: unknown } = {}
@@ -201,7 +211,7 @@ export async function cotarFrete(params: {
       height: Math.max(p.alturaCm ?? MINIMO.altura, MINIMO.altura),
     },
     options: {
-      insurance_value: p.valorSegurado ?? 0,
+      insurance_value: arredondarCentavos(p.valorSegurado ?? 0),
       receipt: false,
       own_hand: false,
     },
@@ -463,7 +473,9 @@ export async function enviarParaCarrinho(params: {
     products: params.itens.map((i) => ({
       name: i.nome,
       quantity: i.quantidade,
-      unitary_value: i.valorUnitario,
+      // a API valida como string monetária de 2 casas ("99.99"); mandar
+      // number com dízima (ex.: 99.50666666666667) é rejeitado
+      unitary_value: arredondarCentavos(i.valorUnitario).toFixed(2),
     })),
     volumes: [
       {
@@ -474,7 +486,7 @@ export async function enviarParaCarrinho(params: {
       },
     ],
     options: {
-      insurance_value: params.valorSegurado,
+      insurance_value: arredondarCentavos(params.valorSegurado),
       receipt: false,
       own_hand: false,
       reverse: false,
