@@ -6,6 +6,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -80,6 +88,10 @@ export default function EnviosPage() {
   const [resultados, setResultados] = useState<Map<string, ResultadoDespacho>>(new Map());
   const [sincronizando, setSincronizando] = useState(false);
   const [avisoSincronia, setAvisoSincronia] = useState<string | null>(null);
+  /// pedido aguardando confirmação de reenvio (já tem envio registrado no banco)
+  const [confirmarReenvio, setConfirmarReenvio] = useState<
+    { pedido: PedidoParaEnvio; executar: () => void } | null
+  >(null);
 
   const guardarResultados = (lista: ResultadoDespacho[]) => {
     setResultados((atual) => {
@@ -94,12 +106,12 @@ export default function EnviosPage() {
    * clique só: o app cota, repete o serviço que ele pagou e manda para o
    * carrinho do Melhor Envio.
    */
-  const despachar = async (ids: string[]) => {
+  const despachar = async (ids: string[], forcarReenvioIds?: string[]) => {
     if (ids.length === 0) return;
     setDespachando(new Set(ids));
     setErroCotacao(null);
     try {
-      const r = await despacharPedidos(ids);
+      const r = await despacharPedidos(ids, forcarReenvioIds ? { forcarReenvioIds } : undefined);
       if (r.erro) {
         setErroCotacao(r.erro);
         return;
@@ -127,10 +139,20 @@ export default function EnviosPage() {
     }
   };
 
+  /**
+   * Reenvio de propósito de um pedido que o banco já marca como enviado.
+   * Passa só depois do lojista confirmar no dialog: é a trava que faltava
+   * para não sair uma segunda etiqueta por um clique sem querer.
+   */
+  const pedirConfirmacaoDeReenvio = (pedido: PedidoParaEnvio, executar: () => void) => {
+    setConfirmarReenvio({ pedido, executar });
+  };
+
   /** Envio com transportadora escolhida à mão, quando o lojista quer trocar. */
   const enviarParaMelhorEnvio = async (
     pedido: PedidoParaEnvio,
-    opcao: { id: number; transportadoraId: number | null; transportadora: string; servico: string; preco: number }
+    opcao: { id: number; transportadoraId: number | null; transportadora: string; servico: string; preco: number },
+    forcarReenvio = false
   ) => {
     const chave = `${pedido.id}-${opcao.id}`;
     setEnviando(chave);
@@ -140,7 +162,23 @@ export default function EnviosPage() {
         pedidoId: pedido.id,
         servicoId: opcao.id,
         transportadoraId: opcao.transportadoraId,
+        transportadoraNome: opcao.transportadora,
+        servicoNome: opcao.servico,
+        preco: opcao.preco,
+        forcarReenvio,
       });
+      if (r.precisaConfirmarReenvio) {
+        setEnviando(null);
+        // r.jaEnviadoAntes vem fresco do banco: pedido (closure) pode estar
+        // desatualizado se este envio aconteceu sem um reload da lista.
+        const pedidoParaDialog = r.jaEnviadoAntes
+          ? { ...pedido, jaEnviado: r.jaEnviadoAntes }
+          : pedido;
+        pedirConfirmacaoDeReenvio(pedidoParaDialog, () =>
+          enviarParaMelhorEnvio(pedido, opcao, true)
+        );
+        return;
+      }
       if (r.ok) {
         guardarResultados([
           {
@@ -562,7 +600,7 @@ export default function EnviosPage() {
 
                             <TableCell>
                               <div className="flex flex-col gap-1 items-start">
-                                {resultados.get(pedido.id)?.ok && (
+                                {(resultados.get(pedido.id)?.ok || pedido.jaEnviado) && (
                                   <Badge className="bg-emerald-600 hover:bg-emerald-700 border-transparent">
                                     <PackageCheck className="w-3 h-3 mr-1" />
                                     No carrinho
@@ -621,6 +659,28 @@ export default function EnviosPage() {
                                 <span className="text-xs text-muted-foreground">
                                   {resultados.get(pedido.id)!.servico ?? "já estava lá"}
                                 </span>
+                              ) : pedido.jaEnviado ? (
+                                <div className="flex items-center justify-end gap-2">
+                                  <span className="text-xs text-muted-foreground text-right leading-tight">
+                                    já enviado
+                                    <br />
+                                    {formatarData(pedido.jaEnviado.enviadoEm)}
+                                  </span>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8"
+                                    disabled={despachando.size > 0}
+                                    onClick={() =>
+                                      pedirConfirmacaoDeReenvio(pedido, () =>
+                                        despachar([pedido.id], [pedido.id])
+                                      )
+                                    }
+                                    title="Este pedido já foi enviado para o Melhor Envio. Confirme se quer mandar de novo."
+                                  >
+                                    Reenviar
+                                  </Button>
+                                </div>
                               ) : pedido.pendencias.length > 0 ? (
                                 <TooltipProvider>
                                   <Tooltip>
@@ -693,6 +753,24 @@ export default function EnviosPage() {
                                     ) : (
                                       resultados.get(pedido.id)!.mensagem
                                     )}
+                                  </div>
+                                )}
+
+                                {!resultados.has(pedido.id) && pedido.jaEnviado && (
+                                  <div className="mb-4 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm">
+                                    Enviado para o carrinho do Melhor Envio em{" "}
+                                    <strong>{formatarData(pedido.jaEnviado.enviadoEm)}</strong> por{" "}
+                                    <strong>
+                                      {pedido.jaEnviado.transportadora} {pedido.jaEnviado.servico}
+                                    </strong>
+                                    {pedido.jaEnviado.protocolo
+                                      ? ` · ${pedido.jaEnviado.protocolo}`
+                                      : ""}
+                                    .{" "}
+                                    <span className="text-muted-foreground">
+                                      Se precisar mandar de novo, use o botão Reenviar (pede
+                                      confirmação, para não sair etiqueta duplicada).
+                                    </span>
                                   </div>
                                 )}
 
@@ -856,6 +934,47 @@ export default function EnviosPage() {
           onSalvo={carregar}
         />
       )}
+
+      <Dialog
+        open={confirmarReenvio !== null}
+        onOpenChange={(v) => !v && setConfirmarReenvio(null)}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reenviar pedido {confirmarReenvio?.pedido.numero}?</DialogTitle>
+            <DialogDescription>
+              {confirmarReenvio?.pedido.jaEnviado ? (
+                <>
+                  Este pedido já foi enviado para o Melhor Envio em{" "}
+                  <strong>{formatarData(confirmarReenvio.pedido.jaEnviado.enviadoEm)}</strong> por{" "}
+                  <strong>
+                    {confirmarReenvio.pedido.jaEnviado.transportadora}{" "}
+                    {confirmarReenvio.pedido.jaEnviado.servico}
+                  </strong>
+                  . Se aquele envio já foi pago ou impresso, mandar de novo cria uma segunda
+                  etiqueta paga para o mesmo pedido. Confirme só se tiver certeza de que precisa
+                  mesmo de um novo envio.
+                </>
+              ) : (
+                "Este pedido já foi enviado antes. Confirme se quer mandar de novo mesmo assim."
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmarReenvio(null)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                confirmarReenvio?.executar();
+                setConfirmarReenvio(null);
+              }}
+            >
+              Reenviar mesmo assim
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
