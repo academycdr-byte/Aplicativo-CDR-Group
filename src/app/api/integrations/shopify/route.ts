@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { decrypt } from "@/lib/encryption";
 import { getShopifyAuthUrl, generateOAuthState } from "@/lib/integrations/shopify";
+import { contaConfigurada } from "@/lib/integrations/melhor-envio";
 import { cookies } from "next/headers";
 
 // GET /api/integrations/shopify?shop=minha-loja.myshopify.com
@@ -73,7 +74,15 @@ export async function GET(request: NextRequest) {
       path: "/",
     });
 
-    const authUrl = getShopifyAuthUrl(domain, redirectUri, state, clientId);
+    // Loja que despacha pela tela de Envios também precisa deixar o app dar
+    // baixa no pedido com o rastreio; as demais seguem só com leitura.
+    const usaEnvios =
+      contaConfigurada() &&
+      (await prisma.melhorEnvioShipment.count({ where: { organizationId } })) > 0;
+
+    const authUrl = getShopifyAuthUrl(domain, redirectUri, state, clientId, {
+      comBaixaDePedidos: usaEnvios,
+    });
     console.log("[Shopify OAuth] Redirecting to:", authUrl);
 
     return NextResponse.redirect(authUrl);

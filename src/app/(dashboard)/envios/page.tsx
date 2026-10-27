@@ -44,6 +44,7 @@ import {
 import { EditarEntrega } from "./editar-entrega";
 import {
   atualizarPedidosParaEnvio,
+  conferirRastreiosAgora,
   cotarPedidos,
   despacharPedidos,
   enviarPedidoParaMelhorEnvio,
@@ -52,6 +53,7 @@ import {
   type PedidoParaEnvio,
   type ResultadoDespacho,
 } from "@/actions/shipments";
+import type { ResumoRastreio } from "@/lib/rastreio-envios";
 
 const formatarMoeda = (valor: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(valor);
@@ -92,6 +94,14 @@ export default function EnviosPage() {
   const [confirmarReenvio, setConfirmarReenvio] = useState<
     { pedido: PedidoParaEnvio; executar: () => void } | null
   >(null);
+  const [rastreio, setRastreio] = useState<ResumoRastreio | null>(null);
+  const [conferindoRastreio, setConferindoRastreio] = useState(false);
+  /**
+   * Pedidos que ganharam baixa com rastreio nesta visita. A sincronia com a
+   * Shopify pode terminar depois e ainda trazê-los como não despachados, então
+   * toda lista que chega passa por este filtro.
+   */
+  const baixadosAgora = useRef<Set<string>>(new Set());
 
   const guardarResultados = (lista: ResultadoDespacho[]) => {
     setResultados((atual) => {
@@ -243,7 +253,7 @@ export default function EnviosPage() {
     try {
       const resultado = await getPedidosParaEnvio({ busca: buscaAplicada || undefined });
       if (minhaVez !== requisicao.current) return;
-      setPedidos(resultado.pedidos);
+      setPedidos(resultado.pedidos.filter((p) => !baixadosAgora.current.has(p.id)));
       setErro(resultado.erro);
       setSemIntegracao(resultado.semIntegracao);
       setSelecionados(new Set());
@@ -269,7 +279,7 @@ export default function EnviosPage() {
     try {
       const resultado = await atualizarPedidosParaEnvio({ busca: buscaAplicada || undefined });
       if (minhaVez !== requisicao.current) return;
-      setPedidos(resultado.pedidos);
+      setPedidos(resultado.pedidos.filter((p) => !baixadosAgora.current.has(p.id)));
       setErro(resultado.erro);
       setSemIntegracao(resultado.semIntegracao);
       setAvisoSincronia(resultado.avisoDeSincronia);
@@ -284,9 +294,34 @@ export default function EnviosPage() {
     }
   }, [buscaAplicada]);
 
-  // ao abrir a tela já busca as vendas novas, sem esperar clique
+  /**
+   * Etiqueta já gerada no Melhor Envio vira baixa na Shopify com o código de
+   * rastreio. O cron faz isso a cada 30 minutos; aqui roda na hora para a
+   * fila abrir em dia, e quem ganhou baixa sai da lista sem esperar a sincronia.
+   */
+  const conferirRastreio = useCallback(async () => {
+    setConferindoRastreio(true);
+    try {
+      const r = await conferirRastreiosAgora();
+      if (!r) return;
+      setRastreio(r);
+      if (r.baixados.length > 0) {
+        const baixados = baixadosAgora.current;
+        r.baixados.forEach((b) => baixados.add(b.pedidoId));
+        setPedidos((atual) => atual.filter((p) => !baixados.has(p.id)));
+        setSelecionados((atual) => new Set([...atual].filter((id) => !baixados.has(id))));
+      }
+    } catch {
+      // o cron confere de novo em até 30 minutos; a tela segue funcionando
+    } finally {
+      setConferindoRastreio(false);
+    }
+  }, []);
+
+  // ao abrir a tela já busca as vendas novas e confere os rastreios, sem esperar clique
   useEffect(() => {
     atualizar();
+    conferirRastreio();
     // de propósito só na montagem: trocar a busca não precisa falar com a Shopify
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -389,6 +424,72 @@ export default function EnviosPage() {
               </CardContent>
             </Card>
           </div>
+
+          {rastreio && (
+            <Card
+              className={`shadow-none rounded-[20px] border ${
+                rastreio.semPermissaoShopify ? "border-amber-500/40" : "border-border"
+              }`}
+            >
+              <CardContent className="pt-6 flex items-start justify-between gap-4 flex-wrap">
+                <div className="flex items-start gap-3 min-w-0 flex-1">
+                  <PackageCheck
+                    className={`w-5 h-5 mt-0.5 shrink-0 ${
+                      rastreio.semPermissaoShopify ? "text-amber-600" : "text-emerald-600"
+                    }`}
+                  />
+                  <div className="text-sm space-y-1 min-w-0">
+                    <p className="font-medium">Rastreio automático</p>
+                    {rastreio.semPermissaoShopify ? (
+                      <p className="text-amber-700">
+                        A Shopify ainda não deixa o app dar baixa nos pedidos. Reconecte a Shopify em{" "}
+                        <Link href="/integrations" className="underline">
+                          Integrações
+                        </Link>{" "}
+                        para o código de rastreio ir sozinho.
+                      </p>
+                    ) : rastreio.baixados.length > 0 ? (
+                      <p className="text-muted-foreground">
+                        {rastreio.baixados.length === 1
+                          ? `O pedido ${rastreio.baixados[0].numero} ganhou baixa na Shopify com o código de rastreio agora e saiu da fila.`
+                          : `${rastreio.baixados.length} pedidos ganharam baixa na Shopify com o código de rastreio agora e saíram da fila: ${rastreio.baixados
+                              .map((b) => b.numero)
+                              .join(", ")}.`}{" "}
+                        O cliente recebe o e-mail de envio.
+                      </p>
+                    ) : (
+                      <p className="text-muted-foreground">
+                        Quando a etiqueta é gerada no Melhor Envio, o código vai sozinho para a Shopify e o
+                        cliente recebe o e-mail de envio.
+                      </p>
+                    )}
+                    {rastreio.aguardandoEtiqueta > 0 && !rastreio.semPermissaoShopify && (
+                      <p className="text-muted-foreground">
+                        {rastreio.aguardandoEtiqueta === 1
+                          ? "1 pedido no Melhor Envio ainda está sem etiqueta gerada."
+                          : `${rastreio.aguardandoEtiqueta} pedidos no Melhor Envio ainda estão sem etiqueta gerada.`}
+                      </p>
+                    )}
+                    {rastreio.problemas.slice(0, 3).map((p, i) => (
+                      <p key={i} className="text-amber-700">
+                        {p.numero ? `${p.numero}: ` : ""}
+                        {p.mensagem}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={conferirRastreio}
+                  disabled={conferindoRastreio}
+                >
+                  <RefreshCw className={`w-4 h-4 mr-2 ${conferindoRastreio ? "animate-spin" : ""}`} />
+                  {conferindoRastreio ? "Conferindo..." : "Conferir agora"}
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
           <div className="flex items-center gap-3 flex-wrap">
             <div className="relative flex-1 min-w-[240px] max-w-sm">

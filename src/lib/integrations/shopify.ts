@@ -7,18 +7,31 @@ import crypto from "crypto";
 const SHOPIFY_API_VERSION = "2025-01";
 const SHOPIFY_GRAPHQL_VERSION = "2025-10"; // Required for ShopifyQL sessions dataset
 const SHOPIFY_SCOPES = "read_orders,read_products,read_customers,read_reports";
+/**
+ * Dar baixa no pedido com o rastreio do Melhor Envio. Só é pedido para loja
+ * que usa a tela de Envios: o app do Dev Dashboard de cada loja precisa ter
+ * esse escopo declarado, e pedir escopo que o app não tem trava a conexão
+ * das outras lojas.
+ */
+export const SHOPIFY_SCOPE_BAIXA = "write_merchant_managed_fulfillment_orders";
 
 /**
  * Gera a URL de autorizacao OAuth do Shopify (Authorization Code Grant).
  * O usuario e redirecionado para esta URL para autorizar o app.
  */
-export function getShopifyAuthUrl(shop: string, redirectUri: string, state: string, clientId?: string): string {
+export function getShopifyAuthUrl(
+  shop: string,
+  redirectUri: string,
+  state: string,
+  clientId?: string,
+  opcoes?: { comBaixaDePedidos?: boolean }
+): string {
   const id = clientId?.trim() || process.env.SHOPIFY_CLIENT_ID?.trim();
   if (!id) throw new Error("SHOPIFY_CLIENT_ID não configurado");
 
   const params = new URLSearchParams({
     client_id: id,
-    scope: SHOPIFY_SCOPES,
+    scope: opcoes?.comBaixaDePedidos ? `${SHOPIFY_SCOPES},${SHOPIFY_SCOPE_BAIXA}` : SHOPIFY_SCOPES,
     redirect_uri: redirectUri,
     state,
   });
@@ -1332,4 +1345,199 @@ export async function fetchShopifyOrderDocuments(
   }
 
   return encontrados;
+}
+
+export type RastreioDoPedido = {
+  numero: string;
+  transportadora: string | null;
+  url: string | null;
+};
+
+/**
+ * "nada_a_fazer" cobre pedido já processado (à mão ou numa rodada anterior) e
+ * pedido cancelado: não é erro, só não sobrou nada para despachar.
+ */
+export type ResultadoBaixa = {
+  resultado: "baixado" | "nada_a_fazer" | "sem_permissao" | "erro";
+  mensagem: string;
+};
+
+type RespostaGraphql<T> = {
+  data?: T;
+  errors?: { message?: string; extensions?: { code?: string } }[];
+};
+
+function semPermissao(erros: RespostaGraphql<unknown>["errors"]): boolean {
+  return (erros ?? []).some(
+    (e) => e.extensions?.code === "ACCESS_DENIED" || /access denied/i.test(e.message ?? "")
+  );
+}
+
+const MENSAGEM_SEM_PERMISSAO =
+  "A conexão com a Shopify não tem permissão para dar baixa nos pedidos. Reconecte a Shopify em Integrações.";
+
+type PedidoParaBaixa = {
+  order: {
+    cancelledAt: string | null;
+    fulfillmentOrders: {
+      nodes: {
+        id: string;
+        status: string;
+        lineItems: { nodes: { remainingQuantity: number }[] };
+      }[];
+    };
+  } | null;
+};
+
+/**
+ * Dá baixa no pedido na Shopify com o código de rastreio, e a Shopify manda o
+ * e-mail de envio para o cliente. É o mesmo "marcar como processado" que a
+ * equipe fazia à mão, digitando o código que copiava do Melhor Envio.
+ *
+ * A trava contra baixa dobrada é a própria Shopify: só entram os itens que
+ * ainda faltam despachar, então rodar de novo num pedido já processado não
+ * cria um segundo envio nem um segundo e-mail.
+ */
+export async function marcarPedidoComoEnviado(
+  organizationId: string,
+  externalOrderId: string,
+  rastreio: RastreioDoPedido
+): Promise<ResultadoBaixa> {
+  const integration = await prisma.integration.findUnique({
+    where: { organizationId_platform: { organizationId, platform: "SHOPIFY" } },
+    select: { accessToken: true, externalStoreId: true, scopes: true },
+  });
+
+  if (!integration?.accessToken || !integration.externalStoreId) {
+    return { resultado: "erro", mensagem: "Loja Shopify não conectada." };
+  }
+
+  // a conexão guarda os escopos que a loja aprovou: sem o de baixa, nem tenta
+  if (integration.scopes && !integration.scopes.split(",").map((s) => s.trim()).includes(SHOPIFY_SCOPE_BAIXA)) {
+    return { resultado: "sem_permissao", mensagem: MENSAGEM_SEM_PERMISSAO };
+  }
+
+  const accessToken = decrypt(integration.accessToken);
+  const url = `https://${integration.externalStoreId}/admin/api/${SHOPIFY_GRAPHQL_VERSION}/graphql.json`;
+
+  async function graphql<T>(query: string, variables: Record<string, unknown>): Promise<RespostaGraphql<T>> {
+    const resposta = await fetch(url, {
+      method: "POST",
+      headers: { "X-Shopify-Access-Token": accessToken, "Content-Type": "application/json" },
+      body: JSON.stringify({ query, variables }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (resposta.status === 401 || resposta.status === 403) {
+      return { errors: [{ message: "access denied", extensions: { code: "ACCESS_DENIED" } }] };
+    }
+    if (!resposta.ok) {
+      throw new Error(`A Shopify respondeu ${resposta.status}.`);
+    }
+    return (await resposta.json()) as RespostaGraphql<T>;
+  }
+
+  const consulta = `
+    query($id: ID!) {
+      order(id: $id) {
+        cancelledAt
+        fulfillmentOrders(first: 20) {
+          nodes {
+            id
+            status
+            lineItems(first: 100) { nodes { remainingQuantity } }
+          }
+        }
+      }
+    }`;
+
+  /** Remessas que ainda têm item para despachar. */
+  async function remessasAbertas(): Promise<{
+    ids: string[];
+    retidas: number;
+    resposta: RespostaGraphql<PedidoParaBaixa>;
+  }> {
+    const resposta = await graphql<PedidoParaBaixa>(consulta, {
+      id: `gid://shopify/Order/${externalOrderId}`,
+    });
+    const nos = (resposta.data?.order?.fulfillmentOrders?.nodes ?? []).filter((n) =>
+      n.lineItems.nodes.some((l) => l.remainingQuantity > 0)
+    );
+    const ids = nos
+      .filter((n) => n.status === "OPEN" || n.status === "IN_PROGRESS")
+      .map((n) => n.id);
+    // pedido "em espera" na Shopify não aceita baixa até alguém liberar
+    const retidas = nos.filter((n) => n.status === "ON_HOLD").length;
+    return { ids, retidas, resposta };
+  }
+
+  try {
+    const { ids, retidas, resposta } = await remessasAbertas();
+
+    if (semPermissao(resposta.errors)) {
+      return { resultado: "sem_permissao", mensagem: MENSAGEM_SEM_PERMISSAO };
+    }
+    if (!resposta.data?.order) {
+      return { resultado: "erro", mensagem: "Pedido não encontrado na Shopify." };
+    }
+    if (resposta.data.order.cancelledAt) {
+      return { resultado: "nada_a_fazer", mensagem: "Pedido cancelado na Shopify." };
+    }
+    if (ids.length === 0 && retidas > 0) {
+      return {
+        resultado: "erro",
+        mensagem: "O pedido está em espera na Shopify. Libere o pedido lá para o código ir sozinho.",
+      };
+    }
+    if (ids.length === 0) {
+      return { resultado: "nada_a_fazer", mensagem: "O pedido já estava processado na Shopify." };
+    }
+
+    const mutacao = `
+      mutation($fulfillment: FulfillmentInput!) {
+        fulfillmentCreate(fulfillment: $fulfillment) {
+          fulfillment { id }
+          userErrors { message }
+        }
+      }`;
+
+    const r = await graphql<{
+      fulfillmentCreate: { fulfillment: { id: string } | null; userErrors: { message: string }[] } | null;
+    }>(mutacao, {
+      fulfillment: {
+        lineItemsByFulfillmentOrder: ids.map((id) => ({ fulfillmentOrderId: id })),
+        trackingInfo: {
+          number: rastreio.numero,
+          ...(rastreio.transportadora ? { company: rastreio.transportadora } : {}),
+          ...(rastreio.url ? { url: rastreio.url } : {}),
+        },
+        notifyCustomer: true,
+      },
+    });
+
+    if (semPermissao(r.errors)) {
+      return { resultado: "sem_permissao", mensagem: MENSAGEM_SEM_PERMISSAO };
+    }
+
+    const errosDeUso = r.data?.fulfillmentCreate?.userErrors ?? [];
+    if (r.data?.fulfillmentCreate?.fulfillment && errosDeUso.length === 0) {
+      return { resultado: "baixado", mensagem: "Baixa dada com o código de rastreio." };
+    }
+
+    // Outra rodada (ou a equipe) pode ter processado no meio do caminho: se não
+    // sobrou nada em aberto, o pedido está como deveria e não é erro.
+    const depois = await remessasAbertas();
+    if (depois.resposta.data?.order && depois.ids.length === 0) {
+      return { resultado: "nada_a_fazer", mensagem: "O pedido já estava processado na Shopify." };
+    }
+
+    const motivo =
+      errosDeUso.map((e) => e.message).join("; ") ||
+      (r.errors ?? []).map((e) => e.message).filter(Boolean).join("; ") ||
+      "a Shopify não confirmou";
+    return { resultado: "erro", mensagem: `Não deu para dar baixa: ${motivo}.` };
+  } catch (e) {
+    const motivo = e instanceof Error && e.name !== "TimeoutError" ? e.message : "a Shopify demorou demais";
+    return { resultado: "erro", mensagem: `Não deu para falar com a Shopify: ${motivo}` };
+  }
 }

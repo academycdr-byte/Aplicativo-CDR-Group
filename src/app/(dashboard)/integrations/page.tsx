@@ -761,6 +761,13 @@ function IntegrationsContent() {
                           Contas
                         </Button>
                       )}
+                      {platform.platform === "SHOPIFY" && (
+                        // troca o app do Dev Dashboard ou aprova permissão nova sem desconectar a loja
+                        <Button variant="outline" size="sm" onClick={() => openConnect(platform)}>
+                          <Link2 className="w-4 h-4 mr-1" />
+                          Reconectar
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
                         size="sm"

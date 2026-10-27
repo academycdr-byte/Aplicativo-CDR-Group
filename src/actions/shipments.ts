@@ -2,6 +2,8 @@
 
 import { prisma } from "@/lib/prisma";
 import { getSessionWithOrg } from "@/lib/session";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { conferirRastreios, type ResumoRastreio } from "@/lib/rastreio-envios";
 import { fetchShopifyOrderDocuments, syncShopifyOrders } from "@/lib/integrations/shopify";
 import {
   cotarFrete,
@@ -862,6 +864,33 @@ export async function atualizarPedidosParaEnvio(params?: { busca?: string }): Pr
 
   const lista = await getPedidosParaEnvio({ busca: params?.busca });
   return { ...lista, avisoDeSincronia };
+}
+
+/**
+ * Confere na hora se as etiquetas dos pedidos mandados pro Melhor Envio já
+ * foram geradas e dá baixa na Shopify com o código. O cron faz o mesmo a cada
+ * 30 minutos; aqui é para a tela já abrir com a fila em dia.
+ * Volta null quando não há nada para mostrar (conta do Melhor Envio não
+ * configurada, cliques demais em seguida ou falha, que o cron cobre depois).
+ */
+export async function conferirRastreiosAgora(): Promise<ResumoRastreio | null> {
+  const ctx = await getSessionWithOrg();
+  if (!ctx) return null;
+
+  // server action é endpoint público: clique repetido não pode virar rajada
+  // de consultas contra o Melhor Envio
+  if (!checkRateLimit(`rastreio:${ctx.organization.id}`, 6, 60_000).allowed) return null;
+
+  try {
+    const resumo = await conferirRastreios({
+      organizationId: ctx.organization.id,
+      orcamentoMs: 20_000,
+    });
+    return resumo.ativo ? resumo : null;
+  } catch (e) {
+    console.error("[envios] falha ao conferir rastreios", e);
+    return null;
+  }
 }
 
 /** Campos do pedido que o módulo de envios precisa ler do banco. */
