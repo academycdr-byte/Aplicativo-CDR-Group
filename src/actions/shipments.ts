@@ -869,7 +869,7 @@ export async function atualizarPedidosParaEnvio(params?: { busca?: string }): Pr
 /**
  * Confere na hora se as etiquetas dos pedidos mandados pro Melhor Envio já
  * foram geradas e dá baixa na Shopify com o código. O cron faz o mesmo a cada
- * 30 minutos; aqui é para a tela já abrir com a fila em dia.
+ * 5 minutos; aqui é para a tela já abrir com a fila em dia.
  * Volta null quando não há nada para mostrar (conta do Melhor Envio não
  * configurada, cliques demais em seguida ou falha, que o cron cobre depois).
  */
