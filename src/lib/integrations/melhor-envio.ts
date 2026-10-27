@@ -515,3 +515,99 @@ export function contaConfigurada(): boolean {
     : process.env.MELHOR_ENVIO_TOKEN;
   return Boolean(t && (process.env.MELHOR_ENVIO_CEP_ORIGEM ?? "").replace(/\D/g, "").length === 8);
 }
+
+/* ------------------------------------------------------------------ *
+ * Volta do rastreio: etiqueta gerada lá, código de volta para a loja
+ * ------------------------------------------------------------------ */
+
+type RespostaEtiqueta = {
+  id?: string;
+  protocol?: string | null;
+  status?: string | null;
+  tracking?: string | null;
+  self_tracking?: string | null;
+  generated_at?: string | null;
+  posted_at?: string | null;
+  delivered_at?: string | null;
+  canceled_at?: string | null;
+  expired_at?: string | null;
+  service?: { name?: string | null; company?: { name?: string | null } | null } | null;
+};
+
+export type EtiquetaMelhorEnvio = {
+  id: string;
+  protocolo: string | null;
+  status: string | null;
+  /** código da transportadora (o que o cliente usa para rastrear) */
+  rastreio: string | null;
+  /** código próprio do Melhor Envio, que alguns serviços usam no lugar */
+  rastreioMelhorEnvio: string | null;
+  geradaEm: string | null;
+  canceladaEm: string | null;
+  transportadora: string | null;
+  servico: string | null;
+};
+
+/**
+ * Acha a etiqueta pelo protocolo que o app guardou quando mandou o pedido
+ * para o carrinho. A busca deles também casa CPF e código de rastreio, então
+ * o resultado só vale se o protocolo (ou o id) bater exatamente.
+ */
+export async function buscarEtiqueta(protocoloOuId: string): Promise<EtiquetaMelhorEnvio | null> {
+  const termo = protocoloOuId.trim();
+  if (!termo) return null;
+
+  let resposta: RespostaEtiqueta[] | { data?: RespostaEtiqueta[] };
+  try {
+    resposta = await chamar<RespostaEtiqueta[] | { data?: RespostaEtiqueta[] }>(
+      `/me/orders/search?q=${encodeURIComponent(termo)}`
+    );
+  } catch (e) {
+    // a busca sem resultado volta como erro 400 "Not Found", não como lista vazia
+    if (e instanceof MelhorEnvioError && (e.status === 400 || e.status === 404) && /not found/i.test(e.message)) {
+      return null;
+    }
+    throw e;
+  }
+
+  const lista = Array.isArray(resposta) ? resposta : (resposta?.data ?? []);
+  const achada = lista.find((e) => e.protocol === termo || e.id === termo);
+  if (!achada?.id) return null;
+
+  return {
+    id: achada.id,
+    protocolo: achada.protocol ?? null,
+    status: achada.status ?? null,
+    rastreio: achada.tracking?.trim() || null,
+    rastreioMelhorEnvio: achada.self_tracking?.trim() || null,
+    geradaEm: achada.generated_at ?? achada.posted_at ?? achada.delivered_at ?? null,
+    canceladaEm: achada.canceled_at ?? achada.expired_at ?? null,
+    transportadora: achada.service?.company?.name ?? null,
+    servico: achada.service?.name ?? null,
+  };
+}
+
+/** Situações em que a etiqueta já foi emitida, mesmo sem a data de geração. */
+const STATUS_COM_ETIQUETA = new Set(["generated", "posted", "delivered", "undelivered"]);
+const STATUS_SEM_VALIDADE = new Set(["canceled", "cancelled", "expired"]);
+
+export function etiquetaCancelada(e: EtiquetaMelhorEnvio): boolean {
+  return Boolean(e.canceladaEm) || STATUS_SEM_VALIDADE.has(e.status ?? "");
+}
+
+/**
+ * Código que vai para a loja, ou null enquanto a etiqueta não foi emitida.
+ * Etiqueta só paga ainda pode ser cancelada e trocada, então o código só
+ * conta depois que ela é gerada.
+ */
+export function codigoDeRastreio(e: EtiquetaMelhorEnvio): string | null {
+  if (etiquetaCancelada(e)) return null;
+  const emitida = Boolean(e.geradaEm) || STATUS_COM_ETIQUETA.has(e.status ?? "");
+  if (!emitida) return null;
+  return e.rastreio ?? e.rastreioMelhorEnvio;
+}
+
+/** Página pública do Melhor Rastreio; ela mesma descobre a transportadora pelo código. */
+export function linkDeRastreio(codigo: string): string {
+  return `https://melhorrastreio.com.br/rastreio/${encodeURIComponent(codigo)}`;
+}
