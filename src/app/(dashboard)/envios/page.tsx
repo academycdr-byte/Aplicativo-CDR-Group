@@ -296,7 +296,7 @@ export default function EnviosPage() {
 
   /**
    * Etiqueta já gerada no Melhor Envio vira baixa na Shopify com o código de
-   * rastreio. O cron faz isso a cada 30 minutos; aqui roda na hora para a
+   * rastreio. O cron faz isso a cada 5 minutos; aqui roda na hora para a
    * fila abrir em dia, e quem ganhou baixa sai da lista sem esperar a sincronia.
    */
   const conferirRastreio = useCallback(async () => {
@@ -312,7 +312,7 @@ export default function EnviosPage() {
         setSelecionados((atual) => new Set([...atual].filter((id) => !baixados.has(id))));
       }
     } catch {
-      // o cron confere de novo em até 30 minutos; a tela segue funcionando
+      // o cron confere de novo em até 5 minutos; a tela segue funcionando
     } finally {
       setConferindoRastreio(false);
     }

@@ -4,7 +4,7 @@ import { conferirRastreios } from "@/lib/rastreio-envios";
 export const maxDuration = 60;
 
 /**
- * A cada 30 minutos: pedido mandado pro carrinho do Melhor Envio que já tem
+ * A cada 5 minutos: pedido mandado pro carrinho do Melhor Envio que já tem
  * etiqueta gerada ganha baixa na Shopify com o código de rastreio.
  */
 export async function GET(request: NextRequest) {
