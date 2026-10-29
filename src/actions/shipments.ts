@@ -66,6 +66,8 @@ export type PedidoParaEnvio = {
   pesoGramas: number;
   pesoEstimado: boolean;
   valorTotal: number;
+  /// só os produtos, sem o frete: é o valor declarado ao Melhor Envio
+  valorMercadoria: number;
   /// preenchido quando este pedido já foi mandado pro carrinho do Melhor
   /// Envio. Vem do banco (sobrevive a reload), não do estado da tela.
   jaEnviado: JaEnviado | null;
@@ -172,6 +174,25 @@ function extrairFretePago(pedido: Json): FretePago | null {
   }
 
   return titulo || valor > 0 ? { titulo, valor } : null;
+}
+
+/**
+ * Valor do que vai dentro da caixa: os produtos, já com desconto, sem o frete.
+ * É o que se declara ao Melhor Envio (seguro e declaração de conteúdo). Usar
+ * o total do pedido somava o frete à mercadoria, e um pedido de R$ 960 em
+ * camisas com R$ 40 de frete passava do teto de R$ 1.000 que Buslog, Loggi e
+ * JeT aceitam sem nota fiscal (erro E-CRT-0001 no carrinho).
+ */
+function extrairValorMercadoria(
+  pedido: Json,
+  valorTotal: number,
+  fretePago: FretePago | null
+): number {
+  // o subtotal da Shopify já vem com desconto e sem frete; o current_ ainda
+  // acompanha edição e reembolso feitos depois da compra
+  const subtotal = numero(pedido.current_subtotal_price ?? pedido.subtotal_price);
+  if (subtotal > 0) return subtotal;
+  return Math.max(valorTotal - (fretePago?.valor ?? 0), 0);
 }
 
 function extrairTelefone(pedido: Json): string | null {
@@ -298,6 +319,8 @@ function normalizar(registro: {
   const documento = extrairDocumento(pedido);
   const telefone = extrairTelefone(pedido);
   const cep = texto(endereco?.zip);
+  const fretePago = extrairFretePago(pedido);
+  const valorTotal = numero(registro.totalAmount);
 
   const pendencias: string[] = [];
   if (!endereco) pendencias.push("Pedido sem endereço de entrega");
@@ -336,12 +359,13 @@ function normalizar(registro: {
       cep,
     },
     corrigido: false,
-    fretePago: extrairFretePago(pedido),
+    fretePago,
     itens,
     totalPecas,
     pesoGramas: peso.gramas,
     pesoEstimado: peso.estimado,
-    valorTotal: numero(registro.totalAmount),
+    valorTotal,
+    valorMercadoria: extrairValorMercadoria(pedido, valorTotal, fretePago),
     jaEnviado: null,
     pendencias,
     avisos,
@@ -677,7 +701,7 @@ export async function cotarPedidos(
             pacote: {
               pesoGramas: pedido.pesoGramas,
               ...CAIXA_PADRAO,
-              valorSegurado: arredondarCentavos(pedido.valorTotal),
+              valorSegurado: arredondarCentavos(pedido.valorMercadoria),
             },
           });
           return {
@@ -1027,11 +1051,11 @@ async function colocarNoCarrinho(
       nome: i.titulo,
       quantidade: i.quantidade,
       valorUnitario: arredondarCentavos(
-        Math.max(pedido.valorTotal / Math.max(pedido.totalPecas, 1), 1)
+        Math.max(pedido.valorMercadoria / Math.max(pedido.totalPecas, 1), 1)
       ),
     })),
     pesoGramas: pedido.pesoGramas,
-    valorSegurado: arredondarCentavos(pedido.valorTotal),
+    valorSegurado: arredondarCentavos(pedido.valorMercadoria),
     observacao: marca,
     ...CAIXA_PADRAO,
   });
@@ -1148,7 +1172,7 @@ export async function despacharPedidos(
             pacote: {
               pesoGramas: pedido.pesoGramas,
               ...CAIXA_PADRAO,
-              valorSegurado: arredondarCentavos(pedido.valorTotal),
+              valorSegurado: arredondarCentavos(pedido.valorMercadoria),
             },
           });
 
