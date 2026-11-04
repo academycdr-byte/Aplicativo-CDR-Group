@@ -10,6 +10,7 @@ import {
   contaConfigurada,
   consultarSaldo,
   enviarParaCarrinho,
+  formatarReais,
   envioJaNoCarrinho,
   MelhorEnvioError,
   type OpcaoFrete,
@@ -1006,14 +1007,23 @@ async function registrarEnvio(
 async function colocarNoCarrinho(
   pedido: PedidoParaEnvio,
   servicoId: number,
-  transportadoraId: number | null
-): Promise<{ ok: boolean; mensagem: string; protocolo: string | null; jaEstava: boolean }> {
+  transportadoraId: number | null,
+  frete?: { seguroMaximo: number | null; transportadora: string }
+): Promise<{
+  ok: boolean;
+  mensagem: string;
+  protocolo: string | null;
+  jaEstava: boolean;
+  /// teto de seguro aplicado no lugar do valor da mercadoria, quando houve
+  seguradoAte: number | null;
+}> {
   if (!pedido.destino.cep || !pedido.destino.cidade || !pedido.destino.uf) {
     return {
       ok: false,
       mensagem: "Endereço de entrega incompleto neste pedido.",
       protocolo: null,
       jaEstava: false,
+      seguradoAte: null,
     };
   }
 
@@ -1027,6 +1037,7 @@ async function colocarNoCarrinho(
       ok: true,
       protocolo: jaEnviado,
       jaEstava: true,
+      seguradoAte: null,
       mensagem: `O pedido ${pedido.numero} já estava no carrinho do Melhor Envio (${jaEnviado}), então não foi mandado de novo.`,
     };
   }
@@ -1056,15 +1067,24 @@ async function colocarNoCarrinho(
     })),
     pesoGramas: pedido.pesoGramas,
     valorSegurado: arredondarCentavos(pedido.valorMercadoria),
+    seguroMaximo: frete?.seguroMaximo ?? null,
     observacao: marca,
     ...CAIXA_PADRAO,
   });
+
+  // "Atenção:" na mensagem faz a tela mostrar o aviso no alto, como já faz
+  // com o saldo zerado.
+  const avisoSeguro =
+    resultado.seguradoAte !== null
+      ? ` Atenção: ${frete?.transportadora || "esta transportadora"} só segura até ${formatarReais(resultado.seguradoAte)} sem nota fiscal, então o valor declarado foi limitado a esse teto (a mercadoria vale ${formatarReais(pedido.valorMercadoria)}).`
+      : "";
 
   return {
     ok: true,
     protocolo: resultado.protocolo,
     jaEstava: false,
-    mensagem: `Pedido ${pedido.numero} enviado para o carrinho do Melhor Envio.`,
+    seguradoAte: resultado.seguradoAte,
+    mensagem: `Pedido ${pedido.numero} enviado para o carrinho do Melhor Envio.${avisoSeguro}`,
   };
 }
 
@@ -1092,6 +1112,9 @@ export type ResultadoDespacho = {
   protocolo: string | null;
   /// já estava no carrinho antes deste clique, então nada foi criado agora
   jaEstava: boolean;
+  /// valor declarado foi limitado a este teto da transportadora (sem nota
+  /// fiscal); null quando foi declarado o valor cheio da mercadoria
+  seguradoAte: number | null;
 };
 
 /**
@@ -1144,6 +1167,7 @@ export async function despacharPedidos(
           motivo: null,
           protocolo: null,
           jaEstava: false,
+          seguradoAte: null,
         };
 
         if (pedido.pendencias.length > 0) {
@@ -1188,7 +1212,11 @@ export async function despacharPedidos(
           const envio = await colocarNoCarrinho(
             pedido,
             escolha.opcao.id,
-            escolha.opcao.transportadoraId
+            escolha.opcao.transportadoraId,
+            {
+              seguroMaximo: escolha.opcao.seguroMaximo,
+              transportadora: escolha.opcao.transportadora,
+            }
           );
 
           if (envio.ok && !envio.jaEstava) {
@@ -1207,6 +1235,7 @@ export async function despacharPedidos(
             motivo: envio.ok && !envio.jaEstava ? escolha.motivo : null,
             protocolo: envio.protocolo,
             jaEstava: envio.jaEstava,
+            seguradoAte: envio.seguradoAte,
           };
         } catch (e) {
           const mensagem =
@@ -1232,6 +1261,7 @@ export async function despacharPedidos(
         motivo: null,
         protocolo: null,
         jaEstava: false,
+        seguradoAte: null,
         mensagem: ids.includes(id)
           ? "Este pedido não pôde ser preparado para envio. Atualize a lista e tente de novo."
           : `Só dá para enviar ${MAXIMO_POR_DESPACHO} por vez. Este ficou de fora, é só selecionar e enviar de novo.`,
@@ -1256,6 +1286,8 @@ export async function enviarPedidoParaMelhorEnvio(params: {
   transportadoraNome?: string;
   servicoNome?: string;
   preco?: number;
+  /// teto de seguro sem nota da opção escolhida, como veio na cotação
+  seguroMaximo?: number | null;
   /// true quando o lojista já confirmou que quer mandar de novo mesmo
   /// sabendo que este pedido já tem um envio registrado
   forcarReenvio?: boolean;
@@ -1263,6 +1295,7 @@ export async function enviarPedidoParaMelhorEnvio(params: {
   ok: boolean;
   mensagem: string;
   protocolo?: string | null;
+  seguradoAte?: number | null;
   /// true quando a chamada foi bloqueada só porque falta a confirmação de
   /// reenvio; a tela deve perguntar e chamar de novo com forcarReenvio: true
   precisaConfirmarReenvio?: boolean;
@@ -1303,7 +1336,11 @@ export async function enviarPedidoParaMelhorEnvio(params: {
     }
 
     const aviso = await avisoDeSaldo();
-    const envio = await colocarNoCarrinho(pedido, params.servicoId, params.transportadoraId);
+    const seguroMaximo = typeof params.seguroMaximo === "number" ? params.seguroMaximo : null;
+    const envio = await colocarNoCarrinho(pedido, params.servicoId, params.transportadoraId, {
+      seguroMaximo,
+      transportadora: params.transportadoraNome ?? "",
+    });
 
     if (envio.ok && !envio.jaEstava) {
       const opcao: OpcaoFrete = {
@@ -1314,6 +1351,7 @@ export async function enviarPedidoParaMelhorEnvio(params: {
         preco: params.preco ?? 0,
         prazoDias: null,
         logoUrl: null,
+        seguroMaximo,
       };
       await registrarEnvio(ctx.organization.id, pedido, opcao, envio.protocolo);
     }
@@ -1321,6 +1359,7 @@ export async function enviarPedidoParaMelhorEnvio(params: {
     return {
       ok: envio.ok,
       protocolo: envio.protocolo,
+      seguradoAte: envio.seguradoAte,
       mensagem: envio.ok ? envio.mensagem + aviso : envio.mensagem,
     };
   } catch (e) {
