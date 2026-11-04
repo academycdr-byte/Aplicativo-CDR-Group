@@ -161,7 +161,14 @@ export default function EnviosPage() {
   /** Envio com transportadora escolhida à mão, quando o lojista quer trocar. */
   const enviarParaMelhorEnvio = async (
     pedido: PedidoParaEnvio,
-    opcao: { id: number; transportadoraId: number | null; transportadora: string; servico: string; preco: number },
+    opcao: {
+      id: number;
+      transportadoraId: number | null;
+      transportadora: string;
+      servico: string;
+      preco: number;
+      seguroMaximo?: number | null;
+    },
     forcarReenvio = false
   ) => {
     const chave = `${pedido.id}-${opcao.id}`;
@@ -175,6 +182,7 @@ export default function EnviosPage() {
         transportadoraNome: opcao.transportadora,
         servicoNome: opcao.servico,
         preco: opcao.preco,
+        seguroMaximo: opcao.seguroMaximo ?? null,
         forcarReenvio,
       });
       if (r.precisaConfirmarReenvio) {
@@ -201,6 +209,7 @@ export default function EnviosPage() {
             motivo: "foi você que escolheu",
             protocolo: r.protocolo ?? null,
             jaEstava: false,
+            seguradoAte: r.seguradoAte ?? null,
           },
         ]);
         // o aviso de saldo zerado vem junto da confirmação e precisa aparecer
@@ -850,6 +859,18 @@ export default function EnviosPage() {
                                             : ""}
                                           Pague e imprima lá, junto com os outros pedidos do dia.
                                         </span>
+                                        {resultados.get(pedido.id)!.seguradoAte !== null && (
+                                          <span className="block mt-1 text-amber-700 dark:text-amber-400">
+                                            Segurado só até{" "}
+                                            <strong>
+                                              {formatarMoeda(resultados.get(pedido.id)!.seguradoAte!)}
+                                            </strong>
+                                            : é o máximo que essa transportadora aceita sem nota
+                                            fiscal. A mercadoria vale{" "}
+                                            {formatarMoeda(pedido.valorMercadoria)}, então se o
+                                            pacote extraviar a cobertura é menor.
+                                          </span>
+                                        )}
                                       </>
                                     ) : (
                                       resultados.get(pedido.id)!.mensagem

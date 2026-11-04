@@ -40,6 +40,15 @@ export type OpcaoFrete = {
   preco: number;
   prazoDias: number | null;
   logoUrl: string | null;
+  /**
+   * Maior valor que esta transportadora aceita segurar num envio SEM nota
+   * fiscal (declaração de conteúdo). Vem de restrictions.insurance_value.max_dec
+   * da cotação; null quando a cotação não informa. É bem menor que o teto com
+   * nota (Buslog, Loggi, JeT, Total e LATAM: R$ 1.000; Jadlog: R$ 1.500) e a
+   * cotação não valida: passa na cotação e quebra na hora de ir pro carrinho
+   * (erro E-CRT-0001).
+   */
+  seguroMaximo: number | null;
 };
 
 /** Correios não aceitam agência de postagem no carrinho; as demais exigem. */
@@ -112,6 +121,43 @@ function arredondarCentavos(valor: number): number {
   return Math.round(valor * 100) / 100;
 }
 
+function numero(valor: unknown): number | null {
+  if (typeof valor === "number") return Number.isFinite(valor) ? valor : null;
+  if (typeof valor === "string" && valor.trim()) {
+    const n = parseFloat(valor.replace(",", "."));
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+type RestricoesCotacao = {
+  insurance_value?: { max_dec?: unknown; max?: unknown; min?: unknown } | null;
+} | null;
+
+/** Teto do seguro sem nota fiscal, se a cotação informar. */
+function lerSeguroMaximo(restricoes: RestricoesCotacao | undefined): number | null {
+  const teto = numero(restricoes?.insurance_value?.max_dec);
+  return teto !== null && teto > 0 ? teto : null;
+}
+
+/**
+ * Quando o Melhor Envio recusa o envio por valor segurado acima do teto
+ * ("E-CRT-0001: O valor segurado em envios não comerciais não pode ser maior
+ * que R$ 1.000,00."), a própria mensagem diz o teto. Devolve esse valor para
+ * tentar de novo limitado a ele; null se o erro é outro.
+ */
+export function tetoDoErroDeSeguro(mensagem: string): number | null {
+  if (!/E-CRT-0001|valor segurado/i.test(mensagem)) return null;
+  const m = mensagem.match(/R\$\s*([\d.]+(?:,\d{1,2})?)/);
+  if (!m) return null;
+  const n = parseFloat(m[1].replace(/\./g, "").replace(",", "."));
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+export function formatarReais(valor: number): string {
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(valor);
+}
+
 async function chamar<T>(
   caminho: string,
   opcoes: { metodo?: "GET" | "POST"; corpo?: unknown } = {}
@@ -180,6 +226,7 @@ type RespostaCotacao = {
   delivery_time?: number;
   company?: { id?: number; name?: string; picture?: string };
   error?: string;
+  restrictions?: RestricoesCotacao;
 }[];
 
 /**
@@ -243,6 +290,7 @@ export async function cotarFrete(params: {
       preco,
       prazoDias: item.delivery_time ?? null,
       logoUrl: item.company?.picture ?? null,
+      seguroMaximo: lerSeguroMaximo(item.restrictions),
     });
   }
 
@@ -428,11 +476,24 @@ export async function enviarParaCarrinho(params: {
   itens: ItemEnvio[];
   pesoGramas: number;
   valorSegurado: number;
+  /**
+   * Teto do seguro sem nota fiscal da transportadora escolhida (ver
+   * OpcaoFrete.seguroMaximo). Quando a mercadoria vale mais que isso, o
+   * valor declarado é limitado ao teto: decisão de negócio de 04/11/2026
+   * (loja de atacado sem CNPJ, cobertura menor é preferível a travar o
+   * envio). null = sem teto conhecido.
+   */
+  seguroMaximo?: number | null;
   observacao?: string;
   comprimentoCm?: number;
   larguraCm?: number;
   alturaCm?: number;
-}): Promise<{ id: string; protocolo: string | null }> {
+}): Promise<{
+  id: string;
+  protocolo: string | null;
+  /** teto aplicado ao valor declarado, ou null quando foi o valor cheio */
+  seguradoAte: number | null;
+}> {
   const remetente = await consultarRemetente();
   const d = params.destinatario;
 
@@ -452,61 +513,92 @@ export async function enviarParaCarrinho(params: {
     ? await buscarAgencia(params.transportadoraId, d.cidade, d.uf)
     : null;
 
-  const corpo: Record<string, unknown> = {
-    service: params.servicoId,
-    from: remetente,
-    to: {
-      name: d.nome,
-      phone: (d.telefone ?? "").replace(/\D/g, ""),
-      email: d.email ?? "",
-      document: documentoDestino,
-      address: d.logradouro,
-      complement: d.complemento ?? "",
-      number: d.numero,
-      district: d.bairro,
-      city: d.cidade,
-      state_abbr: d.uf,
-      country_id: "BR",
-      postal_code: d.cep.replace(/\D/g, ""),
-      note: params.observacao ?? "",
-    },
-    products: params.itens.map((i) => ({
-      name: i.nome,
-      quantity: i.quantidade,
-      // a API valida como string monetária de 2 casas ("99.99"); mandar
-      // number com dízima (ex.: 99.50666666666667) é rejeitado
-      unitary_value: arredondarCentavos(i.valorUnitario).toFixed(2),
-    })),
-    volumes: [
-      {
-        height: Math.max(params.alturaCm ?? MINIMO.altura, MINIMO.altura),
-        width: Math.max(params.larguraCm ?? MINIMO.largura, MINIMO.largura),
-        length: Math.max(params.comprimentoCm ?? MINIMO.comprimento, MINIMO.comprimento),
-        weight: Math.max(params.pesoGramas, 1) / 1000,
+  const valorCheio = arredondarCentavos(params.valorSegurado);
+
+  const montarCorpo = (teto: number | null): Record<string, unknown> => {
+    const limitado = teto !== null && teto < valorCheio;
+    const valorSegurado = limitado ? arredondarCentavos(teto) : valorCheio;
+    // A declaração de conteúdo acompanha o valor segurado: os itens são
+    // reduzidos na mesma proporção, arredondando PARA BAIXO, para a soma dos
+    // itens nunca passar do teto.
+    const fator = limitado && valorCheio > 0 ? valorSegurado / valorCheio : 1;
+    const valorItem = (v: number) =>
+      limitado ? Math.max(Math.floor(v * fator * 100) / 100, 0.01) : arredondarCentavos(v);
+
+    return {
+      service: params.servicoId,
+      from: remetente,
+      to: {
+        name: d.nome,
+        phone: (d.telefone ?? "").replace(/\D/g, ""),
+        email: d.email ?? "",
+        document: documentoDestino,
+        address: d.logradouro,
+        complement: d.complemento ?? "",
+        number: d.numero,
+        district: d.bairro,
+        city: d.cidade,
+        state_abbr: d.uf,
+        country_id: "BR",
+        postal_code: d.cep.replace(/\D/g, ""),
+        note: params.observacao ?? "",
       },
-    ],
-    options: {
-      insurance_value: arredondarCentavos(params.valorSegurado),
-      receipt: false,
-      own_hand: false,
-      reverse: false,
-      non_commercial: true, // sem nota fiscal: vai com declaração de conteúdo
-      platform: "CDR Group",
-    },
+      products: params.itens.map((i) => ({
+        name: i.nome,
+        quantity: i.quantidade,
+        // a API valida como string monetária de 2 casas ("99.99"); mandar
+        // number com dízima (ex.: 99.50666666666667) é rejeitado
+        unitary_value: valorItem(i.valorUnitario).toFixed(2),
+      })),
+      volumes: [
+        {
+          height: Math.max(params.alturaCm ?? MINIMO.altura, MINIMO.altura),
+          width: Math.max(params.larguraCm ?? MINIMO.largura, MINIMO.largura),
+          length: Math.max(params.comprimentoCm ?? MINIMO.comprimento, MINIMO.comprimento),
+          weight: Math.max(params.pesoGramas, 1) / 1000,
+        },
+      ],
+      options: {
+        insurance_value: valorSegurado,
+        receipt: false,
+        own_hand: false,
+        reverse: false,
+        non_commercial: true, // sem nota fiscal: vai com declaração de conteúdo
+        platform: "CDR Group",
+      },
+      ...(agencia ? { agency: agencia } : {}),
+    };
   };
 
-  if (agencia) corpo.agency = agencia;
+  const postar = (teto: number | null) =>
+    chamar<{ id?: string; protocol?: string }>("/me/cart", {
+      metodo: "POST",
+      corpo: montarCorpo(teto),
+    });
 
-  const resposta = await chamar<{ id?: string; protocol?: string }>("/me/cart", {
-    metodo: "POST",
-    corpo,
-  });
+  let teto = params.seguroMaximo ?? null;
+  let resposta: { id?: string; protocol?: string };
+  try {
+    resposta = await postar(teto);
+  } catch (e) {
+    // Rede de segurança: se a cotação não trouxe o teto (ou trouxe errado) e
+    // o Melhor Envio recusou por valor segurado, a mensagem dele diz o teto.
+    // Tenta UMA vez mais limitado a ele; qualquer outro erro sobe igual.
+    const tetoDoErro = e instanceof MelhorEnvioError ? tetoDoErroDeSeguro(e.message) : null;
+    if (tetoDoErro === null || tetoDoErro >= (teto ?? valorCheio)) throw e;
+    teto = tetoDoErro;
+    resposta = await postar(teto);
+  }
 
   if (!resposta?.id) {
     throw new MelhorEnvioError("O Melhor Envio não confirmou o envio para o carrinho.");
   }
 
-  return { id: resposta.id, protocolo: resposta.protocol ?? null };
+  return {
+    id: resposta.id,
+    protocolo: resposta.protocol ?? null,
+    seguradoAte: teto !== null && teto < valorCheio ? arredondarCentavos(teto) : null,
+  };
 }
 
 export function contaConfigurada(): boolean {
